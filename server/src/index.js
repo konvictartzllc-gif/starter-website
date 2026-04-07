@@ -12,6 +12,7 @@ import adminRoutes from "./routes/admin.js";
 import userRoutes from "./routes/user.js";
 import dexRoutes from "./routes/dex.js";
 import { initDb } from "./db.js";
+import { initEmailTransporter } from "./email.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +26,9 @@ async function start() {
   if (!process.env.JWT_SECRET) {
     throw new Error("JWT_SECRET is required in environment");
   }
+
+  // Initialize email transporter
+  initEmailTransporter();
 
   const legacyDbPath = path.join(__dirname, "../data/dex.db");
   const dbPath = process.env.DB_PATH || path.join(__dirname, "../data/konvict_artz.db");

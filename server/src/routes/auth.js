@@ -86,13 +86,19 @@ router.post(
     const referralCode = await generateReferralCode(db, username);
     const referredBy = ref ? ref.trim() : null;
 
+    // Calculate trial period: 3 days from now
+    const trialStartedAt = new Date().toISOString();
+    const trialExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
     const result = await db.run(
-      "INSERT INTO users (email, username, password_hash, referral_code, referred_by) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO users (email, username, password_hash, referral_code, referred_by, trial_started_at, trial_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       email.toLowerCase(),
       username,
       password_hash,
       referralCode,
       referredBy,
+      trialStartedAt,
+      trialExpiresAt,
     );
 
     if (referredBy) {

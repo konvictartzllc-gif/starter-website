@@ -7,7 +7,11 @@ const state = {
   works: [],
   deals: [],
   bookings: [],
+  dexChatOpen: false,
+  dexMessages: [],
 };
+
+import { dexVoice } from './voice.js';
 
 // Update these 3 links when your Dex destinations are ready.
 const DEX_LINKS = {
@@ -276,12 +280,12 @@ async function refreshAll() {
     requests.push(api("/api/admin/bookings"));
   }
 
-  const results = await Promise.all(requests);
-  state.products = results[0];
-  state.reviews = results[1];
-  state.works = results[2];
-  state.deals = results[3];
-  state.bookings = state.token ? results[4] : [];
+  const results = await Promise.allSettled(requests);
+  state.products = results[0]?.status === "fulfilled" ? results[0].value : [];
+  state.reviews = results[1]?.status === "fulfilled" ? results[1].value : [];
+  state.works = results[2]?.status === "fulfilled" ? results[2].value : [];
+  state.deals = results[3]?.status === "fulfilled" ? results[3].value : [];
+  state.bookings = state.token && results[4]?.status === "fulfilled" ? results[4].value : [];
   render();
 }
 
@@ -525,6 +529,93 @@ function showDexToast(msg) {
   setTimeout(() => toast.classList.remove("dex-toast-show"), 3500);
 }
 
+// Dex Chat Functions
+function openDexChat() {
+  state.dexChatOpen = true;
+  document.getElementById("dexChatInterface").classList.remove("hidden");
+  document.getElementById("dexChatMessages").innerHTML = '';
+  state.dexMessages = [];
+  
+  if (dexVoice.isSupported()) {
+    startWakeWordListener();
+  }
+}
+
+function closeDexChat() {
+  state.dexChatOpen = false;
+  document.getElementById("dexChatInterface").classList.add("hidden");
+  dexVoice.stop();
+  dexVoice.stopSpeaking();
+}
+
+function addChatMessage(text, sender = 'user') {
+  state.dexMessages.push({ text, sender });
+  const messagesDiv = document.getElementById("dexChatMessages");
+  const msgEl = document.createElement("div");
+  msgEl.className = `dex-chat-message ${sender}`;
+  msgEl.textContent = text;
+  messagesDiv.appendChild(msgEl);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+async function sendDexMessage(message) {
+  if (!message.trim()) return;
+
+  addChatMessage(message, 'user');
+  document.getElementById("dexChatInput").value = '';
+
+  try {
+    const response = await userApi('/dex/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      addChatMessage('Sorry, I encountered an error. Please try again.', 'assistant');
+      return;
+    }
+
+    const data = await response.json();
+    addChatMessage(data.reply, 'assistant');
+    
+    // Read response aloud if supported
+    if (dexVoice.isSupported()) {
+      dexVoice.speak(data.reply);
+    }
+  } catch (error) {
+    console.error('Dex chat error:', error);
+    addChatMessage('Error connecting to Dex. Please try again.', 'assistant');
+  }
+}
+
+function startWakeWordListener() {
+  if (!dexVoice.isSupported()) {
+    showDexToast('Voice recognition not supported in your browser');
+    return;
+  }
+
+  dexVoice.on('onWakeWordDetected', () => {
+    showDexToast('Hey Dex! 🎤 Say your command now...');
+    dexVoice.startUserInput();
+  });
+
+  dexVoice.on('onTranscript', (transcript) => {
+    if (transcript && transcript.trim()) {
+      sendDexMessage(transcript);
+      startWakeWordListener(); // Resume listening for next command
+    }
+  });
+
+  dexVoice.on('onStatusChange', (status) => {
+    const statusEl = document.getElementById("dexVoiceStatus");
+    if (statusEl) {
+      statusEl.textContent = status;
+    }
+  });
+
+  dexVoice.startWakeWordListener();
+}
+
 // ── Dex user auth ─────────────────────────────────────────────────
 document.getElementById("dexTabLogin").addEventListener("click", () => {
   document.getElementById("dexLoginForm").classList.remove("hidden");
@@ -625,7 +716,45 @@ document.getElementById("dexLogoutBtn").addEventListener("click", () => {
   document.getElementById("dexMyBookings").classList.add("hidden");
   stopDexStatsAutoRefresh();
   hideDexCopyStatus();
+  closeDexChat();
   setDexUi();
+});
+
+document.getElementById("dexChatBtn").addEventListener("click", () => {
+  openDexChat();
+});
+
+document.getElementById("dexChatClose").addEventListener("click", () => {
+  closeDexChat();
+});
+
+document.getElementById("dexChatSend").addEventListener("click", () => {
+  const input = document.getElementById("dexChatInput");
+  sendDexMessage(input.value);
+});
+
+document.getElementById("dexChatInput").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    const input = document.getElementById("dexChatInput");
+    sendDexMessage(input.value);
+  }
+});
+
+document.getElementById("dexVoiceToggle").addEventListener("click", () => {
+  if (dexVoice.isListening) {
+    dexVoice.stop();
+    document.getElementById("dexVoiceToggle").classList.remove("active");
+  } else {
+    dexVoice.startUserInput();
+    document.getElementById("dexVoiceToggle").classList.add("active");
+    
+    dexVoice.on('onTranscript', (transcript) => {
+      if (transcript && transcript.trim()) {
+        sendDexMessage(transcript);
+      }
+      document.getElementById("dexVoiceToggle").classList.remove("active");
+    });
+  }
 });
 
 document.getElementById("dexMyBookingsBtn").addEventListener("click", async () => {
@@ -695,5 +824,13 @@ async function init() {
 }
 
 init().catch((err) => {
-  alert(`Could not load data: ${err.message}`);
+  console.error("Initial data load failed:", err);
+  state.products = [];
+  state.reviews = [];
+  state.works = [];
+  state.deals = [];
+  state.bookings = [];
+  render();
+  setDexUi();
+  showDexToast("Some online features are temporarily unavailable.");
 });

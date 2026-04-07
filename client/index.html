@@ -146,9 +146,31 @@
         <p id="dexWelcome" class="meta"></p>
         <div class="dex-user-actions">
           <button id="dexMyBookingsBtn" class="secondary">My Bookings</button>
+          <button id="dexChatBtn" class="secondary">💬 Start Chat</button>
           <button id="dexLogoutBtn" class="secondary">Log Out</button>
         </div>
       </div>
+      
+      <!-- Dex Chat Interface -->
+      <div id="dexChatInterface" class="hidden dex-chat-interface card">
+        <div class="dex-chat-header">
+          <h3>Chat with Dex 🎤</h3>
+          <button id="dexChatClose" class="close-btn">✖</button>
+        </div>
+        <div id="dexChatMessages" class="dex-chat-messages"></div>
+        <div class="dex-chat-input-area">
+          <div class="dex-voice-controls">
+            <button id="dexVoiceToggle" class="voice-toggle">🎤 Click to Speak</button>
+            <span id="dexVoiceStatus" class="voice-status"></span>
+          </div>
+          <div class="dex-text-input">
+            <input id="dexChatInput" type="text" placeholder="Type or say 'Hey Dex' to activate voice..." />
+            <button id="dexChatSend">Send</button>
+          </div>
+          <p class="meta dex-voice-hint">💡 Say "Hey Dex" to activate voice control, or click the microphone button</p>
+        </div>
+      </div>
+      
       <div id="dexReferralCard" class="card dex-referral-card hidden">
         <h3>Referral Dashboard</h3>
         <p class="meta">Share your link. Every signup you refer is tracked live.</p>

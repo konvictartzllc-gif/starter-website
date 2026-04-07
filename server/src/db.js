@@ -110,6 +110,8 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
     "ALTER TABLE users ADD COLUMN free_access INTEGER NOT NULL DEFAULT 0;",
     "ALTER TABLE users ADD COLUMN referrals_count INTEGER NOT NULL DEFAULT 0;",
     "ALTER TABLE users ADD COLUMN paid INTEGER NOT NULL DEFAULT 0;",
+    "ALTER TABLE users ADD COLUMN trial_started_at TEXT;",
+    "ALTER TABLE users ADD COLUMN trial_expires_at TEXT;",
   ];
 
   for (const sql of userMigrations) {

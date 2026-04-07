@@ -16,8 +16,9 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "square": "^39.1.0",
+    "nodemailer": "^8.0.5",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "square": "^39.1.0"
   }
 }
