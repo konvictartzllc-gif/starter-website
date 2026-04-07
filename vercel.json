@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/app.js", "destination": "/client/app.js" },
+    { "source": "/styles.css", "destination": "/client/styles.css" },
+    { "source": "/sw.js", "destination": "/client/sw.js" },
+    { "source": "/manifest.webmanifest", "destination": "/client/manifest.webmanifest" },
+    { "source": "/icons/:path*", "destination": "/client/icons/:path*" },
+    { "source": "/api/:path*", "destination": "https://REPLACE_WITH_BACKEND_DOMAIN/api/:path*" },
+    { "source": "/(.*)", "destination": "/client/index.html" }
+  ]
+}
