@@ -81,6 +81,15 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
       idempotency_key TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS access_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      used INTEGER NOT NULL DEFAULT 0,
+      used_by_user_id INTEGER REFERENCES users(id),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      used_at TEXT
+    );
   `);
 
   // Migration: add user_id column to bookings if it doesn't exist yet.
@@ -112,6 +121,8 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
     "ALTER TABLE users ADD COLUMN paid INTEGER NOT NULL DEFAULT 0;",
     "ALTER TABLE users ADD COLUMN trial_started_at TEXT;",
     "ALTER TABLE users ADD COLUMN trial_expires_at TEXT;",
+    "ALTER TABLE users ADD COLUMN referral_earnings_cents INTEGER NOT NULL DEFAULT 0;",
+    "ALTER TABLE users ADD COLUMN subscribed_referrals_count INTEGER NOT NULL DEFAULT 0;",
   ];
 
   for (const sql of userMigrations) {

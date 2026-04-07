@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -68,7 +68,7 @@
   </section>
 
   <section id="deals">
-    <h2>Special Deals & Events</h2>
+    <h2>Special Deals &amp; Events</h2>
     <div id="dealsList"></div>
     <div id="adminDealForm" class="card hidden">
       <textarea id="dealText" placeholder="Post a new deal/event"></textarea>
@@ -87,6 +87,19 @@
         <button id="clearAllBtn" class="danger">Clear All Data</button>
       </div>
       <p id="adminStatus" class="meta">Status: Logged out</p>
+    </div>
+    <div id="adminCodeGenForm" class="card hidden">
+      <h3>Generate Promoter Access Code</h3>
+      <p class="meta">Generates a one-time code for lifetime Dex access. Optionally send to recipient via email.</p>
+      <input id="codeRecipientEmail" type="email" placeholder="Recipient email (optional)" />
+      <div class="actions">
+        <button id="generateCodeBtn">Generate Code</button>
+      </div>
+      <div id="generatedCodeDisplay" class="hidden">
+        <p class="meta">Code: <strong id="generatedCodeValue" style="font-family:monospace;font-size:1.3em;letter-spacing:3px"></strong></p>
+        <p class="meta" id="codeEmailStatus"></p>
+        <button id="copyGeneratedCodeBtn" class="secondary">Copy Code</button>
+      </div>
     </div>
   </section>
 
@@ -119,102 +132,116 @@
   <section id="dex">
     <h2>Dex AI Assistant</h2>
 
-    <!-- Auth wall — shown when not signed in -->
+    <div class="dex-hero">
+      <div class="dex-info card">
+        <h3>Meet Dex &mdash; Your Personal AI Assistant</h3>
+        <p>Dex is a smart AI companion designed to help you manage home services, track orders, set reminders, automate your schedule, and more &mdash; all from one place.</p>
+        <ul class="feature-list">
+          <li>Voice &amp; chat-powered assistant available 24/7</li>
+          <li>Book and manage service appointments instantly</li>
+          <li>Smart reminders for upcoming jobs and deliveries</li>
+          <li>Personalized recommendations based on your needs</li>
+          <li>Seamlessly integrates with your Konvict Artz account</li>
+        </ul>
+      </div>
+      <div class="dex-pricing card">
+        <span class="trial-badge">3-Day Free Trial</span>
+        <p class="dex-price">$9.99<span>/mo</span></p>
+        <p class="meta">After your free trial, full access is just $9.99/month. Cancel anytime.</p>
+        <div class="dex-download-btns">
+          <button id="downloadDexDesktopBtn">&#x1F5A5; Install on Desktop</button>
+          <button id="downloadDexIosBtn" class="secondary">&#xF8FF; Install on iPhone / iPad</button>
+          <button id="downloadDexAndroidBtn" class="secondary">&#x1F916; Install on Android</button>
+        </div>
+        <p class="meta dex-platforms">Install Dex as an app on Desktop and Mobile from your browser</p>
+      </div>
+    </div>
+
     <div id="dexAuthWall" class="card dex-auth-wall">
       <p class="meta">Sign in or create a free account to access Dex AI.</p>
       <div class="dex-auth-tabs">
         <button id="dexTabLogin" class="tab active">Log In</button>
         <button id="dexTabRegister" class="tab">Sign Up</button>
+        <button id="dexTabCode" class="tab">Access Code</button>
       </div>
+
       <div id="dexLoginForm">
         <input id="dexLoginEmail" type="email" placeholder="Email" autocomplete="email" />
         <input id="dexLoginPassword" type="password" placeholder="Password" autocomplete="current-password" />
         <button id="dexLoginBtn">Log In</button>
       </div>
+
       <div id="dexRegisterForm" class="hidden">
         <input id="dexRegUsername" type="text" placeholder="Username" autocomplete="username" />
         <input id="dexRegEmail" type="email" placeholder="Email" autocomplete="email" />
         <input id="dexRegPassword" type="password" placeholder="Password (min 8 characters)" autocomplete="new-password" />
-        <button id="dexRegisterBtn">Create Account</button>
+        <button id="dexRegisterBtn">Create Account &amp; Start Free Trial</button>
       </div>
+
+      <div id="dexCodeForm" class="hidden">
+        <p class="meta">Promoters: enter your one-time access code to get <strong>lifetime Dex access</strong>.</p>
+        <input id="dexCodeInput" type="text" placeholder="Access Code (e.g. DEXA3B7C)" autocomplete="off" style="text-transform:uppercase" />
+        <input id="dexCodeUsername" type="text" placeholder="Create a username" autocomplete="username" />
+        <input id="dexCodeEmail" type="email" placeholder="Your email address" autocomplete="email" />
+        <input id="dexCodePassword" type="password" placeholder="Create a password (min 8 characters)" autocomplete="new-password" />
+        <button id="dexRedeemCodeBtn">Redeem Code &amp; Get Lifetime Access</button>
+      </div>
+
       <p id="dexAuthStatus" class="meta dex-auth-status"></p>
     </div>
 
-    <!-- Dex content — shown when signed in -->
     <div id="dexContent" class="hidden">
       <div class="dex-user-bar">
         <p id="dexWelcome" class="meta"></p>
         <div class="dex-user-actions">
           <button id="dexMyBookingsBtn" class="secondary">My Bookings</button>
-          <button id="dexChatBtn" class="secondary">💬 Start Chat</button>
+          <button id="dexChatBtn" class="secondary">&#x1F4AC; Start Chat</button>
           <button id="dexLogoutBtn" class="secondary">Log Out</button>
         </div>
       </div>
-      
-      <!-- Dex Chat Interface -->
+
       <div id="dexChatInterface" class="hidden dex-chat-interface card">
         <div class="dex-chat-header">
-          <h3>Chat with Dex 🎤</h3>
-          <button id="dexChatClose" class="close-btn">✖</button>
+          <h3>Chat with Dex &#x1F3A4;</h3>
+          <button id="dexChatClose" class="close-btn">&#x2716;</button>
         </div>
         <div id="dexChatMessages" class="dex-chat-messages"></div>
         <div class="dex-chat-input-area">
           <div class="dex-voice-controls">
-            <button id="dexVoiceToggle" class="voice-toggle">🎤 Click to Speak</button>
+            <button id="dexVoiceToggle" class="voice-toggle">&#x1F3A4; Click to Speak</button>
             <span id="dexVoiceStatus" class="voice-status"></span>
           </div>
           <div class="dex-text-input">
             <input id="dexChatInput" type="text" placeholder="Type or say 'Hey Dex' to activate voice..." />
             <button id="dexChatSend">Send</button>
           </div>
-          <p class="meta dex-voice-hint">💡 Say "Hey Dex" to activate voice control, or click the microphone button</p>
+          <p class="meta dex-voice-hint">&#x1F4A1; Say "Hey Dex" to activate voice, or click the microphone button</p>
         </div>
       </div>
-      
+
       <div id="dexReferralCard" class="card dex-referral-card hidden">
         <h3>Referral Dashboard</h3>
-        <p class="meta">Share your link. Every signup you refer is tracked live.</p>
+        <p class="meta">Share your link. Earn <strong>$2 for every paying subscriber</strong> who signs up with your code.</p>
         <div class="dex-referral-link-row">
           <input id="dexReferralLink" type="text" readonly />
           <button id="dexCopyReferralBtn" class="secondary">Copy Link</button>
         </div>
-        <p id="dexCopyStatus" class="meta dex-copy-status hidden">Copied</p>
+        <p id="dexCopyStatus" class="meta dex-copy-status hidden">Copied!</p>
         <div class="dex-referral-stats">
-          <p class="meta">Code: <strong id="dexReferralCode">-</strong></p>
-          <p class="meta">Referrals: <strong id="dexReferralCount">0</strong></p>
+          <p class="meta">Your Code: <strong id="dexReferralCode">-</strong></p>
+          <p class="meta">Total Sign-Ups: <strong id="dexReferralCount">0</strong></p>
+          <p class="meta">Paid Subscribers: <strong id="dexSubscribedCount">0</strong></p>
+          <p class="meta">Total Earnings: <strong id="dexEarnings">$0.00</strong></p>
           <p class="meta">Free Access: <strong id="dexReferralFree">No</strong></p>
         </div>
         <div class="actions">
           <button id="dexRefreshStatsBtn" class="secondary">Refresh Stats</button>
         </div>
       </div>
+
       <div id="dexMyBookings" class="hidden">
         <h3>My Bookings</h3>
         <div id="dexBookingsList"></div>
-      </div>
-      <div class="dex-hero">
-        <div class="dex-info card">
-          <h3>Meet Dex &mdash; Your Personal AI Assistant</h3>
-          <p>Dex is a smart AI companion designed to help you manage home services, track orders, set reminders, automate your schedule, and more &mdash; all from one place.</p>
-          <ul class="feature-list">
-            <li>Voice &amp; chat-powered assistant available 24/7</li>
-            <li>Book and manage service appointments instantly</li>
-            <li>Smart reminders for upcoming jobs and deliveries</li>
-            <li>Personalized recommendations based on your needs</li>
-            <li>Seamlessly integrates with your Konvict Artz account</li>
-          </ul>
-        </div>
-        <div class="dex-pricing card">
-          <span class="trial-badge">3-Day Free Trial</span>
-          <p class="dex-price">$9.99<span>/mo</span></p>
-          <p class="meta">After your free trial, full access is just $9.99/month. Cancel anytime.</p>
-          <div class="dex-download-btns">
-            <button id="downloadDexDesktopBtn">&#x1F5A5; Install on Desktop</button>
-            <button id="downloadDexIosBtn" class="secondary">&#xF8FF; Install on iPhone / iPad</button>
-            <button id="downloadDexAndroidBtn" class="secondary">&#x1F916; Install on Android</button>
-          </div>
-          <p class="meta dex-platforms">Install Dex as an app on Desktop and Mobile from your browser</p>
-        </div>
       </div>
     </div>
   </section>

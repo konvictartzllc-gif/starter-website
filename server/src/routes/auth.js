@@ -169,4 +169,69 @@ router.post(
   },
 );
 
+router.post(
+  "/user/redeem-code",
+  [
+    body("code").isString().trim().isLength({ min: 4, max: 32 }),
+    body("username").isString().trim().isLength({ min: 2, max: 50 }),
+    body("email").isEmail().normalizeEmail(),
+    body("password").isString().isLength({ min: 8 }),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { code, username, email, password } = req.body;
+    const db = req.app.locals.db;
+
+    const accessCode = await db.get(
+      "SELECT id, used FROM access_codes WHERE code = ? COLLATE NOCASE",
+      code.trim().toUpperCase(),
+    );
+
+    if (!accessCode) {
+      return res.status(404).json({ error: "Invalid access code. Please check and try again." });
+    }
+    if (accessCode.used) {
+      return res.status(409).json({ error: "This code has already been used and is no longer valid." });
+    }
+
+    const existing = await db.get(
+      "SELECT id FROM users WHERE email = ? COLLATE NOCASE",
+      email,
+    );
+    if (existing) {
+      return res.status(409).json({ error: "An account with that email already exists. Please log in instead." });
+    }
+
+    const password_hash = await bcrypt.hash(password, 12);
+    const referralCode = await generateReferralCode(db, username);
+
+    const result = await db.run(
+      "INSERT INTO users (email, username, password_hash, referral_code, free_access, is_promoter) VALUES (?, ?, ?, ?, 1, 1)",
+      email.toLowerCase(),
+      username,
+      password_hash,
+      referralCode,
+    );
+
+    await db.run(
+      "UPDATE access_codes SET used = 1, used_by_user_id = ?, used_at = ? WHERE id = ?",
+      result.lastID,
+      new Date().toISOString(),
+      accessCode.id,
+    );
+
+    const token = jwt.sign(
+      { sub: result.lastID, username, email: email.toLowerCase(), role: "user", referralCode },
+      process.env.JWT_SECRET,
+      { expiresIn: "8h" },
+    );
+
+    return res.status(201).json({ token, lifetimeAccess: true });
+  },
+);
+
 export default router;

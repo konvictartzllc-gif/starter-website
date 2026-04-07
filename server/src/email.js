@@ -120,3 +120,45 @@ export async function sendTrialExpiringNotification(email, username) {
     console.error('❌ Failed to send trial expiring email:', error.message);
   }
 }
+
+export async function sendAccessCode(toEmail, code, appBase) {
+  if (!transporter) {
+    console.warn('⚠️  Skipping email: transporter not initialized');
+    return false;
+  }
+
+  const senderEmail = process.env.SENDER_EMAIL || process.env.SMTP_USER;
+  const senderName = process.env.SENDER_NAME || 'Konvict Artz';
+  const siteUrl = appBase || process.env.CLIENT_ORIGIN || 'https://konvict-artz.com';
+
+  try {
+    await transporter.sendMail({
+      from: `${senderName} <${senderEmail}>`,
+      to: toEmail,
+      subject: '🔑 Your Dex Lifetime Access Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Your Dex Lifetime Access Code</h2>
+          <p>You've been given lifetime access to Dex AI!</p>
+          <h3>Your One-Time Access Code:</h3>
+          <p style="background:#f0f0f0;padding:20px;border-radius:8px;font-family:monospace;font-size:24px;font-weight:bold;letter-spacing:4px;text-align:center;">${code}</p>
+          <h3>How to Redeem:</h3>
+          <ol>
+            <li>Go to <a href="${siteUrl}">${siteUrl}</a></li>
+            <li>Scroll to the <strong>Dex AI</strong> section</li>
+            <li>Click the <strong>Access Code</strong> tab</li>
+            <li>Enter your code and create your account</li>
+          </ol>
+          <p><strong>Important:</strong> This code can only be used once. After redemption it is permanently linked to your account.</p>
+          <hr style="border:none;border-top:1px solid #ddd;margin:30px 0;">
+          <p style="color:#666;font-size:12px;">Best regards,<br>The Konvict Artz Team</p>
+        </div>
+      `,
+    });
+    console.log(`✅ Access code email sent to ${toEmail}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send access code email:', error.message);
+    return false;
+  }
+}

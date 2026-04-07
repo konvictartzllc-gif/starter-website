@@ -47,7 +47,23 @@ async function start() {
   app.locals.db = db;
 
   app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(cors({ origin: CLIENT_ORIGIN }));
+  const allowedOrigins = new Set(
+    CLIENT_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean),
+  );
+  // Always allow localhost for local dev
+  for (const port of ["4000", "3000", "5500", "8080"]) {
+    allowedOrigins.add(`http://localhost:${port}`);
+    allowedOrigins.add(`http://127.0.0.1:${port}`);
+  }
+  app.use(
+    cors({
+      origin: (origin, cb) => {
+        if (!origin || allowedOrigins.has(origin)) return cb(null, true);
+        return cb(null, false);
+      },
+      credentials: true,
+    }),
+  );
   app.use(express.json({ limit: "1mb" }));
   app.use(morgan("dev"));
 

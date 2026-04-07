@@ -3,7 +3,7 @@ import { Router } from "express";
 import { body, param, validationResult } from "express-validator";
 import { Client, Environment } from "square";
 import { requireAdmin, requireUser } from "../middleware/auth.js";
-import { sendPromoterNotification } from "../email.js";
+import { sendPromoterNotification, sendAccessCode } from "../email.js";
 
 const router = Router();
 
@@ -75,6 +75,44 @@ router.post(
   },
 );
 
+router.post(
+  "/generate-code",
+  requireAdmin,
+  [body("email").optional({ checkFalsy: true }).isEmail().normalizeEmail()],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const db = req.app.locals.db;
+    const recipientEmail = req.body.email ? req.body.email.toLowerCase() : null;
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    let code;
+    for (let i = 0; i < 20; i++) {
+      const suffix = [...Array(5)].map(() => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+      const candidate = `DEX${suffix}`;
+      const existing = await db.get("SELECT id FROM access_codes WHERE code = ?", candidate);
+      if (!existing) { code = candidate; break; }
+    }
+
+    if (!code) {
+      return res.status(500).json({ error: "Failed to generate unique code. Please try again." });
+    }
+
+    await db.run("INSERT INTO access_codes (code) VALUES (?)", code);
+
+    let emailSent = false;
+    if (recipientEmail) {
+      const appBase = process.env.CLIENT_ORIGIN || "https://konvict-artz.com";
+      emailSent = await sendAccessCode(recipientEmail, code, appBase);
+    }
+
+    return res.json({ code, emailSent });
+  },
+);
+
 router.get(
   "/stats/:code",
   [param("code").isString().trim().isLength({ min: 3, max: 64 })],
@@ -86,7 +124,7 @@ router.get(
 
     const db = req.app.locals.db;
     const row = await db.get(
-      "SELECT referrals_count, free_access FROM users WHERE referral_code = ? COLLATE NOCASE",
+      "SELECT referrals_count, free_access, subscribed_referrals_count, referral_earnings_cents FROM users WHERE referral_code = ? COLLATE NOCASE",
       req.params.code,
     );
 
@@ -97,6 +135,8 @@ router.get(
     return res.json({
       referrals: row.referrals_count,
       freeAccess: Boolean(row.free_access),
+      subscribedReferrals: row.subscribed_referrals_count ?? 0,
+      earningsCents: row.referral_earnings_cents ?? 0,
     });
   },
 );
@@ -188,6 +228,16 @@ router.post(
       const status = payment?.result?.payment?.status || payment?.payment?.status || "COMPLETED";
 
       await db.run("UPDATE users SET paid = 1 WHERE id = ?", user.id);
+
+      // Credit referring promoter $2 per subscription
+      const paidUser = await db.get("SELECT referred_by FROM users WHERE id = ?", user.id);
+      if (paidUser?.referred_by) {
+        await db.run(
+          "UPDATE users SET referral_earnings_cents = referral_earnings_cents + 200, subscribed_referrals_count = subscribed_referrals_count + 1 WHERE referral_code = ? COLLATE NOCASE",
+          paidUser.referred_by,
+        );
+      }
+
       await db.run(
         "INSERT INTO payments (user_id, square_payment_id, amount_cents, currency, status, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)",
         user.id,

@@ -85,6 +85,8 @@ function setAdminUi() {
   adminDealForm.classList.toggle("hidden", !isAdmin);
   document.getElementById("adminBookingList").classList.toggle("hidden", !isAdmin);
   adminStatus.textContent = isAdmin ? "Status: Logged in" : "Status: Logged out";
+  document.getElementById("adminCodeGenForm").classList.toggle("hidden", !isAdmin);
+  if (isAdmin) document.getElementById("generatedCodeDisplay").classList.add("hidden");
 }
 
 function setDexUi() {
@@ -154,10 +156,14 @@ async function updateReferralCard() {
     if (!response.ok) {
       throw new Error("Could not load referral stats");
     }
+    document.getElementById("dexSubscribedCount").textContent = String(stats.subscribedReferrals ?? 0);
+    document.getElementById("dexEarnings").textContent = `$${((stats.earningsCents ?? 0) / 100).toFixed(2)}`;
     countEl.textContent = String(stats.referrals ?? 0);
     freeEl.textContent = stats.freeAccess ? "Yes" : "No";
   } catch {
     countEl.textContent = "-";
+    document.getElementById("dexSubscribedCount").textContent = "-";
+    document.getElementById("dexEarnings").textContent = "-";
     freeEl.textContent = "-";
   }
 
@@ -389,6 +395,40 @@ document.getElementById("clearAllBtn").addEventListener("click", async () => {
   }
 });
 
+document.getElementById("generateCodeBtn").addEventListener("click", async () => {
+  const email = document.getElementById("codeRecipientEmail").value.trim();
+  const statusEl = document.getElementById("codeEmailStatus");
+  const display = document.getElementById("generatedCodeDisplay");
+  const value = document.getElementById("generatedCodeValue");
+
+  try {
+    const payload = email ? { email } : {};
+    const res = await api("/api/dex/generate-code", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    value.textContent = res.code;
+    statusEl.textContent = email
+      ? (res.emailSent ? `Code emailed to ${email}.` : "Code generated, but email could not be sent.")
+      : "Code generated. Copy and send it to promoter.";
+    display.classList.remove("hidden");
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+document.getElementById("copyGeneratedCodeBtn").addEventListener("click", async () => {
+  const code = document.getElementById("generatedCodeValue").textContent || "";
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+    document.getElementById("codeEmailStatus").textContent = "Code copied.";
+  } catch {
+    document.getElementById("codeEmailStatus").textContent = "Could not copy. Please copy manually.";
+  }
+});
+
 document.addEventListener("click", async (event) => {
   const { target } = event;
   if (!(target instanceof HTMLElement)) {
@@ -565,17 +605,10 @@ async function sendDexMessage(message) {
   document.getElementById("dexChatInput").value = '';
 
   try {
-    const response = await userApi('/dex/chat', {
+    const data = await userApi('/api/dex/chat', {
       method: 'POST',
       body: JSON.stringify({ message }),
     });
-
-    if (!response.ok) {
-      addChatMessage('Sorry, I encountered an error. Please try again.', 'assistant');
-      return;
-    }
-
-    const data = await response.json();
     addChatMessage(data.reply, 'assistant');
     
     // Read response aloud if supported
@@ -620,17 +653,73 @@ function startWakeWordListener() {
 document.getElementById("dexTabLogin").addEventListener("click", () => {
   document.getElementById("dexLoginForm").classList.remove("hidden");
   document.getElementById("dexRegisterForm").classList.add("hidden");
+  document.getElementById("dexCodeForm").classList.add("hidden");
   document.getElementById("dexTabLogin").classList.add("active");
   document.getElementById("dexTabRegister").classList.remove("active");
+  document.getElementById("dexTabCode").classList.remove("active");
   document.getElementById("dexAuthStatus").textContent = "";
 });
 
 document.getElementById("dexTabRegister").addEventListener("click", () => {
   document.getElementById("dexRegisterForm").classList.remove("hidden");
   document.getElementById("dexLoginForm").classList.add("hidden");
+  document.getElementById("dexCodeForm").classList.add("hidden");
   document.getElementById("dexTabRegister").classList.add("active");
   document.getElementById("dexTabLogin").classList.remove("active");
+  document.getElementById("dexTabCode").classList.remove("active");
   document.getElementById("dexAuthStatus").textContent = "";
+});
+
+document.getElementById("dexTabCode").addEventListener("click", () => {
+  document.getElementById("dexCodeForm").classList.remove("hidden");
+  document.getElementById("dexLoginForm").classList.add("hidden");
+  document.getElementById("dexRegisterForm").classList.add("hidden");
+  document.getElementById("dexTabCode").classList.add("active");
+  document.getElementById("dexTabLogin").classList.remove("active");
+  document.getElementById("dexTabRegister").classList.remove("active");
+  document.getElementById("dexAuthStatus").textContent = "";
+});
+
+document.getElementById("dexRedeemCodeBtn").addEventListener("click", async () => {
+  const code = document.getElementById("dexCodeInput").value.trim().toUpperCase();
+  const username = document.getElementById("dexCodeUsername").value.trim();
+  const email = document.getElementById("dexCodeEmail").value.trim();
+  const password = document.getElementById("dexCodePassword").value;
+  const statusEl = document.getElementById("dexAuthStatus");
+
+  if (!code || !username || !email || !password) {
+    statusEl.textContent = "Please fill in all code redemption fields.";
+    statusEl.style.color = "var(--danger)";
+    return;
+  }
+
+  if (password.length < 8) {
+    statusEl.textContent = "Password must be at least 8 characters.";
+    statusEl.style.color = "var(--danger)";
+    return;
+  }
+
+  try {
+    statusEl.textContent = "Redeeming code...";
+    statusEl.style.color = "var(--ink-soft)";
+
+    const res = await fetch(apiUrl("/api/auth/user/redeem-code"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, username, email, password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Code redemption failed");
+
+    state.userToken = data.token;
+    sessionStorage.setItem("konvict_user_token", data.token);
+    await restoreUser();
+    setDexUi();
+    statusEl.textContent = "";
+  } catch (err) {
+    statusEl.textContent = err.message;
+    statusEl.style.color = "var(--danger)";
+  }
 });
 
 document.getElementById("dexLoginBtn").addEventListener("click", async () => {
