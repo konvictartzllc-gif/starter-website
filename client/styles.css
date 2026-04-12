@@ -124,6 +124,32 @@ button.secondary {
   background: #e5e7eb;
 }
 
+.store-page-section {
+  min-height: 70vh;
+}
+
+.store-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.store-filter-group {
+  display: flex;
+  gap: 8px;
+}
+
+.store-filter-group button {
+  width: auto;
+}
+
+.store-price {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--brand);
+}
+
 .hidden {
   display: none;
 }
@@ -142,6 +168,16 @@ button.secondary {
 
   .actions {
     flex-direction: column;
+  }
+
+  .store-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .store-filter-group {
+    width: 100%;
+    flex-wrap: wrap;
   }
 }
 

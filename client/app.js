@@ -212,10 +212,13 @@ function esc(s) {
 }
 
 function productCard(p) {
+  const itemCondition = (p.item_condition || "refurbished").toLowerCase() === "new" ? "New" : "Refurbished";
+  const inventory = Number.isFinite(Number(p.inventory)) ? Number(p.inventory) : 0;
   return `<div class="card">
       <img class="product-img" src="${p.image}" alt="${p.name}">
       <h3>${p.name}</h3>
       <p>$${Number(p.price).toFixed(2)}</p>
+      <p class="meta">${itemCondition} &bull; ${inventory} in stock</p>
       <p class="meta">Added ${new Date(p.created_at).toLocaleString()}</p>
       ${state.token ? `<button class="danger" data-delete-product="${p.id}">Delete</button>` : ""}
     </div>`;
@@ -303,6 +306,8 @@ document.getElementById("addProductBtn").addEventListener("click", async () => {
         name: document.getElementById("name").value.trim(),
         price: Number(document.getElementById("price").value),
         image: document.getElementById("image").value.trim(),
+        itemCondition: "refurbished",
+        inventory: 1,
       }),
     });
 

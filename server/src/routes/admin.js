@@ -12,6 +12,8 @@ router.post(
     body("name").isString().trim().isLength({ min: 1, max: 150 }),
     body("price").isFloat({ min: 0 }),
     body("image").isURL(),
+    body("itemCondition").optional({ checkFalsy: true }).isIn(["refurbished", "new"]),
+    body("inventory").optional({ checkFalsy: true }).isInt({ min: 0, max: 99999 }),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -20,15 +22,19 @@ router.post(
     }
 
     const { name, price, image } = req.body;
+    const itemCondition = (req.body.itemCondition || "refurbished").toLowerCase();
+    const inventory = req.body.inventory === undefined ? 1 : Number(req.body.inventory);
     const result = await req.app.locals.db.run(
-      "INSERT INTO products (name, price, image) VALUES (?, ?, ?)",
+      "INSERT INTO products (name, price, image, item_condition, inventory) VALUES (?, ?, ?, ?, ?)",
       name.trim(),
       Number(price),
       image,
+      itemCondition,
+      inventory,
     );
 
     const row = await req.app.locals.db.get(
-      "SELECT id, name, price, image, created_at FROM products WHERE id = ?",
+      "SELECT id, name, price, image, item_condition, inventory, created_at FROM products WHERE id = ?",
       result.lastID,
     );
     return res.status(201).json(row);

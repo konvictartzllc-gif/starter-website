@@ -22,6 +22,8 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
       name TEXT NOT NULL,
       price REAL NOT NULL,
       image TEXT NOT NULL,
+      item_condition TEXT NOT NULL DEFAULT 'refurbished',
+      inventory INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -108,6 +110,19 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
 
   try {
     await db.exec("ALTER TABLE bookings ADD COLUMN discounted INTEGER NOT NULL DEFAULT 0;");
+  } catch {
+    // Column already exists — safe to ignore.
+  }
+
+  // Migration: store item condition and inventory for products.
+  try {
+    await db.exec("ALTER TABLE products ADD COLUMN item_condition TEXT NOT NULL DEFAULT 'refurbished';");
+  } catch {
+    // Column already exists — safe to ignore.
+  }
+
+  try {
+    await db.exec("ALTER TABLE products ADD COLUMN inventory INTEGER NOT NULL DEFAULT 1;");
   } catch {
     // Column already exists — safe to ignore.
   }

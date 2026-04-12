@@ -5,7 +5,7 @@ const router = Router();
 
 router.get("/products", async (req, res) => {
   const rows = await req.app.locals.db.all(
-    "SELECT id, name, price, image, created_at FROM products ORDER BY id DESC",
+    "SELECT id, name, price, image, item_condition, inventory, created_at FROM products ORDER BY id DESC",
   );
   res.json(rows);
 });
