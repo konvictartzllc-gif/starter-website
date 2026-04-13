@@ -2,8 +2,9 @@ services:
   - type: web
     name: konvict-artz
     runtime: node
-    buildCommand: npm --prefix server install
-    startCommand: npm --prefix server run start
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm run start
     # Uncomment the disk block to persist the SQLite database across restarts.
     # Render free plan does not support disks; upgrade to a paid plan to enable.
     # disk:
