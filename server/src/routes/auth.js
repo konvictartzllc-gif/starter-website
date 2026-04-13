@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
 import { Router } from "express";
 import { body, validationResult } from "express-validator";
@@ -83,7 +84,6 @@ router.post(
     }
 
     const password_hash = await bcrypt.hash(password, 12);
-    const referralCode = await generateReferralCode(db, username);
     const referredBy = ref ? ref.trim() : null;
 
     // Calculate trial period: 3 days from now
@@ -91,11 +91,10 @@ router.post(
     const trialExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
     const result = await db.run(
-      "INSERT INTO users (email, username, password_hash, referral_code, referred_by, trial_started_at, trial_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO users (email, username, password_hash, referred_by, trial_started_at, trial_expires_at) VALUES (?, ?, ?, ?, ?, ?)",
       email.toLowerCase(),
       username,
       password_hash,
-      referralCode,
       referredBy,
       trialStartedAt,
       trialExpiresAt,
@@ -121,7 +120,6 @@ router.post(
         username,
         email: email.toLowerCase(),
         role: "user",
-        referralCode,
       },
       process.env.JWT_SECRET,
       { expiresIn: "8h" },
@@ -166,6 +164,90 @@ router.post(
     );
 
     return res.json({ token });
+  },
+);
+
+router.post(
+  "/user/login-with-code",
+  [body("code").isString().trim().isLength({ min: 4, max: 32 })],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const code = req.body.code.trim().toUpperCase();
+    const db = req.app.locals.db;
+
+    const accessCode = await db.get(
+      "SELECT id, used, assigned_email FROM access_codes WHERE code = ? COLLATE NOCASE",
+      code,
+    );
+
+    if (!accessCode) {
+      return res.status(404).json({ error: "Invalid access code. Please check and try again." });
+    }
+    if (accessCode.used) {
+      return res.status(409).json({ error: "This code has already been used and is no longer valid." });
+    }
+    if (!accessCode.assigned_email) {
+      return res.status(400).json({ error: "This code is not assigned to a promoter email." });
+    }
+
+    const assignedEmail = String(accessCode.assigned_email).toLowerCase();
+    let user = await db.get(
+      "SELECT id, username, email, referral_code FROM users WHERE email = ? COLLATE NOCASE",
+      assignedEmail,
+    );
+
+    if (!user) {
+      const emailBase = assignedEmail.split("@")[0] || "promoter";
+      const username = `${emailBase.replace(/[^a-zA-Z0-9]/g, "").slice(0, 20) || "promoter"}${Math.floor(100 + Math.random() * 900)}`;
+      const passwordHash = await bcrypt.hash(randomUUID(), 12);
+      const referralCode = await generateReferralCode(db, username);
+      const created = await db.run(
+        "INSERT INTO users (email, username, password_hash, referral_code, free_access, is_promoter) VALUES (?, ?, ?, ?, 1, 1)",
+        assignedEmail,
+        username,
+        passwordHash,
+        referralCode,
+      );
+      user = await db.get(
+        "SELECT id, username, email, referral_code FROM users WHERE id = ?",
+        created.lastID,
+      );
+    } else {
+      let referralCode = user.referral_code;
+      if (!referralCode) {
+        referralCode = await generateReferralCode(db, user.username);
+      }
+
+      await db.run(
+        "UPDATE users SET is_promoter = 1, free_access = 1, referral_code = ? WHERE id = ?",
+        referralCode,
+        user.id,
+      );
+
+      user = {
+        ...user,
+        referral_code: referralCode,
+      };
+    }
+
+    await db.run(
+      "UPDATE access_codes SET used = 1, used_by_user_id = ?, used_at = ? WHERE id = ?",
+      user.id,
+      new Date().toISOString(),
+      accessCode.id,
+    );
+
+    const token = jwt.sign(
+      { sub: user.id, username: user.username, email: user.email, role: "user", referralCode: user.referral_code },
+      process.env.JWT_SECRET,
+      { expiresIn: "8h" },
+    );
+
+    return res.json({ token, promoter: true, referralCode: user.referral_code });
   },
 );
 

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="api-base-url" content="" />
+  <title>Konvict Artz Work Portfolio</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Konvict Artz Work Portfolio</h1>
+    <nav>
+      <a href="/index.html">Home</a>
+      <a href="/services.html">Services</a>
+      <a href="/store.html">Store</a>
+      <a href="/portfolio.html">Work Portfolio</a>
+      <a href="/index.html#dex">Dex AI</a>
+    </nav>
+  </header>
+
+  <section class="store-page-section">
+    <div class="store-toolbar card">
+      <div>
+        <h2>Past Jobs Gallery</h2>
+        <p class="meta">Browse completed job photos from our portfolio.</p>
+      </div>
+      <p id="portfolioStatus" class="meta">Loading portfolio...</p>
+    </div>
+
+    <div id="portfolioGrid" class="grid"></div>
+  </section>
+
+  <script type="module" src="portfolio.js"></script>
+</body>
+</html>

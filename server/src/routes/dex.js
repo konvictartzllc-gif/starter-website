@@ -78,7 +78,7 @@ router.post(
 router.post(
   "/generate-code",
   requireAdmin,
-  [body("email").optional({ checkFalsy: true }).isEmail().normalizeEmail()],
+  [body("email").isEmail().normalizeEmail()],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -86,7 +86,7 @@ router.post(
     }
 
     const db = req.app.locals.db;
-    const recipientEmail = req.body.email ? req.body.email.toLowerCase() : null;
+    const recipientEmail = req.body.email.toLowerCase();
     const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     let code;
@@ -101,15 +101,12 @@ router.post(
       return res.status(500).json({ error: "Failed to generate unique code. Please try again." });
     }
 
-    await db.run("INSERT INTO access_codes (code) VALUES (?)", code);
+    await db.run("INSERT INTO access_codes (code, assigned_email) VALUES (?, ?)", code, recipientEmail);
 
-    let emailSent = false;
-    if (recipientEmail) {
-      const appBase = process.env.CLIENT_ORIGIN || "https://konvict-artz.com";
-      emailSent = await sendAccessCode(recipientEmail, code, appBase);
-    }
+    const appBase = process.env.CLIENT_ORIGIN || "https://konvict-artz.com";
+    const emailSent = await sendAccessCode(recipientEmail, code, appBase);
 
-    return res.json({ code, emailSent });
+    return res.json({ code, emailSent, assignedEmail: recipientEmail });
   },
 );
 

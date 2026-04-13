@@ -9,6 +9,7 @@ const state = {
   bookings: [],
   dexChatOpen: false,
   dexMessages: [],
+  cart: [],
 };
 
 import { dexVoice } from './voice.js';
@@ -35,9 +36,16 @@ const adminStoreForm = document.getElementById("adminStoreForm");
 const adminWorkForm = document.getElementById("adminWorkForm");
 const adminDealForm = document.getElementById("adminDealForm");
 const adminStatus = document.getElementById("adminStatus");
+const productFormTitle = document.getElementById("productFormTitle");
+const addProductBtn = document.getElementById("addProductBtn");
+const cancelProductEditBtn = document.getElementById("cancelProductEditBtn");
+const uploadProductImageBtn = document.getElementById("uploadProductImageBtn");
+const productImageFileInput = document.getElementById("productImageFile");
+const productImageUploadStatus = document.getElementById("productImageUploadStatus");
 let dexStatsIntervalId = null;
 let dexCopyStatusTimeoutId = null;
 let deferredInstallPrompt = null;
+let editingProductId = null;
 
 const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
 const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
@@ -211,16 +219,53 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+function resetProductForm() {
+  editingProductId = null;
+  productFormTitle.textContent = "Add Product (Admin)";
+  addProductBtn.textContent = "Add Product";
+  cancelProductEditBtn.classList.add("hidden");
+  document.getElementById("name").value = "";
+  document.getElementById("description").value = "";
+  document.getElementById("price").value = "";
+  document.getElementById("image").value = "";
+  document.getElementById("itemCondition").value = "new";
+  document.getElementById("inventory").value = "";
+  productImageFileInput.value = "";
+  productImageUploadStatus.textContent = "";
+}
+
+function startProductEdit(productId) {
+  const product = state.products.find((item) => Number(item.id) === Number(productId));
+  if (!product) {
+    alert("Product not found.");
+    return;
+  }
+
+  editingProductId = Number(product.id);
+  productFormTitle.textContent = `Edit Product #${product.id}`;
+  addProductBtn.textContent = "Save Changes";
+  cancelProductEditBtn.classList.remove("hidden");
+  document.getElementById("name").value = product.name || "";
+  document.getElementById("description").value = product.description || "";
+  document.getElementById("price").value = product.price ?? "";
+  document.getElementById("image").value = product.image || "";
+  document.getElementById("itemCondition").value = (product.item_condition || "new").toLowerCase();
+  document.getElementById("inventory").value = product.inventory ?? "";
+  adminStoreForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function productCard(p) {
   const itemCondition = (p.item_condition || "refurbished").toLowerCase() === "new" ? "New" : "Refurbished";
   const inventory = Number.isFinite(Number(p.inventory)) ? Number(p.inventory) : 0;
+  const inStock = inventory > 0;
   return `<div class="card">
       <img class="product-img" src="${p.image}" alt="${p.name}">
       <h3>${p.name}</h3>
-      <p>$${Number(p.price).toFixed(2)}</p>
+      ${p.description ? `<p>${p.description}</p>` : ""}
+      <p><strong>$${Number(p.price).toFixed(2)}</strong></p>
       <p class="meta">${itemCondition} &bull; ${inventory} in stock</p>
       <p class="meta">Added ${new Date(p.created_at).toLocaleString()}</p>
-      ${state.token ? `<button class="danger" data-delete-product="${p.id}">Delete</button>` : ""}
+      ${state.token ? `<div class="actions"><button data-edit-product="${p.id}" class="secondary">Edit</button><button class="danger" data-delete-product="${p.id}">Delete</button></div>` : inStock ? `<button class="primary" data-add-to-cart="${p.id}" data-product-name="${p.name}" data-product-price="${p.price}" data-product-inventory="${p.inventory}">Add to Cart</button>` : `<button disabled>Out of Stock</button>`}
     </div>`;
 }
 
@@ -298,25 +343,71 @@ async function refreshAll() {
   render();
 }
 
-document.getElementById("addProductBtn").addEventListener("click", async () => {
+addProductBtn.addEventListener("click", async () => {
   try {
-    await api("/api/admin/products", {
-      method: "POST",
-      body: JSON.stringify({
-        name: document.getElementById("name").value.trim(),
-        price: Number(document.getElementById("price").value),
-        image: document.getElementById("image").value.trim(),
-        itemCondition: "refurbished",
-        inventory: 1,
-      }),
-    });
+    const payload = {
+      name: document.getElementById("name").value.trim(),
+      description: document.getElementById("description").value.trim(),
+      price: Number(document.getElementById("price").value),
+      image: document.getElementById("image").value.trim(),
+      itemCondition: document.getElementById("itemCondition").value,
+      inventory: Number(document.getElementById("inventory").value) || 1,
+    };
 
-    document.getElementById("name").value = "";
-    document.getElementById("price").value = "";
-    document.getElementById("image").value = "";
+    if (editingProductId) {
+      await api(`/api/admin/products/${editingProductId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await api("/api/admin/products", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    }
+
+    resetProductForm();
     await refreshAll();
   } catch (err) {
     alert(err.message);
+  }
+});
+
+cancelProductEditBtn.addEventListener("click", () => {
+  resetProductForm();
+});
+
+uploadProductImageBtn.addEventListener("click", async () => {
+  try {
+    const file = productImageFileInput.files?.[0];
+    if (!file) {
+      productImageUploadStatus.textContent = "Select an image file first.";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const headers = {};
+    if (state.token) {
+      headers.Authorization = `Bearer ${state.token}`;
+    }
+
+    const response = await fetch(apiUrl("/api/admin/upload-product-image"), {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "Image upload failed");
+    }
+
+    document.getElementById("image").value = data.imagePath;
+    productImageUploadStatus.textContent = `Uploaded: ${data.imagePath}`;
+  } catch (err) {
+    productImageUploadStatus.textContent = `Upload failed: ${err.message}`;
   }
 });
 
@@ -384,6 +475,7 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   state.token = "";
   sessionStorage.removeItem("konvict_admin_token");
+  resetProductForm();
   await refreshAll();
 });
 
@@ -407,16 +499,20 @@ document.getElementById("generateCodeBtn").addEventListener("click", async () =>
   const value = document.getElementById("generatedCodeValue");
 
   try {
-    const payload = email ? { email } : {};
+    if (!email) {
+      throw new Error("Recipient email is required for promoter code generation.");
+    }
+
+    const payload = { email };
     const res = await api("/api/dex/generate-code", {
       method: "POST",
       body: JSON.stringify(payload),
     });
 
     value.textContent = res.code;
-    statusEl.textContent = email
-      ? (res.emailSent ? `Code emailed to ${email}.` : "Code generated, but email could not be sent.")
-      : "Code generated. Copy and send it to promoter.";
+    statusEl.textContent = res.emailSent
+      ? `Code emailed to ${email}.`
+      : "Code generated, but email could not be sent.";
     display.classList.remove("hidden");
   } catch (err) {
     alert(err.message);
@@ -440,11 +536,19 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  const { deleteProduct, deleteWork, deleteReview, deleteDeal, deleteBooking } = target.dataset;
+  const { editProduct, deleteProduct, deleteWork, deleteReview, deleteDeal, deleteBooking } = target.dataset;
 
   try {
+    if (editProduct) {
+      startProductEdit(editProduct);
+      return;
+    }
+
     if (deleteProduct) {
       await api(`/api/admin/products/${deleteProduct}`, { method: "DELETE" });
+      if (editingProductId === Number(deleteProduct)) {
+        resetProductForm();
+      }
       await refreshAll();
     }
 
@@ -581,7 +685,7 @@ function openDexChat() {
   document.getElementById("dexChatMessages").innerHTML = '';
   state.dexMessages = [];
   
-  if (dexVoice.isSupported()) {
+  if (dexVoice.isRecognitionSupported()) {
     startWakeWordListener();
   }
 }
@@ -617,7 +721,7 @@ async function sendDexMessage(message) {
     addChatMessage(data.reply, 'assistant');
     
     // Read response aloud if supported
-    if (dexVoice.isSupported()) {
+    if (dexVoice.canSpeak()) {
       dexVoice.speak(data.reply);
     }
   } catch (error) {
@@ -627,7 +731,7 @@ async function sendDexMessage(message) {
 }
 
 function startWakeWordListener() {
-  if (!dexVoice.isSupported()) {
+  if (!dexVoice.isRecognitionSupported()) {
     showDexToast('Voice recognition not supported in your browser');
     return;
   }
@@ -687,39 +791,31 @@ document.getElementById("dexTabCode").addEventListener("click", () => {
 
 document.getElementById("dexRedeemCodeBtn").addEventListener("click", async () => {
   const code = document.getElementById("dexCodeInput").value.trim().toUpperCase();
-  const username = document.getElementById("dexCodeUsername").value.trim();
-  const email = document.getElementById("dexCodeEmail").value.trim();
-  const password = document.getElementById("dexCodePassword").value;
   const statusEl = document.getElementById("dexAuthStatus");
 
-  if (!code || !username || !email || !password) {
-    statusEl.textContent = "Please fill in all code redemption fields.";
-    statusEl.style.color = "var(--danger)";
-    return;
-  }
-
-  if (password.length < 8) {
-    statusEl.textContent = "Password must be at least 8 characters.";
+  if (!code) {
+    statusEl.textContent = "Please enter your one-time access code.";
     statusEl.style.color = "var(--danger)";
     return;
   }
 
   try {
-    statusEl.textContent = "Redeeming code...";
+    statusEl.textContent = "Signing you in with code...";
     statusEl.style.color = "var(--ink-soft)";
 
-    const res = await fetch(apiUrl("/api/auth/user/redeem-code"), {
+    const res = await fetch(apiUrl("/api/auth/user/login-with-code"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, username, email, password }),
+      body: JSON.stringify({ code }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || "Code redemption failed");
+    if (!res.ok) throw new Error(data.error || "Code sign-in failed");
 
     state.userToken = data.token;
     sessionStorage.setItem("konvict_user_token", data.token);
     await restoreUser();
     setDexUi();
+    document.getElementById("dexCodeInput").value = "";
     statusEl.textContent = "";
   } catch (err) {
     statusEl.textContent = err.message;
@@ -898,6 +994,88 @@ document.getElementById("dexCopyReferralBtn").addEventListener("click", async ()
 document.getElementById("dexRefreshStatsBtn").addEventListener("click", async () => {
   await updateReferralCard();
 });
+
+// ── Shopping Cart & Checkout ───────────────────────────────────────
+document.addEventListener("click", async (event) => {
+  const btn = event.target;
+  if (!(btn instanceof HTMLElement)) {
+    return;
+  }
+  const { addToCart } = btn.dataset;
+  
+  if (!addToCart) return;
+
+  const productId = Number(addToCart);
+  const productName = btn.dataset.productName;
+  const productPrice = Number(btn.dataset.productPrice);
+  const productInventory = Number(btn.dataset.productInventory);
+
+  const quantity = prompt(`How many "${productName}" would you like? (Max: ${productInventory})`, "1");
+  if (!quantity) return;
+
+  const qty = Number(quantity);
+  if (!Number.isFinite(qty) || qty < 1 || qty > productInventory) {
+    alert(`Please enter a valid quantity between 1 and ${productInventory}`);
+    return;
+  }
+
+  state.cart.push({ productId, productName, productPrice, quantity: qty, total: productPrice * qty });
+  alert(`Added ${qty}x "${productName}" to cart. Total: $${(productPrice * qty).toFixed(2)}`);
+  renderCart();
+});
+
+function renderCart() {
+  const cartDiv = document.getElementById("cartSummary");
+  if (!cartDiv) return;
+
+  if (!state.cart.length) {
+    cartDiv.innerHTML = "";
+    return;
+  }
+
+  const cartHTML = `
+    <div class="card">
+      <h3>Shopping Cart</h3>
+      ${state.cart.map((item, idx) => `
+        <div class="cart-item">
+          <p>${item.quantity}x ${item.productName} = $${item.total.toFixed(2)} <button data-remove-cart="${idx}" class="small danger">Remove</button></p>
+        </div>
+      `).join("")}
+      <p><strong>Total: $${state.cart.reduce((sum, item) => sum + item.total, 0).toFixed(2)}</strong></p>
+      <button id="checkoutBtn" class="primary">Proceed to Checkout</button>
+      <button id="clearCartBtn" class="secondary">Clear Cart</button>
+    </div>
+  `;
+
+  cartDiv.innerHTML = cartHTML;
+
+  document.getElementById("checkoutBtn").addEventListener("click", processCheckout);
+  document.getElementById("clearCartBtn").addEventListener("click", () => {
+    state.cart = [];
+    renderCart();
+  });
+
+  document.querySelectorAll("[data-remove-cart]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.removeCart);
+      state.cart.splice(idx, 1);
+      renderCart();
+    });
+  });
+}
+
+async function processCheckout() {
+  if (!state.cart.length) {
+    alert("Your cart is empty");
+    return;
+  }
+
+  // For now, show a simple checkout message
+  // In production, integrate with Square's web payments SDK
+  const totalAmount = state.cart.reduce((sum, item) => sum + item.total, 0).toFixed(2);
+  alert(`Checkout feature coming soon! Total: $${totalAmount}`);
+  // TODO: Integrate Square Payment Form
+}
 
 async function restoreUser() {
   if (!state.userToken) return;

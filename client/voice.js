@@ -119,7 +119,7 @@ export class DexVoice {
 
   // Read text aloud
   speak(text) {
-    if (!SpeechSynthesisUtterance) {
+    if (!this.canSpeak()) {
       console.warn('Speech synthesis not supported');
       return false;
     }
@@ -129,7 +129,14 @@ export class DexVoice {
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find((v) => /en(-|_)?us|english/i.test(v.lang || v.name || ""));
+    if (preferred) {
+      utterance.voice = preferred;
+    }
+
     window.speechSynthesis.cancel(); // Cancel any previous speech
+    window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);
     return true;
   }
@@ -141,7 +148,15 @@ export class DexVoice {
 
   // Check if voice features are supported
   isSupported() {
-    return Boolean(this.recognition && SpeechSynthesisUtterance);
+    return this.isRecognitionSupported() || this.canSpeak();
+  }
+
+  isRecognitionSupported() {
+    return Boolean(this.recognition);
+  }
+
+  canSpeak() {
+    return Boolean(SpeechSynthesisUtterance && window.speechSynthesis);
   }
 
   // Register callbacks

@@ -20,6 +20,7 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
     CREATE TABLE IF NOT EXISTS products (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
       price REAL NOT NULL,
       image TEXT NOT NULL,
       item_condition TEXT NOT NULL DEFAULT 'refurbished',
@@ -87,6 +88,7 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
     CREATE TABLE IF NOT EXISTS access_codes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       code TEXT NOT NULL UNIQUE,
+      assigned_email TEXT,
       used INTEGER NOT NULL DEFAULT 0,
       used_by_user_id INTEGER REFERENCES users(id),
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -97,6 +99,11 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
   // Migration: add user_id column to bookings if it doesn't exist yet.
   try {
     await db.exec("ALTER TABLE bookings ADD COLUMN user_id INTEGER REFERENCES users(id);");
+  } catch {}
+
+  // Migration: add description column to products if it doesn't exist yet.
+  try {
+    await db.exec("ALTER TABLE products ADD COLUMN description TEXT NOT NULL DEFAULT '';");
   } catch {
     // Column already exists — safe to ignore.
   }
@@ -146,6 +153,12 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
     } catch {
       // Column already exists — safe to ignore.
     }
+  }
+
+  try {
+    await db.exec("ALTER TABLE access_codes ADD COLUMN assigned_email TEXT;");
+  } catch {
+    // Column already exists — safe to ignore.
   }
 
   try {

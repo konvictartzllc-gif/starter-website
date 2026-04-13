@@ -5,7 +5,7 @@ const router = Router();
 
 router.get("/products", async (req, res) => {
   const rows = await req.app.locals.db.all(
-    "SELECT id, name, price, image, item_condition, inventory, created_at FROM products ORDER BY id DESC",
+    "SELECT id, name, description, price, image, item_condition, inventory, created_at FROM products ORDER BY id DESC",
   );
   res.json(rows);
 });
@@ -99,6 +99,83 @@ router.post(
       discountApplied: Boolean(row.discounted),
       booking: row,
     });
+  },
+);
+
+router.post(
+  "/checkout",
+  [
+    body("productId").isInt({ min: 1 }),
+    body("quantity").isInt({ min: 1, max: 999 }),
+    body("sourceId").isString().trim().notEmpty(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { productId, quantity, sourceId } = req.body;
+    const product = await req.app.locals.db.get(
+      "SELECT id, name, price, inventory FROM products WHERE id = ?",
+      productId,
+    );
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    if (product.inventory < quantity) {
+      return res.status(400).json({ error: "Not enough inventory" });
+    }
+
+    const amountCents = Math.round(Number(product.price) * quantity * 100);
+    const { Client, Environment } = await import("square");
+
+    const accessToken = process.env.SQUARE_ACCESS_TOKEN;
+    const locationId = process.env.SQUARE_LOCATION_ID;
+
+    if (!accessToken || !locationId) {
+      return res.status(503).json({ error: "Square payment is not configured" });
+    }
+
+    const env = String(process.env.SQUARE_ENVIRONMENT || "sandbox").toLowerCase() === "production"
+      ? Environment.Production
+      : Environment.Sandbox;
+
+    const squareClient = new Client({ accessToken, environment: env });
+
+    try {
+      const { randomUUID } = await import("crypto");
+      const idempotencyKey = randomUUID();
+
+      const payment = await squareClient.paymentsApi.createPayment({
+        sourceId,
+        idempotencyKey,
+        amountMoney: { amount: amountCents, currency: "USD" },
+        locationId,
+      });
+
+      const squarePaymentId = payment?.result?.payment?.id || null;
+      const status = payment?.result?.payment?.status || "COMPLETED";
+
+      await req.app.locals.db.run(
+        "UPDATE products SET inventory = inventory - ? WHERE id = ?",
+        quantity,
+        productId,
+      );
+
+      return res.json({ 
+        success: true, 
+        paymentId: squarePaymentId, 
+        status, 
+        product: product.name, 
+        quantity,
+        total: (Number(product.price) * quantity).toFixed(2)
+      });
+    } catch (err) {
+      return res.status(502).json({ error: err.message || "Payment failed" });
+    }
   },
 );
 

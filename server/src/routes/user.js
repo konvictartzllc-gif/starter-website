@@ -18,7 +18,7 @@ router.get("/me", requireUser, async (req, res) => {
     id: user.id,
     username: user.username,
     email: user.email,
-    referralCode: user.referral_code,
+    referralCode: Boolean(user.is_promoter) ? user.referral_code : null,
     referredBy: user.referred_by,
     isPromoter: Boolean(user.is_promoter),
     freeAccess: Boolean(user.free_access),

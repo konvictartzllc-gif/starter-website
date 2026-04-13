@@ -110,6 +110,10 @@ button.secondary {
   width: auto;
 }
 
+.actions .hidden {
+  display: none;
+}
+
 .meta {
   color: var(--ink-soft);
   font-size: 13px;
@@ -148,6 +152,19 @@ button.secondary {
   font-size: 1.2rem;
   font-weight: 800;
   color: var(--brand);
+}
+
+#cartSummary {
+  margin: 12px 0 16px;
+}
+
+.cart-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cart-item:last-child {
+  border-bottom: none;
 }
 
 .hidden {
