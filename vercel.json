@@ -1,10 +1,19 @@
 {
   "rewrites": [
+    { "source": "/", "destination": "/client/index.html" },
+    { "source": "/index.html", "destination": "/client/index.html" },
+    { "source": "/services.html", "destination": "/client/services.html" },
+    { "source": "/store.html", "destination": "/client/store.html" },
+    { "source": "/portfolio.html", "destination": "/client/portfolio.html" },
     { "source": "/app.js", "destination": "/client/app.js" },
+    { "source": "/store.js", "destination": "/client/store.js" },
+    { "source": "/portfolio.js", "destination": "/client/portfolio.js" },
+    { "source": "/voice.js", "destination": "/client/voice.js" },
     { "source": "/styles.css", "destination": "/client/styles.css" },
     { "source": "/sw.js", "destination": "/client/sw.js" },
     { "source": "/manifest.webmanifest", "destination": "/client/manifest.webmanifest" },
     { "source": "/icons/:path*", "destination": "/client/icons/:path*" },
+    { "source": "/products/:path*", "destination": "/client/products/:path*" },
     { "source": "/api/:path*", "destination": "https://konvict-artz.onrender.com/api/:path*" },
     { "source": "/(.*)", "destination": "/client/index.html" }
   ]
