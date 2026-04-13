@@ -30,34 +30,35 @@
     </nav>
   </header>
 
-  <section id="services">
-    <h2>Our Services</h2>
-    <div class="grid">
-      <div class="card">Handyman Repair</div>
-      <div class="card">Cleaning Services</div>
-      <div class="card">Lawn Care</div>
-    </div>
-  </section>
+  <main>
+    <section id="services">
+      <h2>Our Services</h2>
+      <div class="grid">
+        <div class="card">Handyman Repair</div>
+        <div class="card">Cleaning Services</div>
+        <div class="card">Lawn Care</div>
+      </div>
+    </section>
 
-  <section id="store">
-    <h2>Store</h2>
-    <p class="meta"><a href="/store.html">Open full store page</a></p>
-    <div id="productList" class="grid"></div>
-      <div id="cartSummary"></div>
-    <div id="adminStoreForm" class="card hidden">
-      <h3 id="productFormTitle">Add Product (Admin)</h3>
-      <input id="name" type="text" placeholder="Item name" aria-label="Product name" />
-      <textarea id="description" placeholder="Product description (optional)" aria-label="Product description"></textarea>
-      <input id="price" type="number" step="0.01" placeholder="Price" aria-label="Product price" />
-      <input id="image" type="text" placeholder="Image URL" aria-label="Product image URL" />
-      <input id="productImageFile" type="file" accept="image/*" aria-label="Upload product image" />
-      <button id="uploadProductImageBtn" type="button" class="secondary">Upload Selected Image</button>
-      <p id="productImageUploadStatus" class="meta"></p>
-      <select id="itemCondition" aria-label="Product condition">
-        <option value="new">New</option>
-        <option value="refurbished">Refurbished</option>
-      </select>
-      <input id="inventory" type="number" min="0" step="1" placeholder="Inventory quantity" aria-label="Inventory quantity" />
+    <section id="store">
+      <h2>Store</h2>
+      <p class="meta"><a href="/store.html">Open full store page</a></p>
+      <div id="productList" class="grid"></div>
+        <div id="cartSummary"></div>
+      <div id="adminStoreForm" class="card hidden">
+        <h3 id="productFormTitle">Add Product (Admin)</h3>
+        <input id="name" type="text" placeholder="Item name" aria-label="Product name" />
+        <textarea id="description" placeholder="Product description (optional)" aria-label="Product description"></textarea>
+        <input id="price" type="number" step="0.01" placeholder="Price" aria-label="Product price" />
+        <input id="image" type="text" placeholder="Image URL" aria-label="Product image URL" />
+        <input id="productImageFile" type="file" accept="image/*" aria-label="Upload product image" />
+        <button id="uploadProductImageBtn" type="button" class="secondary">Upload Selected Image</button>
+        <p id="productImageUploadStatus" class="meta"></p>
+        <select id="itemCondition" aria-label="Product condition">
+          <option value="new">New</option>
+          <option value="refurbished">Refurbished</option>
+        </select>
+        <input id="inventory" type="number" min="0" step="1" placeholder="Inventory quantity" aria-label="Inventory quantity" />
       <div class="actions">
         <button id="addProductBtn">Add Product</button>
         <button id="cancelProductEditBtn" class="secondary hidden" type="button">Cancel Edit</button>
