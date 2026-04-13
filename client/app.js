@@ -13,6 +13,35 @@ const state = {
 };
 
 import { dexVoice } from './voice.js';
+// --- Always-on Dex Wake Word Listener ---
+if (dexVoice.isRecognitionSupported()) {
+  dexVoice.on('onWakeWordDetected', () => {
+    // Open chat and start user input when wake word is detected
+    if (!state.dexChatOpen) {
+      openDexChat();
+    }
+    showDexToast('Hey Dex! 🎤 Say your command now...');
+    dexVoice.startUserInput();
+  });
+
+  dexVoice.on('onTranscript', (transcript) => {
+    if (transcript && transcript.trim()) {
+      sendDexMessage(transcript);
+      // Resume listening for next command after response
+      dexVoice.startWakeWordListener();
+    }
+  });
+
+  dexVoice.on('onStatusChange', (status) => {
+    const statusEl = document.getElementById("dexVoiceStatus");
+    if (statusEl) {
+      statusEl.textContent = status;
+    }
+  });
+
+  // Start listening for "Hey Dex" on page load
+  dexVoice.startWakeWordListener();
+}
 
 // Update these 3 links when your Dex destinations are ready.
 const DEX_LINKS = {
@@ -713,10 +742,16 @@ async function sendDexMessage(message) {
   addChatMessage(message, 'user');
   document.getElementById("dexChatInput").value = '';
 
+  // Prepare conversation history for context
+  const conversationHistory = state.dexMessages.map(msg => ({
+    role: msg.sender === 'assistant' ? 'assistant' : 'user',
+    content: msg.text
+  }));
+
   try {
     const data = await userApi('/api/dex/chat', {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, conversationHistory }),
     });
     addChatMessage(data.reply, 'assistant');
     
