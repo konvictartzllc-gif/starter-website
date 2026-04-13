@@ -1,4 +1,5 @@
 import cors from "cors";
+import { randomBytes } from "crypto";
 import dotenv from "dotenv";
 import express from "express";
 import fs from "fs";
@@ -24,7 +25,10 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || `http://localhost:${PORT}`;
 
 async function start() {
   if (!process.env.JWT_SECRET) {
-    throw new Error("JWT_SECRET is required in environment");
+    // Fallback keeps the service bootable if env vars are misconfigured.
+    // Sessions/tokens issued with this secret will reset on restart.
+    process.env.JWT_SECRET = randomBytes(32).toString("hex");
+    console.warn("JWT_SECRET missing; using temporary startup secret. Configure JWT_SECRET in Render environment.");
   }
 
   // Initialize email transporter
