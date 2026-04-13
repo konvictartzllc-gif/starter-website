@@ -1,5 +1,8 @@
 import jwt from "jsonwebtoken";
 
+export function middleware(req) {
+  return NextResponse.next();
+}
 export function requireAdmin(req, res, next) {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
