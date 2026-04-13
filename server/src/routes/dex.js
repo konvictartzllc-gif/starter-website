@@ -309,6 +309,7 @@ router.post("/chat", requireUser, [body("message").isString().trim().notEmpty()]
 
   const db = req.app.locals.db;
   const message = req.body.message;
+  const conversationHistory = Array.isArray(req.body.conversationHistory) ? req.body.conversationHistory : [];
 
   // Check if user has access to Dex
   const user = await db.get(
@@ -330,7 +331,7 @@ router.post("/chat", requireUser, [body("message").isString().trim().notEmpty()]
   }
 
   try {
-    const reply = await callOpenAI(message);
+    const reply = await callOpenAI(message, conversationHistory);
     return res.json({ reply });
   } catch (err) {
     console.error("Chat error:", err);
