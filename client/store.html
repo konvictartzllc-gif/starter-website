@@ -36,14 +36,14 @@
     <div id="adminStorePanel" class="card hidden">
       <h3>Admin Inventory Control</h3>
       <p class="meta">Add products with condition, stock count, price, and image.</p>
-      <input id="storeName" type="text" placeholder="Item name" />
-      <input id="storePrice" type="number" step="0.01" min="0" placeholder="Price" />
-      <input id="storeInventory" type="number" min="0" step="1" placeholder="Inventory count" />
-      <select id="storeCondition">
+      <input id="storeName" type="text" placeholder="Item name" aria-label="Store product name" />
+      <input id="storePrice" type="number" step="0.01" min="0" placeholder="Price" aria-label="Store product price" />
+      <input id="storeInventory" type="number" min="0" step="1" placeholder="Inventory count" aria-label="Store product inventory" />
+      <select id="storeCondition" aria-label="Store product condition">
         <option value="refurbished">Refurbished</option>
         <option value="new">New</option>
       </select>
-      <input id="storeImage" type="text" placeholder="Image URL" />
+      <input id="storeImage" type="text" placeholder="Image URL" aria-label="Store product image URL" />
       <div class="actions">
         <button id="storeAddBtn">Add Inventory Item</button>
       </div>

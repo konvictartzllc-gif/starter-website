@@ -46,18 +46,18 @@
       <div id="cartSummary"></div>
     <div id="adminStoreForm" class="card hidden">
       <h3 id="productFormTitle">Add Product (Admin)</h3>
-      <input id="name" type="text" placeholder="Item name" />
-      <textarea id="description" placeholder="Product description (optional)"></textarea>
-      <input id="price" type="number" step="0.01" placeholder="Price" />
-      <input id="image" type="text" placeholder="Image URL" />
-      <input id="productImageFile" type="file" accept="image/*" />
+      <input id="name" type="text" placeholder="Item name" aria-label="Product name" />
+      <textarea id="description" placeholder="Product description (optional)" aria-label="Product description"></textarea>
+      <input id="price" type="number" step="0.01" placeholder="Price" aria-label="Product price" />
+      <input id="image" type="text" placeholder="Image URL" aria-label="Product image URL" />
+      <input id="productImageFile" type="file" accept="image/*" aria-label="Upload product image" />
       <button id="uploadProductImageBtn" type="button" class="secondary">Upload Selected Image</button>
       <p id="productImageUploadStatus" class="meta"></p>
-      <select id="itemCondition">
+      <select id="itemCondition" aria-label="Product condition">
         <option value="new">New</option>
         <option value="refurbished">Refurbished</option>
       </select>
-      <input id="inventory" type="number" min="0" step="1" placeholder="Inventory quantity" />
+      <input id="inventory" type="number" min="0" step="1" placeholder="Inventory quantity" aria-label="Inventory quantity" />
       <div class="actions">
         <button id="addProductBtn">Add Product</button>
         <button id="cancelProductEditBtn" class="secondary hidden" type="button">Cancel Edit</button>
@@ -70,14 +70,14 @@
     <h2>Our Work</h2>
     <div id="workGallery" class="grid"></div>
     <div id="adminWorkForm" class="card hidden">
-      <input id="workImg" type="text" placeholder="Work image URL" />
+      <input id="workImg" type="text" placeholder="Work image URL" aria-label="Work image URL" />
       <button id="addWorkBtn">Add Work</button>
     </div>
   </section>
 
   <section id="reviews">
     <h2>Customer Reviews</h2>
-    <textarea id="reviewText" placeholder="Leave a review"></textarea>
+    <textarea id="reviewText" placeholder="Leave a review" aria-label="Review text"></textarea>
     <button id="addReviewBtn">Submit Review</button>
     <div id="reviewsList"></div>
   </section>
@@ -86,7 +86,7 @@
     <h2>Special Deals &amp; Events</h2>
     <div id="dealsList"></div>
     <div id="adminDealForm" class="card hidden">
-      <textarea id="dealText" placeholder="Post a new deal/event"></textarea>
+      <textarea id="dealText" placeholder="Post a new deal/event" aria-label="Deal or event text"></textarea>
       <button id="addDealBtn">Post Deal</button>
     </div>
   </section>
@@ -94,8 +94,8 @@
   <section id="admin">
     <h2>Admin Access</h2>
     <div class="card">
-      <input id="adminUser" type="text" placeholder="Admin username" />
-      <input id="adminPass" type="password" placeholder="Password" />
+      <input id="adminUser" type="text" placeholder="Admin username" aria-label="Admin username" />
+      <input id="adminPass" type="password" placeholder="Password" aria-label="Admin password" />
       <div class="actions">
         <button id="loginBtn">Login</button>
         <button id="logoutBtn" class="secondary">Logout</button>
@@ -106,7 +106,7 @@
     <div id="adminCodeGenForm" class="card hidden">
       <h3>Generate Promoter Access Code</h3>
       <p class="meta">Generates a one-time promoter login code and assigns it to a recipient email.</p>
-      <input id="codeRecipientEmail" type="email" placeholder="Recipient email (required)" />
+      <input id="codeRecipientEmail" type="email" placeholder="Recipient email (required)" aria-label="Promoter recipient email" />
       <div class="actions">
         <button id="generateCodeBtn">Generate Code</button>
       </div>
@@ -121,20 +121,20 @@
   <section id="book">
     <h2>Book an Appointment</h2>
     <div class="card">
-      <input id="bookName" type="text" placeholder="Your full name" />
-      <input id="bookPhone" type="tel" placeholder="Phone number" />
-      <input id="bookEmail" type="email" placeholder="Email address" />
-      <select id="bookService">
+      <input id="bookName" type="text" placeholder="Your full name" aria-label="Booking name" />
+      <input id="bookPhone" type="tel" placeholder="Phone number" aria-label="Booking phone number" />
+      <input id="bookEmail" type="email" placeholder="Email address" aria-label="Booking email address" />
+      <select id="bookService" aria-label="Select service">
         <option value="">Select a service...</option>
         <option value="Handyman Repair">Handyman Repair</option>
         <option value="Cleaning Services">Cleaning Services</option>
         <option value="Lawn Care">Lawn Care</option>
       </select>
       <div class="date-time-row">
-        <input id="bookDate" type="date" />
-        <input id="bookTime" type="time" />
+        <input id="bookDate" type="date" aria-label="Booking date" />
+        <input id="bookTime" type="time" aria-label="Booking time" />
       </div>
-      <textarea id="bookNotes" placeholder="Additional notes (optional)"></textarea>
+      <textarea id="bookNotes" placeholder="Additional notes (optional)" aria-label="Booking notes"></textarea>
       <button id="bookSubmitBtn">Request Appointment</button>
       <p id="bookStatus" class="meta hidden"></p>
     </div>
@@ -181,21 +181,21 @@
       </div>
 
       <div id="dexLoginForm">
-        <input id="dexLoginEmail" type="email" placeholder="Email" autocomplete="email" />
-        <input id="dexLoginPassword" type="password" placeholder="Password" autocomplete="current-password" />
+        <input id="dexLoginEmail" type="email" placeholder="Email" autocomplete="email" aria-label="Dex login email" />
+        <input id="dexLoginPassword" type="password" placeholder="Password" autocomplete="current-password" aria-label="Dex login password" />
         <button id="dexLoginBtn">Log In</button>
       </div>
 
       <div id="dexRegisterForm" class="hidden">
-        <input id="dexRegUsername" type="text" placeholder="Username" autocomplete="username" />
-        <input id="dexRegEmail" type="email" placeholder="Email" autocomplete="email" />
-        <input id="dexRegPassword" type="password" placeholder="Password (min 8 characters)" autocomplete="new-password" />
+        <input id="dexRegUsername" type="text" placeholder="Username" autocomplete="username" aria-label="Dex registration username" />
+        <input id="dexRegEmail" type="email" placeholder="Email" autocomplete="email" aria-label="Dex registration email" />
+        <input id="dexRegPassword" type="password" placeholder="Password (min 8 characters)" autocomplete="new-password" aria-label="Dex registration password" />
         <button id="dexRegisterBtn">Create Account &amp; Start Free Trial</button>
       </div>
 
       <div id="dexCodeForm" class="hidden">
         <p class="meta">Promoters: enter your one-time admin code to sign in instantly and get <strong>lifetime Dex access</strong>.</p>
-        <input id="dexCodeInput" type="text" placeholder="Access Code (e.g. DEXA3B7C)" autocomplete="off" style="text-transform:uppercase" />
+        <input id="dexCodeInput" type="text" placeholder="Access Code (e.g. DEXA3B7C)" autocomplete="off" style="text-transform:uppercase" aria-label="Promoter access code" />
         <button id="dexRedeemCodeBtn">Sign In With Code</button>
       </div>
 
@@ -224,7 +224,7 @@
             <span id="dexVoiceStatus" class="voice-status"></span>
           </div>
           <div class="dex-text-input">
-            <input id="dexChatInput" type="text" placeholder="Type or say 'Hey Dex' to activate voice..." />
+            <input id="dexChatInput" type="text" placeholder="Type or say 'Hey Dex' to activate voice..." aria-label="Dex chat input" />
             <button id="dexChatSend">Send</button>
           </div>
           <p class="meta dex-voice-hint">&#x1F4A1; Say "Hey Dex" to activate voice, or click the microphone button</p>
@@ -235,7 +235,7 @@
         <h3>Referral Dashboard</h3>
         <p class="meta">Share your link. Earn <strong>$2 for every paying subscriber</strong> who signs up with your code.</p>
         <div class="dex-referral-link-row">
-          <input id="dexReferralLink" type="text" readonly />
+          <input id="dexReferralLink" type="text" readonly aria-label="Referral link" />
           <button id="dexCopyReferralBtn" class="secondary">Copy Link</button>
         </div>
         <p id="dexCopyStatus" class="meta dex-copy-status hidden">Copied!</p>
