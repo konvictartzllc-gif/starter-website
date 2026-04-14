@@ -49,10 +49,10 @@ code .\server\.env
 Set these variables:
 ```env
 PORT=4000
-CLIENT_ORIGIN=http://localhost:4000
-JWT_SECRET=your-64-char-random-secret-here
+CLIENT_ORIGIN=https://konvict-artz.com,https://www.konvict-artz.com,https://konvictartz.com
+JWT_SECRET=JWT_SECRET=3887ac7e1a6bef9709087929c45e2407d53a6da580bbac0821a2ef06ea87aacf
 ADMIN_USERNAME=KonvictArtz
-ADMIN_PASSWORD=K0nv1ctArtz2026Launch
+ADMIN_PASSWORD=Thuglife1423
 
 # Optional: Email notifications
 SMTP_HOST=smtp.gmail.com
