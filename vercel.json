@@ -1,7 +1,6 @@
 {
-  "buildCommand": "cd client && npm install && npm run build",
-  "outputDirectory": "client/dist",
-  "installCommand": "echo 'skip root install'",
+  "buildCommand": "cd new code fixed/client && npm install && npm run build",
+  "outputDirectory": "new code fixed/client/dist",
   "rewrites": [
     {
       "source": "/api/:path*",
