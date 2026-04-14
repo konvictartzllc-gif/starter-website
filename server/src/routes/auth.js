@@ -32,24 +32,18 @@ router.post(
     }
 
     const { username, password } = req.body;
-    const db = req.app.locals.db;
+    const envUser = process.env.ADMIN_USERNAME;
+    const envPass = process.env.ADMIN_PASSWORD;
 
-    const admin = await db.get(
-      "SELECT id, username, password_hash FROM admins WHERE username = ? COLLATE NOCASE",
-      username,
-    );
-
-    if (!admin) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    const ok = await bcrypt.compare(password, admin.password_hash);
-    if (!ok) {
+    if (
+      username !== envUser ||
+      password !== envPass
+    ) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const token = jwt.sign(
-      { sub: admin.id, username: admin.username, role: "admin" },
+      { sub: username, username, role: "admin" },
       process.env.JWT_SECRET,
       { expiresIn: "8h" },
     );
