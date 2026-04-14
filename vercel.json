@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd new code fixed/client && npm install && npm run build",
-  "outputDirectory": "new code fixed/client/dist",
+  "buildCommand": "cd new-code-fixed/client && npm install && npm run build",
+  "outputDirectory": "new-code-fixed/client/dist",
   "rewrites": [
     {
       "source": "/api/:path*",
