@@ -1,342 +1,227 @@
-import { randomUUID } from "crypto";
 import { Router } from "express";
-import { body, param, validationResult } from "express-validator";
-import { Client, Environment } from "square";
-import { requireAdmin, requireUser } from "../middleware/auth.js";
-import { sendPromoterNotification, sendAccessCode } from "../email.js";
+import { body, validationResult } from "express-validator";
+import OpenAI from "openai";
+import { requireUser, optionalUser } from "../middleware/auth.js";
+import { getDb } from "../db.js";
+import { triggerEmergencyAlert, sendLowInventoryAlert } from "../services/ringcentral.js";
 
 const router = Router();
 
-async function generateReferralCode(db, username) {
-  const base = username.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "DEX";
-  for (let i = 0; i < 20; i += 1) {
-    const code = `${base}${Math.floor(1000 + Math.random() * 9000)}`;
-    const existing = await db.get("SELECT id FROM users WHERE referral_code = ?", code);
-    if (!existing) {
-      return code;
-    }
-  }
+// ── Emergency keywords ────────────────────────────────────────────────────────
+const EMERGENCY_PATTERNS = [
+  /\b(kill (my|him|her|them|myself|yourself))\b/i,
+  /\b(want to die|going to die|end my life|end it all)\b/i,
+  /\b(suicide|suicidal|self.?harm|cut myself|hurt myself)\b/i,
+  /\b(shoot (him|her|them|myself|everyone))\b/i,
+  /\b(bomb|attack|mass shooting|hurt (someone|people))\b/i,
+  /\b(i (can't|cannot) go on|no reason to live)\b/i,
+];
 
-  return `${base}${Date.now().toString().slice(-6)}`;
+function detectEmergency(text) {
+  return EMERGENCY_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-function getSquareClient() {
-  const accessToken = process.env.SQUARE_ACCESS_TOKEN;
-  if (!accessToken) {
-    return null;
-  }
+// ── Dex AI system prompt ──────────────────────────────────────────────────────
+const DEX_SYSTEM_PROMPT = `You are Dex, the AI assistant for Konvict Artz — a business that offers lawn care, cleaning services, handyman repair, and sells refurbished and new electronics.
 
-  const env = String(process.env.SQUARE_ENVIRONMENT || "sandbox").toLowerCase() === "production"
-    ? Environment.Production
-    : Environment.Sandbox;
+Your personality:
+- You talk like a real, friendly human — casual, warm, and helpful. Not robotic, not stiff.
+- You use natural language, contractions, and occasional light humor.
+- You remember everything from previous conversations with this person and reference it naturally.
+- You never say "As an AI..." or "I'm just a language model..." — you ARE Dex, the Konvict Artz assistant.
 
-  return new Client({ accessToken, environment: env });
+Your capabilities (for subscribers):
+- Help customers book lawn care, cleaning, handyman, or product purchases
+- Answer questions about services, pricing, and availability
+- Schedule and manage appointments (add to calendar when requested)
+- Send emails or texts on behalf of the user when asked
+- Provide reminders and follow-ups
+
+Your limitations (consumer tier — $9.99/month):
+- You help with Konvict Artz services and products only
+- You do NOT manage the user's full business or act as their personal business manager
+- You do NOT access external websites or make purchases outside Konvict Artz
+- You do NOT provide legal, medical, or financial advice
+
+Business info:
+- Services: Lawn Care, Cleaning Services, Handyman Repair
+- Products: Refurbished electronics, new electronics
+- Website: https://www.konvict-artz.com
+- Subscription: $9.99/month after 3-day free trial
+
+If someone asks about pricing, appointments, or wants to book a service, help them and offer to schedule it.
+If someone seems upset, be empathetic and supportive.
+Keep responses concise — 1-3 sentences unless more detail is needed.`;
+
+const DEX_ADMIN_SYSTEM_PROMPT = `${DEX_SYSTEM_PROMPT}
+
+ADMIN MODE — You have full access. You can:
+- View and update inventory
+- Manage affiliates and promo codes
+- Access all user data and analytics
+- Run promotions and site improvements
+- Handle all business operations for Konvict Artz
+- Make decisions about pricing, services, and marketing
+- There are NO limitations in admin mode.`;
+
+// ── Get OpenAI client ─────────────────────────────────────────────────────────
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
-router.post(
-  "/create-promoter",
-  requireAdmin,
-  [body("email").isEmail().normalizeEmail()],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const db = req.app.locals.db;
-    const email = req.body.email.toLowerCase();
-    const user = await db.get(
-      "SELECT id, username, referral_code FROM users WHERE email = ? COLLATE NOCASE",
-      email,
-    );
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const referralCode = user.referral_code || (await generateReferralCode(db, user.username));
-
-    await db.run(
-      "UPDATE users SET referral_code = ?, is_promoter = 1, free_access = 1 WHERE id = ?",
-      referralCode,
-      user.id,
-    );
-
-    const appBase = process.env.CLIENT_ORIGIN || "http://localhost:4000";
-    const referralLink = `${appBase}/?ref=${referralCode}`;
-    
-    // Send email notification to promoter
-    await sendPromoterNotification(email, referralCode, referralLink);
-
-    return res.json({
-      referralCode,
-      link: referralLink,
-    });
-  },
-);
-
-router.post(
-  "/generate-code",
-  requireAdmin,
-  [body("email").isEmail().normalizeEmail()],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const db = req.app.locals.db;
-    const recipientEmail = req.body.email.toLowerCase();
-    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-    let code;
-    for (let i = 0; i < 20; i++) {
-      const suffix = [...Array(5)].map(() => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
-      const candidate = `DEX${suffix}`;
-      const existing = await db.get("SELECT id FROM access_codes WHERE code = ?", candidate);
-      if (!existing) { code = candidate; break; }
-    }
-
-    if (!code) {
-      return res.status(500).json({ error: "Failed to generate unique code. Please try again." });
-    }
-
-    await db.run("INSERT INTO access_codes (code, assigned_email) VALUES (?, ?)", code, recipientEmail);
-
-    const appBase = process.env.CLIENT_ORIGIN || "https://konvict-artz.com";
-    const emailSent = await sendAccessCode(recipientEmail, code, appBase);
-
-    return res.json({ code, emailSent, assignedEmail: recipientEmail });
-  },
-);
-
-router.get(
-  "/stats/:code",
-  [param("code").isString().trim().isLength({ min: 3, max: 64 })],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const db = req.app.locals.db;
-    const row = await db.get(
-      "SELECT referrals_count, free_access, subscribed_referrals_count, referral_earnings_cents FROM users WHERE referral_code = ? COLLATE NOCASE",
-      req.params.code,
-    );
-
-    if (!row) {
-      return res.status(404).json({ error: "Not found" });
-    }
-
-    return res.json({
-      referrals: row.referrals_count,
-      freeAccess: Boolean(row.free_access),
-      subscribedReferrals: row.subscribed_referrals_count ?? 0,
-      earningsCents: row.referral_earnings_cents ?? 0,
-    });
-  },
-);
-
-router.post("/access-ai", requireUser, async (req, res) => {
-  const db = req.app.locals.db;
-  const user = await db.get(
-    "SELECT free_access, paid, trial_expires_at FROM users WHERE id = ?",
-    req.user.sub,
-  );
-
-  if (!user) {
-    return res.status(404).json({ error: "No user" });
-  }
-
-  // Check if user has promoter/paid access
-  if (Boolean(user.free_access) || Boolean(user.paid)) {
-    return res.status(200).json({ 
-      access: true,
-      type: user.free_access ? "promoter" : "paid"
-    });
-  }
-
-  // Check if trial is still active
-  const now = new Date();
-  const trialExpires = user.trial_expires_at ? new Date(user.trial_expires_at) : null;
-  
-  if (trialExpires && now < trialExpires) {
-    return res.status(200).json({ 
-      access: true,
-      type: "trial",
-      expiresAt: trialExpires.toISOString()
-    });
-  }
-
-  // No access - trial expired and not paid
-  return res.status(403).json({ 
-    access: false,
-    type: "expired_trial",
-    message: "Your trial has expired. Please subscribe to continue."
-  });
-});
-
-router.post(
-  "/pay",
-  requireUser,
-  [body("sourceId").isString().trim().isLength({ min: 10 })],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const squareClient = getSquareClient();
-    const locationId = process.env.SQUARE_LOCATION_ID;
-
-    if (!squareClient || !locationId) {
-      return res.status(503).json({
-        error: "Square payment is not configured",
-      });
-    }
-
-    const db = req.app.locals.db;
-    const user = await db.get("SELECT id, paid FROM users WHERE id = ?", req.user.sub);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    if (user.paid) {
-      return res.json({ success: true, alreadyPaid: true });
-    }
-
-    const amountCents = Number(process.env.DEX_PRICE_CENTS || 1000);
-    const currency = process.env.DEX_CURRENCY || "USD";
-    const idempotencyKey = randomUUID();
-
-    try {
-      const payment = await squareClient.paymentsApi.createPayment({
-        sourceId: req.body.sourceId,
-        idempotencyKey,
-        amountMoney: {
-          amount: amountCents,
-          currency,
-        },
-        locationId,
-      });
-
-      const squarePaymentId = payment?.result?.payment?.id || payment?.payment?.id || null;
-      const status = payment?.result?.payment?.status || payment?.payment?.status || "COMPLETED";
-
-      await db.run("UPDATE users SET paid = 1 WHERE id = ?", user.id);
-
-      // Credit referring promoter $2 per subscription
-      const paidUser = await db.get("SELECT referred_by FROM users WHERE id = ?", user.id);
-      if (paidUser?.referred_by) {
-        await db.run(
-          "UPDATE users SET referral_earnings_cents = referral_earnings_cents + 200, subscribed_referrals_count = subscribed_referrals_count + 1 WHERE referral_code = ? COLLATE NOCASE",
-          paidUser.referred_by,
-        );
-      }
-
-      await db.run(
-        "INSERT INTO payments (user_id, square_payment_id, amount_cents, currency, status, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)",
-        user.id,
-        squarePaymentId,
-        amountCents,
-        currency,
-        status,
-        idempotencyKey,
-      );
-
-      return res.json({ success: true, paymentId: squarePaymentId, status });
-    } catch (err) {
-      return res.status(502).json({ error: err.message || "Payment failed" });
-    }
-  },
-);
-
-// Dex Chat endpoint with OpenAI integration
-async function callOpenAI(message, conversationHistory = []) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || "gpt-3.5-turbo";
-
-  if (!apiKey) {
-    // Fallback response when OpenAI is not configured
-    return `I'm Dex, your AI assistant. To enable AI chat, please configure OpenAI API. For now, I can help you: say "book a service", "check my bookings", "set a reminder", or ask me anything!`;
-  }
-
-  const messages = [
-    ...conversationHistory,
-    { role: "user", content: message }
-  ];
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: "You are Dex, a helpful AI assistant for Konvict Artz home services. Help users book services, manage appointments, set reminders, and answer questions about home services. Keep responses concise and friendly.",
-          },
-          ...messages
-        ],
-        max_tokens: 150,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("OpenAI API error:", await response.text());
-      return "Sorry, I encountered an error. Please try again.";
-    }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || "I didn't understand that. Can you rephrase?";
-  } catch (error) {
-    console.error("OpenAI API call failed:", error);
-    return "I'm having trouble connecting. Please try again.";
-  }
-}
-
-router.post("/chat", requireUser, [body("message").isString().trim().notEmpty()], async (req, res) => {
+// ── POST /api/dex/chat ────────────────────────────────────────────────────────
+router.post("/chat", requireUser, [body("message").notEmpty().trim()], async (req, res) => {
   const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const db = req.app.locals.db;
-  const message = req.body.message;
-  const conversationHistory = Array.isArray(req.body.conversationHistory) ? req.body.conversationHistory : [];
-
-  // Check if user has access to Dex
-  const user = await db.get(
-    "SELECT free_access, paid, trial_expires_at FROM users WHERE id = ?",
-    req.user.sub,
-  );
-
-  if (!user) {
-    return res.status(404).json({ error: "User not found" });
-  }
+  const { message } = req.body;
+  const db = getDb();
+  const userId = req.user.id;
 
   // Check access
-  const now = new Date();
-  const trialExpires = user.trial_expires_at ? new Date(user.trial_expires_at) : null;
-  const hasAccess = Boolean(user.free_access) || Boolean(user.paid) || (trialExpires && now < trialExpires);
+  const user = await db.get("SELECT * FROM users WHERE id = ?", [userId]);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const isAdmin = user.role === "admin";
+  let hasAccess = isAdmin;
 
   if (!hasAccess) {
-    return res.status(403).json({ error: "Access denied. Please subscribe to use Dex AI." });
+    if (user.access_type === "paid") {
+      if (user.sub_expires && new Date() > new Date(user.sub_expires)) {
+        await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [userId]);
+        return res.status(403).json({ error: "subscription_expired", message: "Your subscription has expired. Renew for $9.99/month to keep chatting with Dex." });
+      }
+      hasAccess = true;
+    } else if (user.access_type === "trial") {
+      const trialEnd = new Date(user.trial_start);
+      trialEnd.setDate(trialEnd.getDate() + 3);
+      if (new Date() > trialEnd) {
+        await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [userId]);
+        return res.status(403).json({ error: "trial_expired", message: "Your 3-day free trial has ended. Subscribe for $9.99/month to continue." });
+      }
+      hasAccess = true;
+    } else if (user.access_type === "unlimited") {
+      hasAccess = true;
+    }
   }
 
-  try {
-    const reply = await callOpenAI(message, conversationHistory);
-    return res.json({ reply });
-  } catch (err) {
-    console.error("Chat error:", err);
-    return res.status(500).json({ error: "Chat processing failed" });
+  if (!hasAccess) {
+    return res.status(403).json({ error: "no_access", message: "Start your free 3-day trial or subscribe for $9.99/month." });
   }
+
+  // Emergency detection
+  if (detectEmergency(message)) {
+    const userInfo = `${user.name || "Unknown"} (${user.email})`;
+    await triggerEmergencyAlert(userInfo, message);
+    return res.json({
+      reply: "Hey, I hear you and I want you to know you matter. I've just notified someone who can help right away. Please reach out to the 988 Suicide & Crisis Lifeline by calling or texting 988. You're not alone.",
+      emergency: true,
+    });
+  }
+
+  // Load chat history (last 20 messages for memory)
+  const history = await db.all(
+    "SELECT role, content FROM chat_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 20",
+    [userId]
+  );
+  const messages = history.reverse().map((h) => ({ role: h.role, content: h.content }));
+
+  // Add current message
+  messages.push({ role: "user", content: message });
+
+  // Save user message to history
+  await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'user', ?)", [userId, message]);
+
+  try {
+    const openai = getOpenAI();
+    const systemPrompt = isAdmin ? DEX_ADMIN_SYSTEM_PROMPT : DEX_SYSTEM_PROMPT;
+
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      messages: [{ role: "system", content: systemPrompt }, ...messages],
+      max_tokens: 500,
+      temperature: 0.85,
+    });
+
+    const reply = completion.choices[0].message.content.trim();
+
+    // Save Dex's reply to history
+    await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, reply]);
+
+    // Check for appointment intent
+    const appointmentIntent = /\b(schedule|book|appointment|set up|add to (my )?calendar)\b/i.test(message);
+
+    return res.json({ reply, appointmentIntent });
+  } catch (err) {
+    console.error("OpenAI error:", err.message);
+    // Fallback response
+    const fallback = "Hey, I'm having a little trouble connecting right now. Give me a sec and try again — I'll be right here!";
+    return res.json({ reply: fallback });
+  }
+});
+
+// ── POST /api/dex/access — check access without chatting ─────────────────────
+router.get("/access", requireUser, async (req, res) => {
+  const db = getDb();
+  const user = await db.get("SELECT * FROM users WHERE id = ?", [req.user.id]);
+  if (!user) return res.status(404).json({ error: "Not found" });
+
+  let access = user.access_type;
+  let trialDaysLeft = null;
+
+  if (access === "trial" && user.trial_start) {
+    const trialEnd = new Date(user.trial_start);
+    trialEnd.setDate(trialEnd.getDate() + 3);
+    const now = new Date();
+    if (now > trialEnd) {
+      access = "expired";
+      await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [user.id]);
+    } else {
+      trialDaysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
+    }
+  }
+
+  return res.json({ access, trialDaysLeft });
+});
+
+// ── POST /api/dex/appointment — save appointment ──────────────────────────────
+router.post("/appointment", requireUser, [
+  body("title").notEmpty().trim(),
+  body("start_time").notEmpty(),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const { title, description, start_time, end_time } = req.body;
+  const db = getDb();
+
+  const result = await db.run(
+    `INSERT INTO appointments (user_id, title, description, start_time, end_time)
+     VALUES (?, ?, ?, ?, ?)`,
+    [req.user.id, title, description || null, start_time, end_time || null]
+  );
+
+  return res.json({ success: true, id: result.lastID, title, start_time });
+});
+
+// ── GET /api/dex/appointments ─────────────────────────────────────────────────
+router.get("/appointments", requireUser, async (req, res) => {
+  const db = getDb();
+  const appts = await db.all(
+    "SELECT * FROM appointments WHERE user_id = ? ORDER BY start_time ASC",
+    [req.user.id]
+  );
+  return res.json(appts);
+});
+
+// ── GET /api/dex/history — chat history ──────────────────────────────────────
+router.get("/history", requireUser, async (req, res) => {
+  const db = getDb();
+  const history = await db.all(
+    "SELECT role, content, created_at FROM chat_history WHERE user_id = ? ORDER BY created_at ASC LIMIT 100",
+    [req.user.id]
+  );
+  return res.json(history);
 });
 
 export default router;
