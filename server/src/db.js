@@ -4,192 +4,135 @@ import path from "path";
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 
+let db = null;
+
 export async function initDb({ dbPath, adminUsername, adminPassword }) {
   const dbDir = path.dirname(dbPath);
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  const db = await open({
-    filename: dbPath,
-    driver: sqlite3.Database,
-  });
-
+  db = await open({ filename: dbPath, driver: sqlite3.Database });
   await db.exec("PRAGMA journal_mode = WAL;");
+  await db.exec("PRAGMA foreign_keys = ON;");
 
+  // ── Users ──────────────────────────────────────────────────────────────────
   await db.exec(`
-    CREATE TABLE IF NOT EXISTS admins (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS products (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      price REAL NOT NULL,
-      image TEXT NOT NULL,
-      item_condition TEXT NOT NULL DEFAULT 'refurbished',
-      inventory INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS reviews (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      text TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS works (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      image TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS deals (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      text TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS bookings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      email TEXT NOT NULL,
-      service TEXT NOT NULL,
-      booking_date TEXT NOT NULL,
-      booking_time TEXT NOT NULL,
-      notes TEXT NOT NULL DEFAULT '',
-      total_price REAL,
-      discounted INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT NOT NULL UNIQUE,
-      username TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
-      referral_code TEXT UNIQUE,
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      email       TEXT    UNIQUE NOT NULL,
+      name        TEXT,
+      password    TEXT,
+      role        TEXT    NOT NULL DEFAULT 'user',
+      access_type TEXT    NOT NULL DEFAULT 'none',
+      trial_start TEXT,
+      sub_expires TEXT,
+      square_customer_id TEXT,
+      square_subscription_id TEXT,
       referred_by TEXT,
-      is_promoter INTEGER NOT NULL DEFAULT 0,
-      free_access INTEGER NOT NULL DEFAULT 0,
-      referrals_count INTEGER NOT NULL DEFAULT 0,
-      paid INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS payments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL REFERENCES users(id),
-      square_payment_id TEXT,
-      amount_cents INTEGER NOT NULL,
-      currency TEXT NOT NULL DEFAULT 'USD',
-      status TEXT NOT NULL,
-      idempotency_key TEXT NOT NULL UNIQUE,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS access_codes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      code TEXT NOT NULL UNIQUE,
-      assigned_email TEXT,
-      used INTEGER NOT NULL DEFAULT 0,
-      used_by_user_id INTEGER REFERENCES users(id),
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      used_at TEXT
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `);
 
-  // Migration: add user_id column to bookings if it doesn't exist yet.
-  try {
-    await db.exec("ALTER TABLE bookings ADD COLUMN user_id INTEGER REFERENCES users(id);");
-  } catch {}
-
-  // Migration: add description column to products if it doesn't exist yet.
-  try {
-    await db.exec("ALTER TABLE products ADD COLUMN description TEXT NOT NULL DEFAULT '';");
-  } catch {
-    // Column already exists — safe to ignore.
-  }
-
-  // Migration: add pricing/discount columns to bookings if missing.
-  try {
-    await db.exec("ALTER TABLE bookings ADD COLUMN total_price REAL;");
-  } catch {
-    // Column already exists — safe to ignore.
-  }
-
-  try {
-    await db.exec("ALTER TABLE bookings ADD COLUMN discounted INTEGER NOT NULL DEFAULT 0;");
-  } catch {
-    // Column already exists — safe to ignore.
-  }
-
-  // Migration: store item condition and inventory for products.
-  try {
-    await db.exec("ALTER TABLE products ADD COLUMN item_condition TEXT NOT NULL DEFAULT 'refurbished';");
-  } catch {
-    // Column already exists — safe to ignore.
-  }
-
-  try {
-    await db.exec("ALTER TABLE products ADD COLUMN inventory INTEGER NOT NULL DEFAULT 1;");
-  } catch {
-    // Column already exists — safe to ignore.
-  }
-
-  const userMigrations = [
-    "ALTER TABLE users ADD COLUMN referral_code TEXT;",
-    "ALTER TABLE users ADD COLUMN referred_by TEXT;",
-    "ALTER TABLE users ADD COLUMN is_promoter INTEGER NOT NULL DEFAULT 0;",
-    "ALTER TABLE users ADD COLUMN free_access INTEGER NOT NULL DEFAULT 0;",
-    "ALTER TABLE users ADD COLUMN referrals_count INTEGER NOT NULL DEFAULT 0;",
-    "ALTER TABLE users ADD COLUMN paid INTEGER NOT NULL DEFAULT 0;",
-    "ALTER TABLE users ADD COLUMN trial_started_at TEXT;",
-    "ALTER TABLE users ADD COLUMN trial_expires_at TEXT;",
-    "ALTER TABLE users ADD COLUMN referral_earnings_cents INTEGER NOT NULL DEFAULT 0;",
-    "ALTER TABLE users ADD COLUMN subscribed_referrals_count INTEGER NOT NULL DEFAULT 0;",
-  ];
-
-  for (const sql of userMigrations) {
-    try {
-      await db.exec(sql);
-    } catch {
-      // Column already exists — safe to ignore.
-    }
-  }
-
-  try {
-    await db.exec("ALTER TABLE access_codes ADD COLUMN assigned_email TEXT;");
-  } catch {
-    // Column already exists — safe to ignore.
-  }
-
-  try {
-    await db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);");
-  } catch {
-    // Index may fail on duplicate legacy data — do not block startup.
-  }
-
-  const existingAdmin = await db.get("SELECT id FROM admins WHERE username = ?", adminUsername);
-  const passwordHash = await bcrypt.hash(adminPassword, 12);
-
-  if (!existingAdmin) {
-    await db.run(
-      "INSERT INTO admins (username, password_hash) VALUES (?, ?)",
-      adminUsername,
-      passwordHash,
+  // ── Affiliates / Promoters ─────────────────────────────────────────────────
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS affiliates (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER NOT NULL REFERENCES users(id),
+      promo_code   TEXT    UNIQUE NOT NULL,
+      signups      INTEGER NOT NULL DEFAULT 0,
+      paid_subs    INTEGER NOT NULL DEFAULT 0,
+      earnings     REAL    NOT NULL DEFAULT 0.0,
+      created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
     );
-  } else {
-    await db.run(
-      "UPDATE admins SET password_hash = ? WHERE id = ?",
-      passwordHash,
-      existingAdmin.id,
+  `);
+
+  // ── Inventory ──────────────────────────────────────────────────────────────
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS inventory (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      name         TEXT    NOT NULL,
+      description  TEXT,
+      category     TEXT,
+      price_cents  INTEGER NOT NULL DEFAULT 0,
+      quantity     INTEGER NOT NULL DEFAULT 0,
+      low_threshold INTEGER NOT NULL DEFAULT 5,
+      alerted      INTEGER NOT NULL DEFAULT 0,
+      image_url    TEXT,
+      square_catalog_id TEXT,
+      created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at   TEXT    NOT NULL DEFAULT (datetime('now'))
     );
+  `);
+
+  // ── Chat Memory ────────────────────────────────────────────────────────────
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_history (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id),
+      role       TEXT    NOT NULL,
+      content    TEXT    NOT NULL,
+      created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  // ── Appointments ──────────────────────────────────────────────────────────
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS appointments (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         INTEGER NOT NULL REFERENCES users(id),
+      title           TEXT    NOT NULL,
+      description     TEXT,
+      start_time      TEXT    NOT NULL,
+      end_time        TEXT,
+      google_event_id TEXT,
+      created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  // ── Promo Codes ────────────────────────────────────────────────────────────
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS promo_codes (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      code        TEXT    UNIQUE NOT NULL,
+      type        TEXT    NOT NULL DEFAULT 'free_trial',
+      uses_left   INTEGER NOT NULL DEFAULT 1,
+      created_by  INTEGER REFERENCES users(id),
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  // ── Payments / Transactions ────────────────────────────────────────────────
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS payments (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         INTEGER NOT NULL REFERENCES users(id),
+      square_payment_id TEXT,
+      amount_cents    INTEGER NOT NULL,
+      currency        TEXT    NOT NULL DEFAULT 'USD',
+      status          TEXT    NOT NULL DEFAULT 'pending',
+      affiliate_code  TEXT,
+      created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  // ── Seed admin user ────────────────────────────────────────────────────────
+  const existing = await db.get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+  if (!existing) {
+    const hashed = await bcrypt.hash(adminPassword, 12);
+    await db.run(
+      `INSERT INTO users (email, name, password, role, access_type)
+       VALUES (?, ?, ?, 'admin', 'unlimited')`,
+      [adminUsername, "Admin", hashed]
+    );
+    console.log(`✅ Admin user seeded: ${adminUsername}`);
   }
 
+  console.log("✅ Database initialized");
+  return db;
+}
+
+export function getDb() {
+  if (!db) throw new Error("Database not initialized. Call initDb() first.");
   return db;
 }

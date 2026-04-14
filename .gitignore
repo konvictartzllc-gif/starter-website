@@ -1,5 +1,10 @@
 node_modules/
 server/node_modules/
+client/node_modules/
 server/data/
 server/.env
+server/.env.test
+client/.env
+client/dist/
 .vercel
+*.db
