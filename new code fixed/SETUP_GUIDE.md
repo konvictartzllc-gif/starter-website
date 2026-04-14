@@ -199,7 +199,7 @@ konvict-artz/
     │   ├── components/
     │   │   └── DexChat.jsx    ← The Dex AI chat widget
     │   ├── hooks/
-    │   │   ├── useAuth.js     ← Auth context
+    │   │   ├── useAuth.jsx     ← Auth context
     │   │   └── useDexVoice.js ← Wake word + voice
     │   ├── pages/
     │   │   ├── Home.jsx       ← Main landing page
