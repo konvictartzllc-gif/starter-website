@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./hooks/useAuth.jsx";
+import { AuthProvider } from "./hooks/useAuth.jsxx";
 import Home from "./pages/Home.jsx";
 import { RegisterPage, LoginPage } from "./pages/Auth.jsx";
 import AdminPortal from "./pages/AdminPortal.jsx";
