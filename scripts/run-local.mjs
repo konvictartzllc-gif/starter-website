@@ -32,7 +32,7 @@ function isServerAlreadyRunning() {
             resolve(false);
           }
         });
-      },
+      }
     );
 
     req.on("timeout", () => {
