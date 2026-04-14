@@ -7,11 +7,24 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
   const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef(null);
   const listeningForCommandRef = useRef(false);
+  const wakeTimeoutRef = useRef(null);
   const synthRef = useRef(window.speechSynthesis);
+
+  const clearWakeTimeout = useCallback(() => {
+    if (wakeTimeoutRef.current) {
+      clearTimeout(wakeTimeoutRef.current);
+      wakeTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    synthRef.current = window.speechSynthesis;
+  }, []);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     setIsSupported(!!SpeechRecognition);
+
     if (!SpeechRecognition || !enabled) return;
 
     const recognition = new SpeechRecognition();
@@ -28,11 +41,24 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
       if (!listeningForCommandRef.current) {
         // Listening for wake word
         if (transcript.includes(WAKE_WORD)) {
+          const spokenCommand = transcript.replace(WAKE_WORD, "").trim();
           listeningForCommandRef.current = true;
           setStatus("active");
-          onWakeWord?.();
+          onWakeWord?.({ transcript, spokenCommand });
+
+          // If the user says the wake phrase and command in the same utterance,
+          // send it immediately instead of waiting for a second transcript.
+          if (lastResult.isFinal && spokenCommand.length > 2) {
+            clearWakeTimeout();
+            listeningForCommandRef.current = false;
+            setStatus("listening");
+            onTranscript?.(spokenCommand);
+            return;
+          }
+
           // Reset after 10 seconds if no command
-          setTimeout(() => {
+          clearWakeTimeout();
+          wakeTimeoutRef.current = setTimeout(() => {
             listeningForCommandRef.current = false;
             setStatus("listening");
           }, 10000);
@@ -42,6 +68,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
         if (lastResult.isFinal && transcript.trim()) {
           const command = transcript.replace(WAKE_WORD, "").trim();
           if (command.length > 2) {
+            clearWakeTimeout();
             listeningForCommandRef.current = false;
             setStatus("listening");
             onTranscript?.(command);
@@ -71,31 +98,51 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     }
 
     return () => {
+      clearWakeTimeout();
+      listeningForCommandRef.current = false;
       try { recognition.stop(); } catch {}
+      recognitionRef.current = null;
+      setStatus("idle");
     };
-  }, [enabled]);
+  }, [enabled, onWakeWord, onTranscript, clearWakeTimeout]);
 
   const speak = useCallback((text) => {
     const synth = synthRef.current;
-    if (!synth) return;
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    // Try to pick a natural voice
-    const voices = synth.getVoices();
-    const preferred = voices.find(
-      (v) => v.name.includes("Google US English") || v.name.includes("Samantha") || v.lang === "en-US"
-    );
-    if (preferred) utterance.voice = preferred;
-    setStatus("speaking");
-    utterance.onend = () => setStatus("listening");
-    synth.speak(utterance);
+    if (!synth || !text?.trim()) return;
+
+    const speakNow = () => {
+      synth.cancel();
+      if (typeof synth.resume === "function") synth.resume();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      // Try to pick a natural voice
+      const voices = synth.getVoices();
+      const preferred = voices.find(
+        (v) => v.name.includes("Google US English") || v.name.includes("Samantha") || v.lang === "en-US"
+      );
+      if (preferred) utterance.voice = preferred;
+      setStatus("speaking");
+      utterance.onend = () => setStatus("listening");
+      utterance.onerror = () => setStatus("listening");
+      synth.speak(utterance);
+    };
+
+    if (synth.getVoices().length === 0 && "onvoiceschanged" in synth) {
+      synth.onvoiceschanged = () => {
+        synth.onvoiceschanged = null;
+        speakNow();
+      };
+    } else {
+      speakNow();
+    }
   }, []);
 
   const stopSpeaking = useCallback(() => {
-    synthRef.current?.cancel();
+    const synth = synthRef.current;
+    if (!synth) return;
+    synth.cancel();
     setStatus("listening");
   }, []);
 
