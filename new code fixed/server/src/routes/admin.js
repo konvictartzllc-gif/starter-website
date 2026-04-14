@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { requireAdmin } from "../middleware/auth.js";
 import { getDb } from "../db.js";
 import { sendPromoterNotification, sendPromoCode } from "../services/email.js";
-import { sendLowInventoryAlert } from "../services/twilio.js";
+import { sendLowInventoryAlert } from "../services/ringcentral.js";
 
 const router = Router();
 

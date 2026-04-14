@@ -3,7 +3,7 @@ import { body, validationResult } from "express-validator";
 import OpenAI from "openai";
 import { requireUser, optionalUser } from "../middleware/auth.js";
 import { getDb } from "../db.js";
-import { triggerEmergencyAlert, sendLowInventoryAlert } from "../services/twilio.js";
+import { triggerEmergencyAlert, sendLowInventoryAlert } from "../services/ringcentral.js";
 
 const router = Router();
 
