@@ -25,12 +25,22 @@ services:
         sync: false
       - key: SQUARE_LOCATION_ID
         sync: false
-      - key: TWILIO_ACCOUNT_SID
+      - key: RC_CLIENT_ID
         sync: false
-      - key: TWILIO_AUTH_TOKEN
+      - key: RC_CLIENT_SECRET
         sync: false
-      - key: TWILIO_PHONE_NUMBER
+      - key: RC_USERNAME
         sync: false
+      - key: RC_PASSWORD
+        sync: false
+      - key: RC_PHONE_NUMBER
+        sync: false
+      - key: RC_SERVER
+        value: https://platform.ringcentral.com
+      - key: EMERGENCY_PHONE
+        value: "2057492403"
+      - key: ADMIN_PHONE
+        value: "2056239541"
       - key: SMTP_HOST
         sync: false
       - key: SMTP_USER
