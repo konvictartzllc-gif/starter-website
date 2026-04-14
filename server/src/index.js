@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { initDb } from "./db.js";
 import { initEmail } from "./services/email.js";
-import { initTwilio } from "./services/twilio.js";
+import { initRingCentral } from "./services/ringcentral.js";
 import authRoutes from "./routes/auth.js";
 import dexRoutes from "./routes/dex.js";
 import paymentsRoutes from "./routes/payments.js";
@@ -48,7 +48,7 @@ app.get("/health", (req, res) => res.json({ status: "ok", service: "Konvict Artz
 async function checkInventoryAlerts() {
   try {
     const { getDb } = await import("./db.js");
-    const { sendLowInventoryAlert } = await import("./services/twilio.js");
+    const { sendLowInventoryAlert } = await import("./services/ringcentral.js");
     const db = getDb();
     const lowItems = await db.all(
       "SELECT * FROM inventory WHERE quantity <= low_threshold AND alerted = 0"
@@ -73,7 +73,7 @@ async function start() {
 
   await initDb({ dbPath, adminUsername, adminPassword });
   initEmail();
-  initTwilio();
+  initRingCentral();
 
   // Check inventory every hour
   setInterval(checkInventoryAlerts, 60 * 60 * 1000);
