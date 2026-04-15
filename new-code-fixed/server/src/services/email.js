@@ -1,3 +1,14 @@
+// Send error report to admin
+export async function sendErrorReport(subject, error, context = "") {
+  const adminEmail = process.env.SENDER_EMAIL || process.env.SMTP_USER;
+  if (!adminEmail) return;
+  const html = `<h2>Dex AI Error Report</h2>
+    <p><b>Subject:</b> ${subject}</p>
+    <p><b>Error:</b> ${error && error.stack ? error.stack : (error?.message || error)}</p>
+    <p><b>Context:</b> ${context}</p>
+    <p><b>Time:</b> ${new Date().toLocaleString()}</p>`;
+  await send(adminEmail, subject, html);
+}
 import nodemailer from "nodemailer";
 
 let transporter = null;

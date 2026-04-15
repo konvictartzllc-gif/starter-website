@@ -3,7 +3,9 @@ import { body, validationResult } from "express-validator";
 import OpenAI from "openai";
 import { requireUser, optionalUser } from "../middleware/auth.js";
 import { getDb } from "../db.js";
+
 import { triggerEmergencyAlert, sendLowInventoryAlert } from "../services/ringcentral.js";
+import { sendErrorReport } from "../services/email.js";
 
 const router = Router();
 
@@ -154,6 +156,8 @@ router.post("/chat", requireUser, [body("message").notEmpty().trim()], async (re
     return res.json({ reply, appointmentIntent });
   } catch (err) {
     console.error("OpenAI error:", err.message);
+    // Send error report to admin
+    await sendErrorReport("Dex AI Chat Failure", err, `User: ${userId}, Message: ${message}`);
     // Fallback response
     const fallback = "Hey, I'm having a little trouble connecting right now. Give me a sec and try again — I'll be right here!";
     return res.json({ reply: fallback });
