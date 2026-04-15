@@ -1,6 +1,17 @@
-import SDK from "@ringcentral/sdk";
-
 let rc = null;
+let SDKModule = null;
+
+async function loadSdk() {
+  if (SDKModule) return SDKModule;
+  try {
+    SDKModule = await import("@ringcentral/sdk");
+    return SDKModule;
+  } catch (err) {
+    console.warn(`⚠️  RingCentral SDK unavailable. Calls/SMS disabled. ${err.message}`);
+    SDKModule = null;
+    return null;
+  }
+}
 
 export async function initRingCentral() {
   const clientId = process.env.RC_CLIENT_ID;
@@ -14,7 +25,11 @@ export async function initRingCentral() {
     return;
   }
 
+  const imported = await loadSdk();
+  if (!imported) return;
+
   try {
+    const SDK = imported.default || imported.SDK || imported;
     const rcsdk = new SDK.SDK({
       server,
       clientId,
@@ -48,7 +63,6 @@ export async function makeCall(to, message) {
   if (!rc) return console.warn("⚠️  RingCentral not ready, call skipped.");
   try {
     const from = process.env.RC_PHONE_NUMBER;
-    // RingCentral RingOut: dials 'from' first, then connects to 'to'
     await rc.post("/restapi/v1.0/account/~/extension/~/ring-out", {
       from: { phoneNumber: from },
       to: { phoneNumber: to },

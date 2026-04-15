@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../utils/api.js";
-import { useAuth } from "../hooks/useAuth.jsx";
+import { useAuth } from "../hooks/useAuth.jsxx";
 
 export function RegisterPage() {
   const { login } = useAuth();

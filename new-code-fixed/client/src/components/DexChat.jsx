@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "../utils/api.js";
 import { useDexVoice } from "../hooks/useDexVoice.js";
-import { useAuth } from "../hooks/useAuth.jsx";
+import { useAuth } from "../hooks/useAuth.jsxx";
 
 const DEX_AVATAR = "🤖";
 
