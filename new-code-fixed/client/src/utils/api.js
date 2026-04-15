@@ -4,19 +4,28 @@ function getToken() {
   return localStorage.getItem("dex_token");
 }
 
-async function request(path, options = {}) {
+
+async function request(path, options = {}, retries = 2) {
   const token = getToken();
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
-  const data = await res.json();
-  if (!res.ok) throw { status: res.status, ...data };
-  return data;
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+    const data = await res.json();
+    if (!res.ok) throw { status: res.status, ...data };
+    return data;
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 700));
+      return request(path, options, retries - 1);
+    }
+    throw err;
+  }
 }
 
 export const api = {

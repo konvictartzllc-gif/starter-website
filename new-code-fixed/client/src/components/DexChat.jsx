@@ -58,20 +58,17 @@ export default function DexChat() {
       const data = await api.chat(trimmed);
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
       speak(data.reply);
-
       if (data.appointmentIntent) {
         showToast("📅 Want me to add that to your calendar? Just confirm!");
       }
     } catch (err) {
-      if (err.error === "trial_expired" || err.error === "subscription_expired") {
+      let msg = "Hmm, something went wrong on my end. Give me a sec and try again!";
+      if (err && (err.error === "trial_expired" || err.error === "subscription_expired")) {
         setAccessError(err.message);
-        setMessages((prev) => [...prev, { role: "assistant", content: err.message }]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "Hmm, something went wrong on my end. Give me a sec and try again!" },
-        ]);
+        msg = err.message;
       }
+      setMessages((prev) => [...prev, { role: "assistant", content: msg }]);
+      speak(msg);
     } finally {
       setLoading(false);
     }
