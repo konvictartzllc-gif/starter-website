@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Client, Environment } from "square";
+import { SquareClient, SquareEnvironment } from "square";
 import { requireUser } from "../middleware/auth.js";
 import { getDb } from "../db.js";
 import { sendSubscriptionConfirmation } from "../services/email.js";
@@ -7,9 +7,9 @@ import { sendSubscriptionConfirmation } from "../services/email.js";
 const router = Router();
 
 function getSquareClient() {
-  return new Client({
+  return new SquareClient({
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
-    environment: process.env.SQUARE_ENV === "production" ? Environment.Production : Environment.Sandbox,
+    environment: process.env.SQUARE_ENV === "production" ? SquareEnvironment.Production : SquareEnvironment.Sandbox,
   });
 }
 
