@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../utils/api.js";
-import { useAuth } from "../hooks/useAuth.jsx";
+import { useAuth } from "../hooks/useAuth.jsxx";
 
 export default function AffiliateDashboard() {
   const { user } = useAuth();
