@@ -88,3 +88,12 @@ export default function DexChat() {
         setMessages((prev) => [...prev, { role: "assistant", content: err.message }]);
       } else {
         setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "Sorry, something went wrong. Please try again later." },
+        ]);
+      }
+    }
+  }
+
+  // ...existing code for the rest of the DexChat component...
+}

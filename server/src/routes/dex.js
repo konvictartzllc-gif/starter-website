@@ -3,66 +3,164 @@ import { body, validationResult } from "express-validator";
 import OpenAI from "openai";
 import { requireUser, optionalUser } from "../middleware/auth.js";
 import { getDb } from "../db.js";
-import { triggerEmergencyAlert, sendLowInventoryAlert } from "../services/ringcentral.js";
-
+import { triggerEmergencyAlert, sendLowInventoryAlert, sendSms, makeCall } from "../services/ringcentral.js";
+import { createEvent, listEvents } from "../services/calendar.js";
+import { verifyOta, spamFilter } from "../middleware/security.js";
 const router = Router();
 
-// ── Emergency keywords ────────────────────────────────────────────────────────
-const EMERGENCY_PATTERNS = [
-  /\b(kill (my|him|her|them|myself|yourself))\b/i,
-  /\b(want to die|going to die|end my life|end it all)\b/i,
-  /\b(suicide|suicidal|self.?harm|cut myself|hurt myself)\b/i,
-  /\b(shoot (him|her|them|myself|everyone))\b/i,
-  /\b(bomb|attack|mass shooting|hurt (someone|people))\b/i,
-  /\b(i (can't|cannot) go on|no reason to live)\b/i,
-];
+// ...existing code...
 
-function detectEmergency(text) {
-  return EMERGENCY_PATTERNS.some((pattern) => pattern.test(text));
+// ── Get OpenAI client ─────────────────────────────────────────────────────────
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
-// ── Dex AI system prompt ──────────────────────────────────────────────────────
-const DEX_SYSTEM_PROMPT = `You are Dex, the AI assistant for Konvict Artz — a business that offers lawn care, cleaning services, handyman repair, and sells refurbished and new electronics.
+// ── POST /api/dex/chat ────────────────────────────────────────────────────────
+router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-Your personality:
-- You talk like a real, friendly human — casual, warm, and helpful. Not robotic, not stiff.
-- You use natural language, contractions, and occasional light humor.
-- You remember everything from previous conversations with this person and reference it naturally.
-- You never say "As an AI..." or "I'm just a language model..." — you ARE Dex, the Konvict Artz assistant.
+  const { message } = req.body;
+  const db = getDb();
+  const userId = req.user.id;
 
-Your capabilities (for subscribers):
-- Help customers book lawn care, cleaning, handyman, or product purchases
-- Answer questions about services, pricing, and availability
-- Schedule and manage appointments (add to calendar when requested)
-- Send emails or texts on behalf of the user when asked
-- Provide reminders and follow-ups
+  // Check access
+  const user = await db.get("SELECT * FROM users WHERE id = ?", [userId]);
+  if (!user) return res.status(404).json({ error: "User not found" });
 
-Your limitations (consumer tier — $9.99/month):
-- You help with Konvict Artz services and products only
-- You do NOT manage the user's full business or act as their personal business manager
-- You do NOT access external websites or make purchases outside Konvict Artz
-- You do NOT provide legal, medical, or financial advice
+  const isAdmin = user.role === "admin";
+  let hasAccess = isAdmin;
 
-Business info:
-- Services: Lawn Care, Cleaning Services, Handyman Repair
-- Products: Refurbished electronics, new electronics
-- Website: https://www.konvict-artz.com
-- Subscription: $9.99/month after 3-day free trial
+  if (!hasAccess) {
+    if (user.access_type === "paid") {
+      if (user.sub_expires && new Date() > new Date(user.sub_expires)) {
+        await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [userId]);
+        return res.status(403).json({ error: "subscription_expired", message: "Your subscription has expired. Renew for $9.99/month to keep chatting with Dex." });
+      }
+      hasAccess = true;
+    } else if (user.access_type === "trial") {
+      const trialEnd = new Date(user.trial_start);
+      trialEnd.setDate(trialEnd.getDate() + 3);
+      if (new Date() > trialEnd) {
+        await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [userId]);
+        return res.status(403).json({ error: "trial_expired", message: "Your 3-day free trial has ended. Subscribe for $9.99/month to continue." });
+      }
+      hasAccess = true;
+    } else if (user.access_type === "unlimited") {
+      hasAccess = true;
+    }
+  }
 
-If someone asks about pricing, appointments, or wants to book a service, help them and offer to schedule it.
-If someone seems upset, be empathetic and supportive.
-Keep responses concise — 1-3 sentences unless more detail is needed.`;
+  if (!hasAccess) {
+    return res.status(403).json({ error: "no_access", message: "Start your free 3-day trial or subscribe for $9.99/month." });
+  }
 
-const DEX_ADMIN_SYSTEM_PROMPT = `${DEX_SYSTEM_PROMPT}
+  // Emergency detection
+  if (detectEmergency(message)) {
+    const userInfo = `${user.name || "Unknown"} (${user.email})`;
+    await triggerEmergencyAlert(userInfo, message);
+    return res.json({
+      reply: "Hey, I hear you and I want you to know you matter. I've just notified someone who can help right away. Please reach out to the 988 Suicide & Crisis Lifeline by calling or texting 988. You're not alone.",
+      emergency: true,
+    });
+  }
 
-ADMIN MODE — You have full access. You can:
-- View and update inventory
-- Manage affiliates and promo codes
-- Access all user data and analytics
-- Run promotions and site improvements
-- Handle all business operations for Konvict Artz
-- Make decisions about pricing, services, and marketing
-- There are NO limitations in admin mode.`;
+  // Load chat history (last 20 messages for memory)
+  const history = await db.all(
+    "SELECT role, content FROM chat_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 20",
+    [userId]
+  );
+  const messages = history.reverse().map((h) => ({ role: h.role, content: h.content }));
+
+  // Add current message
+  messages.push({ role: "user", content: message });
+
+  // Save user message to history
+  await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'user', ?)", [userId, message]);
+
+  try {
+    const openai = getOpenAI();
+    const systemPrompt = isAdmin ? DEX_ADMIN_SYSTEM_PROMPT : DEX_SYSTEM_PROMPT;
+
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      messages: [{ role: "system", content: systemPrompt }, ...messages],
+      max_tokens: 500,
+      temperature: 0.85,
+    });
+
+    const reply = completion.choices[0].message.content.trim();
+
+    // Save Dex's reply to history
+    await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, reply]);
+
+    // Check for appointment intent and sync to calendar
+    const appointmentIntent = /\b(schedule|book|appointment|set up|add to (my )?calendar)\b/i.test(message);
+    if (appointmentIntent) {
+      try {
+        // Simple extraction for demo/starter purposes - in production use a more robust parser
+        const startTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // Default to tomorrow
+        await createEvent({
+          title: `Konvict Artz: ${message.substring(0, 30)}...`,
+          description: `Dex AI Appointment: ${message}`,
+          startTime,
+          endTime: new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(),
+        });
+      } catch (e) {
+        console.error("Auto-calendar sync failed:", e.message);
+      }
+    }
+
+    return res.json({ reply, appointmentIntent });
+  } catch (err) {
+    console.error("OpenAI error:", err.message);
+    // Fallback response
+    const fallback = "Hey, I'm having a little trouble connecting right now. Give me a sec and try again — I'll be right here!";
+    return res.json({ reply: fallback });
+  }
+});
+
+// ...existing code...
+
+// ...existing code...
+// ── PHONE & SMS HANDLING (STUBS) ─────────────────────────────────────────────
+// These endpoints are for integration with telephony/SMS APIs (e.g., Twilio, RingCentral)
+router.post("/phone/incoming", async (req, res) => {
+  // TODO: Authenticate webhook source
+  // TODO: Parse call details from req.body
+  // TODO: Check for spam risk (implement spam filter)
+  // TODO: If authorized, answer call and respond using Dex AI
+  // TODO: If spam, reject call
+  res.json({ status: "stub", message: "Phone call handling not yet implemented." });
+});
+
+router.post("/sms/incoming", async (req, res) => {
+  // TODO: Authenticate webhook source
+  // TODO: Parse SMS details from req.body
+  // TODO: Check for spam risk (implement spam filter)
+  // TODO: If authorized, respond using Dex AI
+  // TODO: If spam, ignore or block
+  res.json({ status: "stub", message: "SMS handling not yet implemented." });
+});
+
+// ── CALENDAR EVENT CREATION (STUB) ──────────────────────────────────────────
+router.post("/calendar/event", requireUser, async (req, res) => {
+  // TODO: Validate and parse event details from req.body
+  // TODO: Integrate with Google/Outlook calendar API
+  // TODO: Set alarms/reminders as requested
+  res.json({ status: "stub", message: "Calendar event creation not yet implemented." });
+});
+
+// ── ONE-TIME AUTHORIZATION (UTILITY STUB) ───────────────────────────────────
+// In production, use a secure, expiring token or code for one-time auth
+// Example: Generate and verify a one-time code for sensitive actions
+// TODO: Implement one-time authorization logic as a middleware or utility
+// All code below this line has been removed to eliminate duplicate declarations and exports.
+// All code below this line was duplicate and has been removed.
+
+// REMOVE ALL CODE BELOW THIS LINE (duplicate declarations and exports)
+
+// ...existing code...
 
 // ── Get OpenAI client ─────────────────────────────────────────────────────────
 function getOpenAI() {

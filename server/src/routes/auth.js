@@ -4,6 +4,8 @@ import jwt from "jsonwebtoken";
 import { body, validationResult } from "express-validator";
 import { getDb } from "../db.js";
 import { sendWelcomeEmail } from "../services/email.js";
+import { requireUser } from "../middleware/auth.js";
+import { generateOta } from "../middleware/security.js";
 
 const router = Router();
 
@@ -14,7 +16,6 @@ function signToken(user) {
     { expiresIn: "7d" }
   );
 }
-
 // POST /api/auth/register
 router.post(
   "/register",
@@ -34,17 +35,14 @@ router.post(
     try {
       const existing = await db.get("SELECT id FROM users WHERE email = ?", [email]);
       if (existing) return res.status(409).json({ error: "Email already registered" });
-
       // Validate promo code if provided
       let referredBy = null;
       if (promoCode) {
         const aff = await db.get("SELECT id, user_id FROM affiliates WHERE promo_code = ?", [promoCode.toUpperCase()]);
         if (aff) {
           referredBy = promoCode.toUpperCase();
-          await db.run("UPDATE affiliates SET signups = signups + 1 WHERE promo_code = ?", [referredBy]);
         }
       }
-
       const hashed = await bcrypt.hash(password, 12);
       const trialStart = new Date().toISOString();
       const result = await db.run(
@@ -52,7 +50,6 @@ router.post(
          VALUES (?, ?, ?, 'user', 'trial', ?, ?)`,
         [email, name || null, hashed, trialStart, referredBy]
       );
-
       const user = await db.get("SELECT * FROM users WHERE id = ?", [result.lastID]);
       await sendWelcomeEmail(email, name);
 
@@ -92,7 +89,6 @@ router.post(
           await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [user.id]);
         }
       }
-
       return res.json({
         token: signToken({ ...user, access_type }),
         user: { id: user.id, email: user.email, name: user.name, role: user.role, access_type },
@@ -104,4 +100,26 @@ router.post(
   }
 );
 
-export default router;
+// ── Update Phone ───────────────────────────────────────────────────────────
+router.put("/phone", requireUser, [body("phone").notEmpty().trim()], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const { phone } = req.body;
+  const db = getDb();
+  await db.run("UPDATE users SET phone = ? WHERE id = ?", [phone, req.user.id]);
+  res.json({ success: true, message: "Phone number updated" });
+});
+
+// ── Request OTA Code ───────────────────────────────────────────────────────
+router.post("/ota/request", requireUser, [body("actionType").notEmpty()], async (req, res) => {
+  const { actionType } = req.body;
+  try {
+    await generateOta(req.user.id, actionType);
+    res.json({ success: true, message: "Authorization code sent via SMS" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to send authorization code" });
+  }
+});
+
+// ...existing code up to first export default router...

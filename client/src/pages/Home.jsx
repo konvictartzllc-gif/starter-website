@@ -8,6 +8,7 @@ const services = [
   { icon: "📱", title: "Electronics", desc: "Refurbished and new electronics at great prices." },
 ];
 
+// Home component definition
 export default function Home() {
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref");
