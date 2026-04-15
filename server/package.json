@@ -15,6 +15,7 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.3.1",
     "express-validator": "^7.1.0",
+    "googleapis": "^137.0.0",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^6.9.13",
     "openai": "^4.52.7",
