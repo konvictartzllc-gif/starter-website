@@ -6,6 +6,10 @@ import AdminPortal from "./pages/AdminPortal.jsx";
 import AffiliateDashboard from "./pages/AffiliateDashboard.jsx";
 import DexChat from "./components/DexChat.jsx";
 
+// New imports added
+import Privacy from "./pages/Privacy.jsx";
+import Terms from "./pages/Terms.jsx";
+
 export default function App() {
   return (
     <AuthProvider>
@@ -15,6 +19,8 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/admin" element={<AdminPortal />} />
         <Route path="/affiliate" element={<AffiliateDashboard />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
       </Routes>
       {/* Dex AI is always present on every page */}
       <DexChat />
