@@ -155,10 +155,6 @@ router.post("/calendar/event", requireUser, async (req, res) => {
 
 // ...existing code...
 
-// ── Get OpenAI client ─────────────────────────────────────────────────────────
-function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-}
 
 // ── POST /api/dex/chat ────────────────────────────────────────────────────────
 router.post("/chat", requireUser, [body("message").notEmpty().trim()], async (req, res) => {
