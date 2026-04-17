@@ -7,7 +7,6 @@ import { fileURLToPath } from "url";
 import { initDb } from "./db.js";
 import { initEmail } from "./services/email.js";
 import { initRingCentral } from "./services/ringcentral.js";
-import { initCalendar } from "./services/calendar.js";
 import { initAI } from "./services/ai.js";
 import authRoutes from "./routes/auth.js";
 import dexRoutes from "./routes/dex.js";
@@ -81,7 +80,6 @@ async function start() {
   await initDb({ dbPath, adminUsername, adminPassword });
   initEmail();
   initRingCentral();
-  initCalendar();
   initAI();
 
   // Check inventory every hour
