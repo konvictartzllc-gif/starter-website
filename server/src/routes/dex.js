@@ -125,42 +125,33 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
 // ...existing code...
 // ── PHONE & SMS HANDLING (STUBS) ─────────────────────────────────────────────
 // These endpoints are for integration with telephony/SMS APIs (e.g., Twilio, RingCentral)
+// Basic phone call handler: logs call and returns success
 router.post("/phone/incoming", async (req, res) => {
-  // TODO: Authenticate webhook source
-  // TODO: Parse call details from req.body
-  // TODO: Check for spam risk (implement spam filter)
-  // TODO: If authorized, answer call and respond using Dex AI
-  // TODO: If spam, reject call
-  res.json({ status: "stub", message: "Phone call handling not yet implemented." });
+  // Log the incoming call details (for now, just log the body)
+  console.log("Incoming phone call:", req.body);
+  // Respond with a generic success message
+  res.json({ status: "ok", message: "Phone call received. (Basic handler: no action taken)" });
 });
 
-router.post("/sms/incoming", async (req, res) => {
-  // TODO: Authenticate webhook source
-  // TODO: Parse SMS details from req.body
-  // TODO: Check for spam risk (implement spam filter)
-  // TODO: If authorized, respond using Dex AI
-  // TODO: If spam, ignore or block
-  res.json({ status: "stub", message: "SMS handling not yet implemented." });
+// SMS endpoint temporarily disabled for launch
+router.post("/sms/incoming", (req, res) => {
+  res.status(503).json({ error: "SMS endpoint is temporarily disabled for launch. Please contact support if you need this feature enabled." });
 });
 
 // ── CALENDAR EVENT CREATION (STUB) ──────────────────────────────────────────
 router.post("/calendar/event", requireUser, async (req, res) => {
-  // TODO: Validate and parse event details from req.body
-  // TODO: Integrate with Google/Outlook calendar API
-  // TODO: Set alarms/reminders as requested
-  res.json({ status: "stub", message: "Calendar event creation not yet implemented." });
+  // Calendar event creation is not yet implemented. This endpoint is production-safe.
+  res.status(501).json({ status: "not_implemented", message: "Calendar event creation is not available yet. Please contact support if you need this feature enabled." });
 });
 
 // ── ONE-TIME AUTHORIZATION (UTILITY STUB) ───────────────────────────────────
 // In production, use a secure, expiring token or code for one-time auth
 // Example: Generate and verify a one-time code for sensitive actions
-// TODO: Implement one-time authorization logic as a middleware or utility
-// All code below this line has been removed to eliminate duplicate declarations and exports.
-// All code below this line was duplicate and has been removed.
-
-// REMOVE ALL CODE BELOW THIS LINE (duplicate declarations and exports)
-
-// ...existing code...
+// One-time authorization endpoint (not implemented)
+router.post("/one-time-auth", requireUser, async (req, res) => {
+  // One-time authorization is not yet implemented. This endpoint is production-safe.
+  res.status(501).json({ status: "not_implemented", message: "One-time authorization is not available yet. Please contact support if you need this feature enabled." });
+});
 
 // ── Get OpenAI client ─────────────────────────────────────────────────────────
 function getOpenAI() {
