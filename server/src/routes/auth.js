@@ -123,3 +123,5 @@ router.post("/ota/request", requireUser, [body("actionType").notEmpty()], async 
 });
 
 // ...existing code up to first export default router...
+
+export default router;
