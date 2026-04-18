@@ -16,6 +16,25 @@ export default function DexChat() {
   const [toast, setToast] = useState("");
   const [accessError, setAccessError] = useState(null);
 
+  // ── VOICE HOOKS ────────────────────────────────────────────────────────────
+  const { status, isSupported, speak, stopSpeaking } = useDexVoice({
+    enabled: true,
+    onWakeWord: ({ spokenCommand } = {}) => {
+      setOpen(true);
+      if (spokenCommand?.trim()) {
+        showToast(`Heard: ${spokenCommand}`);
+        return;
+      }
+      const wakeReply = "I'm here — what can I help you with?";
+      showToast(wakeReply);
+      speak(wakeReply);
+    },
+    onTranscript: (text) => {
+      setOpen(true);
+      sendMessage(text);
+    },
+  });
+
   // ── CALL EVENT POLLING WITH PROGRESSIVE UNLOCK ─────────────────────────────
   useEffect(() => {
     if (!user) return;
