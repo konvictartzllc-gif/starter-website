@@ -1,3 +1,13 @@
+import { Router } from "express";
+import { body, validationResult } from "express-validator";
+import OpenAI from "openai";
+import { requireUser, optionalUser } from "../middleware/auth.js";
+import { getDb } from "../db.js";
+import { triggerEmergencyAlert, sendLowInventoryAlert, sendSms, makeCall } from "../services/ringcentral.js";
+import { createEvent, listEvents } from "../services/calendar.js";
+import { verifyOta, spamFilter } from "../middleware/security.js";
+const router = Router();
+
 // ── LEARNED PREFERENCES ENDPOINTS ───────────────────────────────────────────
 // Dex can get/set learned preferences (e.g., favorite contacts, routines)
 router.get("/preferences", requireUser, async (req, res) => {
@@ -168,30 +178,7 @@ router.get("/memory", requireUser, async (req, res) => {
         res.json({ memory });
 });
 
-router.post("/memory", requireUser, async (req, res) => {
-        const db = getDb();
-        const userId = req.user.id;
-        const { key, value } = req.body;
-        if (!key) return res.status(400).json({ error: "Missing key" });
-        await db.run(
-                `CREATE TABLE IF NOT EXISTS user_memory (user_id TEXT, key TEXT, value TEXT, PRIMARY KEY(user_id, key))`
-        );
-        await db.run(
-                `INSERT INTO user_memory (user_id, key, value) VALUES (?, ?, ?)
-                 ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value`,
-                [userId, key, value]
-        );
-        res.json({ success: true });
-});
-import { Router } from "express";
-import { body, validationResult } from "express-validator";
-import OpenAI from "openai";
-import { requireUser, optionalUser } from "../middleware/auth.js";
-import { getDb } from "../db.js";
-import { triggerEmergencyAlert, sendLowInventoryAlert, sendSms, makeCall } from "../services/ringcentral.js";
-import { createEvent, listEvents } from "../services/calendar.js";
-import { verifyOta, spamFilter } from "../middleware/security.js";
-const router = Router();
+
 
 function getOpenAI() {
     return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
