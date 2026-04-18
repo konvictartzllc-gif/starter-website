@@ -100,25 +100,6 @@ export default function DexChat() {
   const messagesEndRef = useRef(null);
 
 
-  const { status, isSupported, speak, stopSpeaking } = useDexVoice({
-    enabled: true,
-    onWakeWord: ({ spokenCommand } = {}) => {
-      setOpen(true);
-      if (spokenCommand?.trim()) {
-        showToast(`Heard: ${spokenCommand}`);
-        return;
-      }
-      const wakeReply = "I'm here — what can I help you with?";
-      showToast(wakeReply);
-      speak(wakeReply);
-    },
-    onTranscript: (text) => {
-      setOpen(true);
-      sendMessage(text);
-    },
-  });
-
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
