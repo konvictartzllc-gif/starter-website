@@ -1,0 +1,1 @@
+Cleanup in progress: .trash, new-code-fixed, new code fixed, client_old, server_old, Manus 2 will be deleted. All production files are safe in client/ and server/.

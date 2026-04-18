@@ -1,0 +1,1 @@
+This folder is a backup of the current production-ready server directory before cleaning up old/duplicate files.

@@ -1,0 +1,9 @@
+The following folders will be deleted as part of the cleanup:
+- .trash
+- new-code-fixed
+- new code fixed
+- client_old
+- server_old
+- Manus 2
+
+All production and updated files in client/ and server/ are preserved.

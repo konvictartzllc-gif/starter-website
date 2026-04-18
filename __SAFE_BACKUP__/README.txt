@@ -1,0 +1,1 @@
+Backup created before deleting old, duplicate, or unused folders: .trash, new-code-fixed, new code fixed, client_old, server_old, Manus 2. Only the main client/ and server/ directories are kept for production.
