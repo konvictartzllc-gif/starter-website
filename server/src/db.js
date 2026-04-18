@@ -1,3 +1,25 @@
+
+
+  // ── Ads ──────────────────────────────────────────────────────────────────
+
+  import bcrypt from "bcryptjs";
+  import fs from "fs";
+  import path from "path";
+  import sqlite3 from "sqlite3";
+  import { open } from "sqlite";
+
+  let db = null;
+
+  export async function initDb({ dbPath, adminUsername, adminPassword }) {
+    const dbDir = path.dirname(dbPath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+
+    db = await open({ filename: dbPath, driver: sqlite3.Database });
+    await db.exec("PRAGMA journal_mode = WAL;");
+    await db.exec("PRAGMA foreign_keys = ON;");
+
     // ── Ads ──────────────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS ads (
@@ -9,53 +31,34 @@
         active INTEGER NOT NULL DEFAULT 1
       );
     `);
-  // ── User Memory ───────────────────────────────────────────────────────────
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS user_memory (
-      user_id TEXT NOT NULL,
-      key TEXT NOT NULL,
-      value TEXT,
-      PRIMARY KEY(user_id, key),
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    );
-  `);
-import bcrypt from "bcryptjs";
-import fs from "fs";
-import path from "path";
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
-
-let db = null;
-
-export async function initDb({ dbPath, adminUsername, adminPassword }) {
-  const dbDir = path.dirname(dbPath);
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
-
-  db = await open({ filename: dbPath, driver: sqlite3.Database });
-  await db.exec("PRAGMA journal_mode = WAL;");
-  await db.exec("PRAGMA foreign_keys = ON;");
-
-  // ── Users ──────────────────────────────────────────────────────────────────
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      email       TEXT    UNIQUE NOT NULL,
-      name        TEXT,
-      password    TEXT,
-      role        TEXT    NOT NULL DEFAULT 'user',
-      access_type TEXT    NOT NULL DEFAULT 'none',
-      trial_start TEXT,
-      sub_expires TEXT,
-      square_customer_id TEXT,
-      square_subscription_id TEXT,
-      referred_by TEXT,
+    // ── User Memory ───────────────────────────────────────────────────────────
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS user_memory (
+        user_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT,
+        PRIMARY KEY(user_id, key),
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      );
+    `);
+    // ── Users ──────────────────────────────────────────────────────────────────
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        email       TEXT    UNIQUE NOT NULL,
+        name        TEXT,
+        password    TEXT,
+        role        TEXT    NOT NULL DEFAULT 'user',
+        access_type TEXT    NOT NULL DEFAULT 'none',
+        trial_start TEXT,
+        sub_expires TEXT,
+        square_customer_id TEXT,
+        square_subscription_id TEXT,
+        referred_by TEXT,
         created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
-
-    // ── Affiliates / Promoters ─────────────────────────────────────────────────
+    // ── Affiliates / Promoters ────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS affiliates (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,8 +70,7 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
         created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
-
-    // ── Inventory ──────────────────────────────────────────────────────────────
+    // ── Inventory ─────────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS inventory (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,8 +87,7 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
         updated_at   TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
-
-    // ── Chat Memory ────────────────────────────────────────────────────────────
+    // ── Chat Memory ───────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS chat_history (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,7 +97,6 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
         created_at TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
-
     // ── Appointments ──────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS appointments (
@@ -110,8 +110,7 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
         created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
-
-    // ── Promo Codes ────────────────────────────────────────────────────────────
+    // ── Promo Codes ───────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS promo_codes (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,8 +121,7 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
         created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
-
-    // ── Payments / Transactions ────────────────────────────────────────────────
+    // ── Payments / Transactions ───────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS payments (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,8 +134,7 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
         created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
-
-    // ── One-Time Authorization Codes ─────────────────────────────────────────--
+    // ── One-Time Authorization Codes ─────────────────────────────────────────-
     await db.exec(`
       CREATE TABLE IF NOT EXISTS ota_codes (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,8 +146,7 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
         created_at TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
-
-    // ── Seed admin user ─────────────────────────────────────────────────-------
+    // ── Seed admin user ─────────────────────────────────────────────────------
     const existing = await db.get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
     if (!existing) {
       const hashed = await bcrypt.hash(adminPassword, 12);
@@ -165,7 +161,7 @@ export async function initDb({ dbPath, adminUsername, adminPassword }) {
     return db;
   }
 
-export function getDb() {
-  if (!db) throw new Error("Database not initialized. Call initDb() first.");
-  return db;
-}
+  export function getDb() {
+    if (!db) throw new Error("Database not initialized. Call initDb() first.");
+    return db;
+  }
