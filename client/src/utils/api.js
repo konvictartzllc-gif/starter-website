@@ -1,14 +1,4 @@
-        // Learned Preferences
-        getPreferences: () => request("/dex/preferences"),
-        setPreference: (key, value) => request("/dex/preferences", { method: "POST", body: JSON.stringify({ key, value }) }),
-      // Call Events
-      getCallEvents: () => request("/dex/call-events"),
-    // Permissions
-    getPermissions: () => request("/dex/permissions"),
-    setPermissions: (permissions) => request("/dex/permissions", { method: "POST", body: JSON.stringify({ permissions }) }),
-  // User Memory
-  getMemory: () => request("/dex/memory"),
-  setMemory: (key, value) => request("/dex/memory", { method: "POST", body: JSON.stringify({ key, value }) }),
+// ...existing code...
 const BASE = import.meta.env.VITE_API_URL || "/api";
 
 function getToken() {
@@ -41,6 +31,21 @@ export const api = {
   getHistory: () => request("/dex/history"),
   saveAppointment: (body) => request("/dex/appointment", { method: "POST", body: JSON.stringify(body) }),
   getAppointments: () => request("/dex/appointments"),
+
+  // Learned Preferences
+  getPreferences: () => request("/dex/preferences"),
+  setPreference: (key, value) => request("/dex/preferences", { method: "POST", body: JSON.stringify({ key, value }) }),
+
+  // Call Events
+  getCallEvents: () => request("/dex/call-events"),
+
+  // Permissions
+  getPermissions: () => request("/dex/permissions"),
+  setPermissions: (permissions) => request("/dex/permissions", { method: "POST", body: JSON.stringify({ permissions }) }),
+
+  // User Memory
+  getMemory: () => request("/dex/memory"),
+  setMemory: (key, value) => request("/dex/memory", { method: "POST", body: JSON.stringify({ key, value }) }),
 
   // Payments
   subscribe: (sourceId) => request("/payments/subscribe", { method: "POST", body: JSON.stringify({ sourceId }) }),

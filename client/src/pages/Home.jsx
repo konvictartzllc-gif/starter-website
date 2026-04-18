@@ -8,8 +8,7 @@ const services = [
   { icon: "📱", title: "Electronics", desc: "Refurbished and new electronics at great prices." },
 ];
 
-// Home component definition
-
+function Home() {
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref");
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -147,3 +146,5 @@ const services = [
     </div>
   );
 }
+
+export default Home;
