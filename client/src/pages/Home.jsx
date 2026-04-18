@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 const services = [
@@ -9,13 +9,54 @@ const services = [
 ];
 
 // Home component definition
-export default function Home() {
+
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref");
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstall, setShowInstall] = useState(false);
+  const [installStatus, setInstallStatus] = useState("");
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstall(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) {
+      setInstallStatus("Install prompt not available. Try refreshing the page.");
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setShowInstall(false);
+      setInstallStatus("App installed! You can now launch it from your home screen or apps menu.");
+    } else {
+      setInstallStatus("Install dismissed. You can try again later.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Hero */}
+      {showInstall && (
+        <div className="flex flex-col items-center mb-4">
+          <button
+            onClick={handleInstall}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-2 rounded-xl shadow-lg transition-all mb-2"
+          >
+            Install App (Phone/Computer)
+          </button>
+          {installStatus && (
+            <div className="text-sm text-yellow-300 mt-1">{installStatus}</div>
+          )}
+        </div>
+      )}
       <section className="relative overflow-hidden px-6 py-20 text-center">
         <div className="absolute inset-0 bg-gradient-to-br from-brand/20 to-transparent pointer-events-none" />
         <h1 className="text-4xl md:text-6xl font-extrabold mb-4">

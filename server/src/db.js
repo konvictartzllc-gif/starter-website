@@ -1,3 +1,24 @@
+    // ── Ads ──────────────────────────────────────────────────────────────────
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS ads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        image TEXT,
+        target_location TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1
+      );
+    `);
+  // ── User Memory ───────────────────────────────────────────────────────────
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS user_memory (
+      user_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT,
+      PRIMARY KEY(user_id, key),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    );
+  `);
 import bcrypt from "bcryptjs";
 import fs from "fs";
 import path from "path";

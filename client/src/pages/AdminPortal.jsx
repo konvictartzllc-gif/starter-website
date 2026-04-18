@@ -122,7 +122,59 @@ export default function AdminPortal() {
     );
   }
 
-  const tabs = ["stats", "inventory", "affiliates", "promo", "users"];
+  const tabs = ["stats", "inventory", "affiliates", "promo", "users", "ads"];
+  // Ads state
+  const [ads, setAds] = useState([]);
+  const [adForm, setAdForm] = useState({ title: "", content: "", image: "", target_location: "USA", active: true });
+  async function loadAds() {
+    try {
+      const res = await fetch("/api/ads?location=ALL");
+      const data = await res.json();
+      setAds(data.ads || []);
+    } catch {}
+  }
+  async function handleAdSubmit(e) {
+    e.preventDefault();
+    try {
+      await fetch("/api/admin/ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(adForm),
+      });
+      setMsg("✅ Ad saved!");
+      setAdForm({ title: "", content: "", image: "", target_location: "USA", active: true });
+      loadAds();
+    } catch { setMsg("Error saving ad"); }
+  }
+  useEffect(() => { if (tab === "ads") loadAds(); }, [tab]);
+        {/* Ads Management */}
+        {tab === "ads" && (
+          <div>
+            <h2 className="text-lg font-bold mb-4">Ad Campaigns (Banner & Email)</h2>
+            <form onSubmit={handleAdSubmit} className="bg-gray-800 rounded-xl p-4 mb-6 grid grid-cols-2 gap-3">
+              <input placeholder="Ad Title *" value={adForm.title} onChange={e => setAdForm(p => ({...p, title: e.target.value}))} className="col-span-2 bg-gray-700 rounded-lg px-3 py-2 text-sm outline-none" required />
+              <input placeholder="Image URL" value={adForm.image} onChange={e => setAdForm(p => ({...p, image: e.target.value}))} className="col-span-2 bg-gray-700 rounded-lg px-3 py-2 text-sm outline-none" />
+              <textarea placeholder="Ad Content *" value={adForm.content} onChange={e => setAdForm(p => ({...p, content: e.target.value}))} className="col-span-2 bg-gray-700 rounded-lg px-3 py-2 text-sm outline-none" rows={2} required />
+              <input placeholder="Target Location (e.g. USA)" value={adForm.target_location} onChange={e => setAdForm(p => ({...p, target_location: e.target.value}))} className="bg-gray-700 rounded-lg px-3 py-2 text-sm outline-none" required />
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={adForm.active} onChange={e => setAdForm(p => ({...p, active: e.target.checked}))} /> Active
+              </label>
+              <button type="submit" className="col-span-2 bg-brand text-white rounded-lg py-2 font-semibold text-sm">Save Ad</button>
+            </form>
+            <div className="space-y-2">
+              {ads.map(ad => (
+                <div key={ad.id} className="bg-gray-800 rounded-xl p-4 flex items-center gap-4">
+                  {ad.image && <img src={ad.image} alt={ad.title} style={{ maxHeight: 60, borderRadius: 8 }} />}
+                  <div className="flex-1">
+                    <p className="font-semibold">{ad.title}</p>
+                    <p className="text-xs text-gray-400">{ad.target_location} · {ad.active ? "Active" : "Inactive"}</p>
+                    <p className="text-sm mt-1">{ad.content}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">

@@ -1,3 +1,20 @@
+export async function sendAdEmail(to, subject, ad) {
+  if (!transporter) return console.warn("⚠️  Email skipped: not configured.");
+  const from = `${process.env.SENDER_NAME || "Konvict Artz"} <${process.env.SENDER_EMAIL || process.env.SMTP_USER}>`;
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;">
+      <h2>${ad.title}</h2>
+      <p>${ad.content}</p>
+      ${ad.image ? `<img src="${ad.image}" alt="${ad.title}" style="max-width:100%;height:auto;" />` : ""}
+    </div>
+  `;
+  try {
+    await transporter.sendMail({ from, to, subject, html });
+    console.log(`📧 Ad email sent to ${to}`);
+  } catch (err) {
+    console.error("Ad email error:", err.message);
+  }
+}
 import nodemailer from "nodemailer";
 
 let transporter = null;

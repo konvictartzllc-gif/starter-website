@@ -74,7 +74,7 @@ async function checkInventoryAlerts() {
 // ── Start server ──────────────────────────────────────────────────────────────
 async function start() {
   const dbPath = process.env.DB_PATH || path.join(__dirname, "../../data/konvict.db");
-  const adminUsername = process.env.ADMIN_EMAIL || "Konvict_Artz_Admin";
+  const adminUsername = process.env.ADMIN_EMAIL || "konvictartzllc@gmail.com";
   const adminPassword = process.env.ADMIN_PASSWORD || "Thuglife1423";
 
   await initDb({ dbPath, adminUsername, adminPassword });

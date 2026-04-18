@@ -1,3 +1,14 @@
+        // Learned Preferences
+        getPreferences: () => request("/dex/preferences"),
+        setPreference: (key, value) => request("/dex/preferences", { method: "POST", body: JSON.stringify({ key, value }) }),
+      // Call Events
+      getCallEvents: () => request("/dex/call-events"),
+    // Permissions
+    getPermissions: () => request("/dex/permissions"),
+    setPermissions: (permissions) => request("/dex/permissions", { method: "POST", body: JSON.stringify({ permissions }) }),
+  // User Memory
+  getMemory: () => request("/dex/memory"),
+  setMemory: (key, value) => request("/dex/memory", { method: "POST", body: JSON.stringify({ key, value }) }),
 const BASE = import.meta.env.VITE_API_URL || "/api";
 
 function getToken() {
