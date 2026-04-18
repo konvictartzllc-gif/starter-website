@@ -100,22 +100,20 @@ export default function DexChat() {
   const messagesEndRef = useRef(null);
 
 
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
 
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
   }
 
-
   async function sendMessage(text) {
     const trimmed = (text || input).trim();
     if (!trimmed) return;
     setInput("");
-
 
     if (!user) {
       const guestReply = "Hey! You'll need to sign up or log in first to chat with me. It's free for 3 days — no credit card needed!";
@@ -129,16 +127,13 @@ export default function DexChat() {
       return;
     }
 
-
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setLoading(true);
-
 
     try {
       const data = await api.chat(trimmed);
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
       speak(data.reply);
-
 
       if (data.appointmentIntent) {
         showToast("📅 Want me to add that to your calendar? Just confirm!");
