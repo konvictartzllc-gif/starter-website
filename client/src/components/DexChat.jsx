@@ -1,43 +1,62 @@
-    // ── CALL EVENT POLLING WITH PROGRESSIVE UNLOCK ─────────────────────────────
-    useEffect(() => {
-      if (!user) return;
-      let lastTimestamp = null;
-      let unlocked = false;
-      let interval = setInterval(async () => {
-        try {
-          // Check if call feature is unlocked
-          const { memory } = await api.getMemory();
-          unlocked = memory && memory.call_feature_unlocked === "1";
-          if (!unlocked) {
-            // If user has had 3+ calls, offer to unlock
-            const { events } = await api.getCallEvents();
-            const incomingCalls = events.filter(e => e.event === "incoming");
-            if (incomingCalls.length >= 3 && (!memory || memory.call_feature_unlocked !== "1")) {
+import { useState, useEffect, useRef } from "react";
+import { api } from "../utils/api.js";
+import { useDexVoice } from "../hooks/useDexVoice.js";
+import { useAuth } from "../hooks/useAuth.jsx";
+
+const DEX_AVATAR = "🤖";
+
+export default function DexChat() {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState([
+    { role: "assistant", content: "Hey! I'm Dex — your Konvict Artz assistant. What can I help you with today?" },
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState("");
+  const [accessError, setAccessError] = useState(null);
+
+  // ── CALL EVENT POLLING WITH PROGRESSIVE UNLOCK ─────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    let lastTimestamp = null;
+    let unlocked = false;
+    let interval = setInterval(async () => {
+      try {
+        // Check if call feature is unlocked
+        const { memory } = await api.getMemory();
+        unlocked = memory && memory.call_feature_unlocked === "1";
+        if (!unlocked) {
+          // If user has had 3+ calls, offer to unlock
+          const { events } = await api.getCallEvents();
+          const incomingCalls = events.filter(e => e.event === "incoming");
+          if (incomingCalls.length >= 3 && (!memory || memory.call_feature_unlocked !== "1")) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: "I've noticed you get a lot of calls. Would you like me to announce callers and help you accept or decline? (Go to Settings to enable)" },
+            ]);
+            await api.setMemory("call_feature_unlocked", "1");
+          }
+        } else {
+          // Feature unlocked: announce calls
+          const { events } = await api.getCallEvents();
+          if (events && events.length > 0) {
+            const latest = events[0];
+            if (latest.event === "incoming" && latest.timestamp !== lastTimestamp) {
               setMessages((prev) => [
                 ...prev,
-                { role: "assistant", content: "I've noticed you get a lot of calls. Would you like me to announce callers and help you accept or decline? (Go to Settings to enable)" },
+                { role: "assistant", content: `Incoming call from ${latest.caller}. Would you like to accept or decline?` },
               ]);
-              await api.setMemory("call_feature_unlocked", "1");
-            }
-          } else {
-            // Feature unlocked: announce calls
-            const { events } = await api.getCallEvents();
-            if (events && events.length > 0) {
-              const latest = events[0];
-              if (latest.event === "incoming" && latest.timestamp !== lastTimestamp) {
-                setMessages((prev) => [
-                  ...prev,
-                  { role: "assistant", content: `Incoming call from ${latest.caller}. Would you like to accept or decline?` },
-                ]);
-                speak(`Incoming call from ${latest.caller}. Would you like to accept or decline?`);
-                lastTimestamp = latest.timestamp;
-              }
+              speak(`Incoming call from ${latest.caller}. Would you like to accept or decline?`);
+              lastTimestamp = latest.timestamp;
             }
           }
-        } catch {}
-      }, 5000);
-      return () => clearInterval(interval);
-    }, [user, speak]);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [user, speak]);
+
   // ── USER MEMORY HOOKS ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
@@ -59,25 +78,6 @@
     await api.setMemory("name", name);
     showToast(`I'll remember your name is ${name}.`);
   }
-import { useState, useEffect, useRef } from "react";
-import { api } from "../utils/api.js";
-import { useDexVoice } from "../hooks/useDexVoice.js";
-import { useAuth } from "../hooks/useAuth.jsx";
-
-
-const DEX_AVATAR = "🤖";
-
-
-export default function DexChat() {
-  const { user } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { role: "assistant", content: "Hey! I'm Dex — your Konvict Artz assistant. What can I help you with today?" },
-  ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState("");
-  const [accessError, setAccessError] = useState(null);
   const messagesEndRef = useRef(null);
 
 
