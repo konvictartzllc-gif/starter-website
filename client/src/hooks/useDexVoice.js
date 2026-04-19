@@ -80,6 +80,11 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     recognition.onerror = (event) => {
       if (event.error !== "no-speech") {
         console.warn("Speech recognition error:", event.error);
+        if (event.error === "not-allowed") {
+          alert(
+            "Microphone access was blocked. Please enable microphone permissions in your browser settings to use voice features."
+          );
+        }
       }
     };
 

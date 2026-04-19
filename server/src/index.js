@@ -19,8 +19,21 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ── Middleware ────────────────────────────────────────────────────────────────
+const allowedOrigins = [
+  "https://starter-website-4dafg1xyq-konvict-artz.vercel.app",
+  "https://starter-website-git-dex-v2-patches-konvict-artz.vercel.app",
+  "https://www.konvict-artz.com",
+  "https://konvict-artz.com",
+  "https://konvictartz.com"
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || "https://www.konvict-artz.com",
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"), false);
+  },
   credentials: true,
 }));
 app.use(express.json());
