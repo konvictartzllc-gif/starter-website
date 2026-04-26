@@ -1,0 +1,3 @@
+import { Router } from "express";
+// ...dex.js code from original file...
+export default router;
