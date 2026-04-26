@@ -484,17 +484,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val trimmed = serverUrl?.trim()?.trimEnd('/').orEmpty()
         if (trimmed.isBlank()) return DEFAULT_SERVER_URL
         val lower = trimmed.lowercase(Locale.US)
-        return if (
-            lower.startsWith("http://10.0.2.2") ||
-            lower.startsWith("http://127.0.0.1") ||
-            lower.startsWith("http://localhost") ||
-            lower.startsWith("http://192.168.") ||
-            lower.startsWith("http://10.") ||
-            Regex("""^http://172\.(1[6-9]|2\d|3[0-1])\.""").containsMatchIn(lower)
-        ) {
-            DEFAULT_SERVER_URL
-        } else {
-            trimmed
+        return when {
+            lower.startsWith("http://localhost") || lower.startsWith("http://127.0.0.1") -> DEFAULT_SERVER_URL
+            else -> trimmed
         }
     }
 
@@ -1197,7 +1189,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val action = PendingAction(
             kind = PendingActionKind.CONTACT_SAVE,
             summary = getString(R.string.contact_save_summary, number),
-            detail = getString(R.string.contact_save_detail, number),
+            detail = getString(R.string.contact_save_detail),
             targetValue = number,
         )
         queuePendingAction(action)

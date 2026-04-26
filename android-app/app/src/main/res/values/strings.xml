@@ -5,7 +5,7 @@
     <string name="dex_ready_summary">Sign in to your Dex account, connect to your backend, and sync the assistant permissions from your phone.</string>
     <string name="server_title">Backend</string>
     <string name="server_hint">https://your-backend-url.com/api</string>
-    <string name="server_help">Use your real backend API base. Dex now defaults to the live Render API. For local emulator-only testing, you can still use http://10.0.2.2:3001/api</string>
+    <string name="server_help">Use your real backend API base. Dex now defaults to the live Render API. For local testing, use http://10.0.2.2:3001/api in the emulator or http://YOUR_COMPUTER_IP:3001/api on a phone using the same Wi-Fi.</string>
     <string name="account_title">Dex account</string>
     <string name="name_optional">Name (for new account)</string>
     <string name="email">Email</string>
@@ -22,7 +22,7 @@
     <string name="android_permissions_missing">Android runtime permissions still need approval on this device.</string>
     <string name="android_permissions_ready">Android runtime permissions are granted for phone state, contacts, call controls, microphone, and notifications.</string>
     <string name="permissions_disclosure_title">Before Dex requests Android permissions</string>
-    <string name="permissions_disclosure_message">Dex AI Assistant uses phone state and contacts to announce callers, answer or decline calls you approve, and place calls for saved contacts. Dex uses microphone access for voice commands like “Hey Dex” and “answer,” and notifications for reminders and background status. Dex does not need call log access for these features. You can turn Dex features off later in Dex settings or Android system settings.</string>
+    <string name="permissions_disclosure_message">Dex AI Assistant uses phone state and contacts to announce callers, answer or decline calls you approve, and place calls for saved contacts. Dex uses microphone access for voice commands like "Hey Dex" and "answer," and notifications for reminders and background status. Dex does not need call log access for these features. You can turn Dex features off later in Dex settings or Android system settings.</string>
     <string name="permissions_disclosure_continue">Continue</string>
     <string name="permissions_disclosure_cancel">Not now</string>
     <string name="voice_title">Dex voice</string>
@@ -40,15 +40,15 @@
     <string name="test_voice">Test Dex voice</string>
     <string name="setup_voice">Set up voice</string>
     <string name="conversation_title">Conversation mode</string>
-    <string name="conversation_summary">Keep Dex listening while this app is open. Say “Hey Dex” and then ask for help, a task, or a little company.</string>
+    <string name="conversation_summary">Keep Dex listening while this app is open. Say "Hey Dex" and then ask for help, a task, or a little company.</string>
     <string name="start_wake_mode">Start wake mode</string>
     <string name="stop_wake_mode">Stop wake mode</string>
     <string name="wake_mode_off">Wake mode is off.</string>
-    <string name="wake_mode_auto_started">Dex is ready. Say “Hey Dex” whenever you want me.</string>
-    <string name="wake_mode_waiting">Dex is waiting for “Hey Dex”.</string>
+    <string name="wake_mode_auto_started">Dex is ready. Say "Hey Dex" whenever you want me.</string>
+    <string name="wake_mode_waiting">Dex is waiting for "Hey Dex".</string>
     <string name="wake_mode_listening">Dex is listening for the wake phrase.</string>
     <string name="wake_mode_command_ready">Dex is awake. Go ahead.</string>
-    <string name="wake_mode_session_ended">Dex went back to waiting. Say “Hey Dex” when you want me again.</string>
+    <string name="wake_mode_session_ended">Dex went back to waiting. Say "Hey Dex" when you want me again.</string>
     <string name="wake_mode_acknowledged">I am here. What do you need?</string>
     <string name="wake_mode_sleep_reply">Okay. I will be quiet until you wake me again.</string>
     <string name="wake_mode_login_needed">Log in first so Dex can respond with your account.</string>
@@ -60,7 +60,7 @@
     <string name="wake_mode_fallback_reply">I had trouble reaching the Dex chat service just now.</string>
     <string name="last_heard">Last thing Dex heard</string>
     <string name="last_reply">Last reply from Dex</string>
-    <string name="voice_dash">—</string>
+    <string name="voice_dash">-</string>
     <string name="pending_action_title">Pending action</string>
     <string name="pending_action_ready">I drafted that task for your approval.</string>
     <string name="pending_action_canceled">Okay, I canceled that draft.</string>

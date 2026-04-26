@@ -17,12 +17,45 @@ function fireAndForget(label, task) {
     });
 }
 
+function createAuthConfigError(message) {
+  const error = new Error(message);
+  error.code = "AUTH_CONFIG_ERROR";
+  return error;
+}
+
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret) {
+    throw createAuthConfigError("JWT_SECRET is missing.");
+  }
+  return secret;
+}
+
 function signToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role, name: user.name },
-    process.env.JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: "7d" }
   );
+}
+
+function sendAuthFailure(res, context, err, details = {}) {
+  console.error(`[auth:${context}]`, {
+    message: err?.message || "Unknown auth error",
+    code: err?.code || null,
+    details,
+    stack: err?.stack || null,
+  });
+
+  if (err?.code === "AUTH_CONFIG_ERROR") {
+    return res.status(500).json({ error: "Authentication service is not configured correctly." });
+  }
+
+  if (typeof err?.message === "string" && err.message.toLowerCase().includes("invalid salt")) {
+    return res.status(500).json({ error: "This account password is stored incorrectly. Reset or recreate the account." });
+  }
+
+  return res.status(500).json({ error: "Server error" });
 }
 
 async function resolveUserAccess(db, user) {
@@ -55,6 +88,7 @@ async function resolveUserAccess(db, user) {
 
   return { ...user, access_type: accessType, trialDaysLeft };
 }
+
 // POST /api/auth/register
 router.post(
   "/register",
@@ -74,9 +108,7 @@ router.post(
     try {
       const existing = await db.get("SELECT * FROM users WHERE email = ?", [email]);
       if (existing) {
-        const canClaimInvitedAffiliate =
-          existing.role === "affiliate" &&
-          !existing.password;
+        const canClaimInvitedAffiliate = existing.role === "affiliate" && !existing.password;
 
         if (!canClaimInvitedAffiliate) {
           return res.status(409).json({ error: "Email already registered" });
@@ -105,7 +137,7 @@ router.post(
           },
         });
       }
-      // Validate promo code if provided
+
       let referredBy = null;
       if (promoCode) {
         const aff = await db.get("SELECT id, user_id FROM affiliates WHERE promo_code = ?", [promoCode.toUpperCase()]);
@@ -113,6 +145,7 @@ router.post(
           referredBy = promoCode.toUpperCase();
         }
       }
+
       const hashed = await bcrypt.hash(password, 12);
       const trialStart = new Date().toISOString();
       const result = await db.run(
@@ -122,6 +155,7 @@ router.post(
       );
       const user = await db.get("SELECT * FROM users WHERE id = ?", [result.lastID]);
       const resolvedUser = await resolveUserAccess(db, user);
+
       if (referredBy) {
         await db.run(
           `UPDATE affiliates
@@ -130,6 +164,7 @@ router.post(
           [referredBy]
         );
       }
+
       fireAndForget("Welcome email", () => sendWelcomeEmail(email, name));
 
       return res.json({
@@ -144,8 +179,7 @@ router.post(
         },
       });
     } catch (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Server error" });
+      return sendAuthFailure(res, "register", err, { email });
     }
   }
 );
@@ -168,6 +202,7 @@ router.post(
 
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+
       const resolvedUser = await resolveUserAccess(db, user);
       return res.json({
         token: signToken(resolvedUser),
@@ -181,8 +216,7 @@ router.post(
         },
       });
     } catch (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Server error" });
+      return sendAuthFailure(res, "login", err, { email });
     }
   }
 );
@@ -209,7 +243,6 @@ router.get("/me", requireUser, async (req, res) => {
   });
 });
 
-// ── Update Phone ───────────────────────────────────────────────────────────
 router.put("/phone", requireUser, [body("phone").notEmpty().trim()], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
@@ -220,7 +253,6 @@ router.put("/phone", requireUser, [body("phone").notEmpty().trim()], async (req,
   res.json({ success: true, message: "Phone number updated" });
 });
 
-// ── Request OTA Code ───────────────────────────────────────────────────────
 router.post("/ota/request", requireUser, [body("actionType").notEmpty()], async (req, res) => {
   const { actionType } = req.body;
   try {
@@ -230,7 +262,5 @@ router.post("/ota/request", requireUser, [body("actionType").notEmpty()], async 
     res.status(500).json({ error: "Failed to send authorization code" });
   }
 });
-
-// ...existing code up to first export default router...
 
 export default router;

@@ -42,6 +42,14 @@ function boolSummary(value, missingReason) {
     : { configured: false, reason: missingReason };
 }
 
+function requireEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 function getStripeStatus() {
   const configured = Boolean(
     process.env.STRIPE_SECRET_KEY &&
@@ -204,6 +212,7 @@ async function checkInventoryAlerts() {
 
 // ── Start server ──────────────────────────────────────────────────────────────
 async function start() {
+  requireEnv("JWT_SECRET");
   const dbPath = process.env.DB_PATH || path.join(__dirname, "../../data/konvict.db");
   const adminUsername = process.env.ADMIN_EMAIL || "konvictartzllc@gmail.com";
   const adminPassword = process.env.ADMIN_PASSWORD || "Thuglife1423";

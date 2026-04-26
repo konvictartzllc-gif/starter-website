@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj": {}
+    "c:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj": {}
   },
   "projects": {
-    "C:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj": {
+    "c:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj",
+        "projectUniqueName": "c:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj",
         "projectName": "MyFirstAzureWebApp",
-        "projectPath": "C:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj",
+        "projectPath": "c:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj",
         "packagesPath": "C:\\Users\\RACUser\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\obj\\",
+        "outputPath": "c:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\RACUser\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -38,7 +38,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.100"
+        "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
         "net10.0": {
@@ -47,7 +47,7 @@
             "Microsoft.AspNetCore.App.Internal.Assets": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[10.0.3, )",
+              "version": "[10.0.7, )",
               "autoReferenced": true
             }
           },
@@ -70,7 +70,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.103/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

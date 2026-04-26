@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "y8kqrkieyNg=",
+  "dgSpecHash": "/dfdIOGAiCo=",
   "success": true,
-  "projectFilePath": "C:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj",
+  "projectFilePath": "c:\\Users\\RACUser\\starter website\\MyFirstAzureWebApp\\MyFirstAzureWebApp.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\RACUser\\.nuget\\packages\\microsoft.aspnetcore.app.internal.assets\\10.0.3\\microsoft.aspnetcore.app.internal.assets.10.0.3.nupkg.sha512"
+    "C:\\Users\\RACUser\\.nuget\\packages\\microsoft.aspnetcore.app.internal.assets\\10.0.7\\microsoft.aspnetcore.app.internal.assets.10.0.7.nupkg.sha512"
   ],
   "logs": []
 }

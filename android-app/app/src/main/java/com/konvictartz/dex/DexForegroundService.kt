@@ -1,6 +1,7 @@
 package com.konvictartz.dex
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -140,6 +141,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
 
+    @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     private fun startCallMonitoring() {
         if (phoneStateListener != null) return
@@ -246,6 +248,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         )
     }
 
+    @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     private fun answerRingingCall() {
         if (!hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)) return
@@ -259,6 +262,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
+    @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     private fun declineRingingCall() {
         try {
