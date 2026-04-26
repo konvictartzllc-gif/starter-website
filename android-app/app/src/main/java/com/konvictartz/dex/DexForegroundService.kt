@@ -18,6 +18,8 @@ import android.telecom.TelecomManager
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.speech.tts.TextToSpeech
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import okhttp3.MediaType.Companion.toMediaType
@@ -38,6 +40,14 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var ttsReady = false
     private var lastCallState = TelephonyManager.CALL_STATE_IDLE
     private var lastCaller = "Unknown caller"
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var autoAnswerPending = false
+    private val autoAnswerRunnable = Runnable {
+        if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
+            autoAnswerPending = true
+            answerRingingCall()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -57,6 +67,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(autoAnswerRunnable)
         stopCallMonitoring()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
@@ -122,7 +133,6 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         return hasToken &&
             phoneBackendEnabled &&
             hasPermission(Manifest.permission.READ_PHONE_STATE) &&
-            hasPermission(Manifest.permission.READ_CONTACTS) &&
             hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)
     }
 
@@ -149,6 +159,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val manager = telephonyManager ?: return
         phoneStateListener?.let { manager.listen(it, PhoneStateListener.LISTEN_NONE) }
         phoneStateListener = null
+        mainHandler.removeCallbacks(autoAnswerRunnable)
+        autoAnswerPending = false
         lastCallState = TelephonyManager.CALL_STATE_IDLE
         lastCaller = "Unknown caller"
     }
@@ -159,22 +171,32 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             TelephonyManager.CALL_STATE_RINGING -> {
                 lastCaller = resolvedCaller
                 if (isLikelySpamCaller(resolvedCaller, phoneNumber)) {
+                    mainHandler.removeCallbacks(autoAnswerRunnable)
+                    autoAnswerPending = false
                     postCallEvent("declined", resolvedCaller)
                     declineRingingCall()
                 } else {
                     postCallEvent("incoming", resolvedCaller)
                     speakIncomingCallPrompt(resolvedCaller)
+                    mainHandler.removeCallbacks(autoAnswerRunnable)
+                    mainHandler.postDelayed(autoAnswerRunnable, AUTO_ANSWER_DELAY_MS)
                 }
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
+                mainHandler.removeCallbacks(autoAnswerRunnable)
                 if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                     postCallEvent("answered", resolvedCaller)
                 }
+                autoAnswerPending = false
             }
             TelephonyManager.CALL_STATE_IDLE -> {
+                mainHandler.removeCallbacks(autoAnswerRunnable)
                 if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
-                    postCallEvent("declined", resolvedCaller)
+                    if (!autoAnswerPending) {
+                        postCallEvent("declined", resolvedCaller)
+                    }
                 }
+                autoAnswerPending = false
                 lastCaller = "Unknown caller"
             }
         }
@@ -225,6 +247,19 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     @Suppress("DEPRECATION")
+    private fun answerRingingCall() {
+        if (!hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)) return
+        try {
+            val manager = telecomManager ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                manager.acceptRingingCall()
+            }
+        } catch (_: Exception) {
+            // Some OEMs can still block background answering. We leave the call ringing if that happens.
+        }
+    }
+
+    @Suppress("DEPRECATION")
     private fun declineRingingCall() {
         try {
             val manager = telecomManager ?: return
@@ -267,5 +302,6 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     companion object {
         private const val CHANNEL_ID = "dex_background_service"
         private const val NOTIFICATION_ID = 4107
+        private const val AUTO_ANSWER_DELAY_MS = 1200L
     }
 }

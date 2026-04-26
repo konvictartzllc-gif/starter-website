@@ -391,7 +391,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun loadStoredState() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        binding.serverUrlInput.setText(prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL))
+        val restoredServerUrl = normalizeServerUrl(prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL))
+        binding.serverUrlInput.setText(restoredServerUrl)
         authToken = prefs.getString(KEY_TOKEN, null)
         binding.emailInput.setText(prefs.getString(KEY_EMAIL, ""))
     }
@@ -475,7 +476,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun currentServerUrl(): String {
-        return binding.serverUrlInput.text?.toString()?.trim()?.trimEnd('/') ?: DEFAULT_SERVER_URL
+        val rawValue = binding.serverUrlInput.text?.toString()
+        return normalizeServerUrl(rawValue)
+    }
+
+    private fun normalizeServerUrl(serverUrl: String?): String {
+        val trimmed = serverUrl?.trim()?.trimEnd('/').orEmpty()
+        if (trimmed.isBlank()) return DEFAULT_SERVER_URL
+        val lower = trimmed.lowercase(Locale.US)
+        return if (
+            lower.startsWith("http://10.0.2.2") ||
+            lower.startsWith("http://127.0.0.1") ||
+            lower.startsWith("http://localhost") ||
+            lower.startsWith("http://192.168.") ||
+            lower.startsWith("http://10.") ||
+            Regex("""^http://172\.(1[6-9]|2\d|3[0-1])\.""").containsMatchIn(lower)
+        ) {
+            DEFAULT_SERVER_URL
+        } else {
+            trimmed
+        }
     }
 
     private fun login() {
@@ -1950,7 +1970,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_LEARNING_REMINDER_TIME = "learning_reminder_time"
         const val KEY_LEARNING_REMINDER_TITLE = "learning_reminder_title"
         const val KEY_LEARNING_REMINDER_TEXT = "learning_reminder_text"
-        const val DEFAULT_SERVER_URL = "http://10.0.2.2:3001/api"
+        const val DEFAULT_SERVER_URL = "https://konvict-artz.onrender.com/api"
         private const val WAKE_WORD = "hey dex"
         private const val CONVERSATION_TIMEOUT_MS = 45_000L
         private const val MAX_CALL_ANSWER_RETRIES = 2

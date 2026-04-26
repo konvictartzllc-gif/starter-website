@@ -7,6 +7,15 @@ android {
     namespace = "com.konvictartz.dex"
     compileSdk = 34
 
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("${System.getProperty("user.home")}\\.android\\debug.keystore")
+            storePassword = "android"
+            keyAlias = "AndroidDebugKey"
+            keyPassword = "android"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.konvictartz.dex"
         minSdk = 26
@@ -21,6 +30,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

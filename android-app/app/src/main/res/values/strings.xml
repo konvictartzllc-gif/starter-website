@@ -5,7 +5,7 @@
     <string name="dex_ready_summary">Sign in to your Dex account, connect to your backend, and sync the assistant permissions from your phone.</string>
     <string name="server_title">Backend</string>
     <string name="server_hint">https://your-backend-url.com/api</string>
-    <string name="server_help">Use your real backend API base. For local testing on the Android emulator, try http://10.0.2.2:3001/api</string>
+    <string name="server_help">Use your real backend API base. Dex now defaults to the live Render API. For local emulator-only testing, you can still use http://10.0.2.2:3001/api</string>
     <string name="account_title">Dex account</string>
     <string name="name_optional">Name (for new account)</string>
     <string name="email">Email</string>
@@ -32,7 +32,7 @@
     <string name="voice_setup_needed">Dex needs Android text-to-speech set up on this phone.</string>
     <string name="voice_setup_open_failed">Dex could not open Android voice setup.</string>
     <string name="background_service_title">Dex AI Assistant is standing by</string>
-    <string name="background_service_summary">Dex will stay ready after sign-in so you do not have to keep reopening the app.</string>
+    <string name="background_service_summary">Dex will stay ready after sign-in so it can screen spam and answer allowed calls without reopening the app.</string>
     <string name="background_service_channel_name">Dex background service</string>
     <string name="background_service_channel_description">Keeps Dex available for phone and voice support while the app is not front and center.</string>
     <string name="voice_speaking">Dex is speaking now.</string>
@@ -87,12 +87,12 @@
     <string name="no_appointments_found">You do not have any Dex appointments yet.</string>
     <string name="no_matching_appointments">You do not have any matching appointments for that day.</string>
     <string name="call_monitor_title">Call monitoring</string>
-    <string name="call_monitor_summary">When phone access is enabled and Android permissions are granted, Dex can log incoming, answered, and declined calls while this app is active.</string>
+    <string name="call_monitor_summary">When phone access is enabled and Android permissions are granted, Dex can monitor calls, block likely spam, and auto-answer non-spam calls while the app and background service are running.</string>
     <string name="call_monitor_waiting">Call monitoring is waiting for login, backend phone permission, and Android runtime access.</string>
-    <string name="call_monitor_active">Dex call monitoring is active on this device.</string>
+    <string name="call_monitor_active">Dex call monitoring is active and ready to auto-answer allowed calls on this device.</string>
     <string name="call_event_sent">Last call event sent: %1$s</string>
     <string name="call_prompt_template">Incoming call from %1$s. Say answer or decline, or use the buttons on screen.</string>
-    <string name="call_background_prompt_template">Incoming call from %1$s.</string>
+    <string name="call_background_prompt_template">Incoming call from %1$s. Dex is answering now.</string>
     <string name="call_speaking">Dex is speaking the incoming call prompt.</string>
     <string name="call_answering">Dex is trying to answer the ringing call.</string>
     <string name="call_answered">Dex answered the ringing call.</string>
