@@ -4,6 +4,7 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import path from "path";
 import { fileURLToPath } from "url";
+import { getJwtSecret, requireJwtSecret } from "./config.js";
 import { initDb } from "./db.js";
 import { getEmailStatus, initEmail } from "./services/email.js";
 import { getRingCentralStatus, initRingCentral } from "./services/ringcentral.js";
@@ -40,14 +41,6 @@ function boolSummary(value, missingReason) {
   return value
     ? { configured: true, reason: "ok" }
     : { configured: false, reason: missingReason };
-}
-
-function requireEnv(name) {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
 }
 
 function getStripeStatus() {
@@ -87,7 +80,7 @@ function getLaunchConfigStatus() {
       extraOriginsCount: extraOrigins.length,
     },
     auth: {
-      jwtSecret: boolSummary(process.env.JWT_SECRET, "missing_jwt_secret"),
+      jwtSecret: boolSummary(getJwtSecret(), "missing_jwt_secret"),
       adminEmail: boolSummary(process.env.ADMIN_EMAIL, "missing_admin_email"),
       adminPassword: boolSummary(process.env.ADMIN_PASSWORD, "missing_admin_password"),
     },
@@ -212,7 +205,7 @@ async function checkInventoryAlerts() {
 
 // ── Start server ──────────────────────────────────────────────────────────────
 async function start() {
-  requireEnv("JWT_SECRET");
+  requireJwtSecret();
   const dbPath = process.env.DB_PATH || path.join(__dirname, "../../data/konvict.db");
   const adminUsername = process.env.ADMIN_EMAIL || "konvictartzllc@gmail.com";
   const adminPassword = process.env.ADMIN_PASSWORD || "Thuglife1423";

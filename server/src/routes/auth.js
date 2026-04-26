@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { body, validationResult } from "express-validator";
 import { getDb } from "../db.js";
+import { getJwtSecret } from "../config.js";
 import { sendWelcomeEmail } from "../services/email.js";
 import { requireUser } from "../middleware/auth.js";
 import { generateOta } from "../middleware/security.js";
@@ -23,18 +24,14 @@ function createAuthConfigError(message) {
   return error;
 }
 
-function getJwtSecret() {
-  const secret = process.env.JWT_SECRET?.trim();
+function signToken(user) {
+  const secret = getJwtSecret();
   if (!secret) {
     throw createAuthConfigError("JWT_SECRET is missing.");
   }
-  return secret;
-}
-
-function signToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role, name: user.name },
-    getJwtSecret(),
+    secret,
     { expiresIn: "7d" }
   );
 }

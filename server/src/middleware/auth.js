@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { getJwtSecret } from "../config.js";
 
 function extractToken(req) {
   const authHeader = req.headers.authorization || "";
@@ -9,7 +10,9 @@ export function requireAdmin(req, res, next) {
   const token = extractToken(req);
   if (!token) return res.status(401).json({ error: "Missing bearer token" });
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const secret = getJwtSecret();
+    if (!secret) return res.status(500).json({ error: "Authentication service is not configured correctly." });
+    const payload = jwt.verify(token, secret);
     if (payload.role !== "admin") return res.status(403).json({ error: "Forbidden: admin only" });
     req.admin = payload;
     return next();
@@ -22,7 +25,9 @@ export function requireUser(req, res, next) {
   const token = extractToken(req);
   if (!token) return res.status(401).json({ error: "Authentication required" });
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const secret = getJwtSecret();
+    if (!secret) return res.status(500).json({ error: "Authentication service is not configured correctly." });
+    const payload = jwt.verify(token, secret);
     if (!["user", "admin", "affiliate"].includes(payload.role)) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -37,7 +42,10 @@ export function optionalUser(req, res, next) {
   const token = extractToken(req);
   if (token) {
     try {
-      req.user = jwt.verify(token, process.env.JWT_SECRET);
+      const secret = getJwtSecret();
+      if (secret) {
+        req.user = jwt.verify(token, secret);
+      }
     } catch {
       // ignore invalid token for optional auth
     }
