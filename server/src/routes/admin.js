@@ -8,15 +8,63 @@ import { sendLowInventoryAlert } from "../services/ringcentral.js";
 
 const router = Router();
 
-// ── Dashboard Stats ──────────────────────────────────────────────────────────
+function getReferralLink(promoCode) {
+  return `${process.env.CLIENT_ORIGIN || "https://www.konvict-artz.com"}?ref=${promoCode}`;
+}
+
+async function ensureFeatureFlagsTable(db) {
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS feature_flags (
+      key TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      description TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await db.run(`
+    INSERT INTO feature_flags (key, enabled, description)
+    VALUES
+      ('relationship_aliases', 1, 'Let users map relationship shortcuts like wife or boss to saved contacts.'),
+      ('morning_briefing', 1, 'Enable Dex morning briefing summaries and planning suggestions.'),
+      ('action_center', 1, 'Enable Dex action center for tasks and follow-up suggestions.'),
+      ('learning_reminders', 1, 'Enable Dex daily learning reminder scheduling.')
+    ON CONFLICT(key) DO NOTHING;
+  `);
+}
+
+async function ensureAffiliateRecord(db, userId) {
+  const existing = await db.get("SELECT * FROM affiliates WHERE user_id = ?", [userId]);
+  if (existing) return existing;
+
+  const promoCode = `DEX${uuidv4().slice(0, 6).toUpperCase()}`;
+  await db.run(
+    "INSERT INTO affiliates (user_id, promo_code) VALUES (?, ?)",
+    [userId, promoCode]
+  );
+  return db.get("SELECT * FROM affiliates WHERE user_id = ?", [userId]);
+}
+
 router.get("/stats", requireAdmin, async (req, res) => {
   const db = getDb();
+  await ensureFeatureFlagsTable(db);
   const totalUsers = await db.get("SELECT COUNT(*) as count FROM users WHERE role = 'user'");
   const paidUsers = await db.get("SELECT COUNT(*) as count FROM users WHERE access_type = 'paid'");
   const trialUsers = await db.get("SELECT COUNT(*) as count FROM users WHERE access_type = 'trial'");
   const totalRevenue = await db.get("SELECT SUM(amount_cents) as total FROM payments WHERE status = 'completed'");
   const affiliateCount = await db.get("SELECT COUNT(*) as count FROM affiliates");
   const lowInventory = await db.all("SELECT * FROM inventory WHERE quantity <= low_threshold ORDER BY quantity ASC");
+  const activeToday = await db.get(`
+    SELECT COUNT(DISTINCT user_id) as count
+      FROM (
+        SELECT user_id FROM chat_history WHERE created_at >= datetime('now', '-1 day')
+        UNION ALL
+        SELECT user_id FROM call_events WHERE created_at >= datetime('now', '-1 day')
+      )
+  `);
+  const openTasks = await db.get("SELECT COUNT(*) as count FROM task_items WHERE status != 'done'");
+  const savedAliases = await db.get("SELECT COUNT(*) as count FROM relationship_aliases");
+  const learningLessons = await db.get("SELECT COUNT(*) as count FROM learning_lessons");
+  const featureFlags = await db.all("SELECT key, enabled, description, updated_at FROM feature_flags ORDER BY key ASC");
 
   return res.json({
     totalUsers: totalUsers.count,
@@ -25,10 +73,39 @@ router.get("/stats", requireAdmin, async (req, res) => {
     totalRevenueCents: totalRevenue.total || 0,
     affiliateCount: affiliateCount.count,
     lowInventory,
+    activeToday: activeToday.count,
+    openTasks: openTasks.count,
+    savedAliases: savedAliases.count,
+    learningLessons: learningLessons.count,
+    featureFlags,
   });
 });
 
-// ── Inventory Management ─────────────────────────────────────────────────────
+router.get("/feature-flags", requireAdmin, async (req, res) => {
+  const db = getDb();
+  await ensureFeatureFlagsTable(db);
+  const flags = await db.all("SELECT key, enabled, description, updated_at FROM feature_flags ORDER BY key ASC");
+  return res.json(flags);
+});
+
+router.patch("/feature-flags/:key", requireAdmin, async (req, res) => {
+  const db = getDb();
+  await ensureFeatureFlagsTable(db);
+  const key = String(req.params.key || "").trim();
+  const enabled = req.body.enabled ? 1 : 0;
+  const current = await db.get("SELECT * FROM feature_flags WHERE key = ?", [key]);
+  if (!current) return res.status(404).json({ error: "Feature flag not found" });
+  await db.run(
+    `UPDATE feature_flags
+        SET enabled = ?,
+            updated_at = datetime('now')
+      WHERE key = ?`,
+    [enabled, key]
+  );
+  const updated = await db.get("SELECT key, enabled, description, updated_at FROM feature_flags WHERE key = ?", [key]);
+  return res.json({ success: true, flag: updated });
+});
+
 router.get("/inventory", requireAdmin, async (req, res) => {
   const db = getDb();
   const items = await db.all("SELECT * FROM inventory ORDER BY name ASC");
@@ -61,8 +138,17 @@ router.put("/inventory/:id", requireAdmin, async (req, res) => {
   const { name, description, category, price_cents, quantity, low_threshold, image_url } = req.body;
   const db = getDb();
   await db.run(
-    `UPDATE inventory SET name=?, description=?, category=?, price_cents=?, quantity=?, low_threshold=?, image_url=?, updated_at=datetime('now'), alerted=0
-     WHERE id=?`,
+    `UPDATE inventory
+        SET name = ?,
+            description = ?,
+            category = ?,
+            price_cents = ?,
+            quantity = ?,
+            low_threshold = ?,
+            image_url = ?,
+            updated_at = datetime('now'),
+            alerted = 0
+      WHERE id = ?`,
     [name, description, category, price_cents, quantity, low_threshold || 5, image_url, req.params.id]
   );
   const item = await db.get("SELECT * FROM inventory WHERE id = ?", [req.params.id]);
@@ -75,13 +161,13 @@ router.delete("/inventory/:id", requireAdmin, async (req, res) => {
   return res.json({ success: true });
 });
 
-// ── Affiliate / Promoter Management ─────────────────────────────────────────
 router.get("/affiliates", requireAdmin, async (req, res) => {
   const db = getDb();
   const affiliates = await db.all(
-    `SELECT a.*, u.email, u.name FROM affiliates a
-     JOIN users u ON u.id = a.user_id
-     ORDER BY a.paid_subs DESC`
+    `SELECT a.*, u.email, u.name
+       FROM affiliates a
+       JOIN users u ON u.id = a.user_id
+      ORDER BY a.paid_subs DESC, a.signups DESC`
   );
   return res.json(affiliates);
 });
@@ -98,34 +184,46 @@ router.post("/affiliates/create", requireAdmin, [
   try {
     let user = await db.get("SELECT * FROM users WHERE email = ?", [email]);
     if (!user) {
-      // Create affiliate user account (no password — they'll set it on first login)
       const result = await db.run(
-        `INSERT INTO users (email, name, role, access_type) VALUES (?, ?, 'affiliate', 'unlimited')`,
+        `INSERT INTO users (email, name, role, access_type)
+         VALUES (?, ?, 'affiliate', 'unlimited')`,
         [email, name || null]
       );
       user = await db.get("SELECT * FROM users WHERE id = ?", [result.lastID]);
     } else {
-      await db.run("UPDATE users SET role = 'affiliate', access_type = 'unlimited' WHERE id = ?", [user.id]);
+      await db.run(
+        `UPDATE users
+            SET role = 'affiliate',
+                access_type = 'unlimited',
+                name = COALESCE(NULLIF(?, ''), name)
+          WHERE id = ?`,
+        [name || null, user.id]
+      );
+      user = await db.get("SELECT * FROM users WHERE id = ?", [user.id]);
     }
 
-    // Generate unique promo code
-    const promoCode = `DEX${uuidv4().slice(0, 6).toUpperCase()}`;
-    await db.run(
-      "INSERT INTO affiliates (user_id, promo_code) VALUES (?, ?)",
-      [user.id, promoCode]
-    );
+    const affiliate = await ensureAffiliateRecord(db, user.id);
+    const referralLink = getReferralLink(affiliate.promo_code);
+    await sendPromoterNotification(user.email, user.name, affiliate.promo_code, referralLink);
 
-    const referralLink = `${process.env.CLIENT_ORIGIN || "https://www.konvict-artz.com"}?ref=${promoCode}`;
-    await sendPromoterNotification(email, name, promoCode, referralLink);
-
-    return res.json({ success: true, promoCode, referralLink });
+    return res.json({
+      success: true,
+      promoCode: affiliate.promo_code,
+      referralLink,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        access_type: user.access_type,
+      },
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to create affiliate" });
   }
 });
 
-// ── Send Promo Code to Anyone ────────────────────────────────────────────────
 router.post("/send-promo", requireAdmin, [
   body("email").isEmail().normalizeEmail(),
   body("code").notEmpty().trim(),
@@ -138,17 +236,64 @@ router.post("/send-promo", requireAdmin, [
   return res.json({ success: true });
 });
 
-// ── Users List ────────────────────────────────────────────────────────────────
 router.get("/users", requireAdmin, async (req, res) => {
   const db = getDb();
   const users = await db.all(
     `SELECT id, email, name, role, access_type, trial_start, sub_expires, created_at
-     FROM users ORDER BY created_at DESC`
+       FROM users
+      ORDER BY created_at DESC`
   );
   return res.json(users);
 });
 
-// ── Check & Alert Low Inventory ───────────────────────────────────────────────
+router.patch("/users/:id/access", requireAdmin, async (req, res) => {
+  const db = getDb();
+  const targetId = parseInt(req.params.id, 10);
+  const { role, access_type } = req.body;
+
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+
+  const allowedRoles = new Set(["user", "affiliate", "admin"]);
+  const allowedAccessTypes = new Set(["none", "trial", "paid", "expired", "unlimited"]);
+
+  if (role && !allowedRoles.has(role)) {
+    return res.status(400).json({ error: "Invalid role" });
+  }
+
+  if (access_type && !allowedAccessTypes.has(access_type)) {
+    return res.status(400).json({ error: "Invalid access type" });
+  }
+
+  const current = await db.get("SELECT * FROM users WHERE id = ?", [targetId]);
+  if (!current) return res.status(404).json({ error: "User not found" });
+
+  const nextRole = role || current.role;
+  const nextAccessType = access_type || current.access_type;
+
+  await db.run(
+    `UPDATE users
+        SET role = ?,
+            access_type = ?
+      WHERE id = ?`,
+    [nextRole, nextAccessType, targetId]
+  );
+
+  if (nextRole === "affiliate") {
+    await ensureAffiliateRecord(db, targetId);
+  }
+
+  const updated = await db.get(
+    `SELECT id, email, name, role, access_type, trial_start, sub_expires, created_at
+       FROM users
+      WHERE id = ?`,
+    [targetId]
+  );
+
+  return res.json({ success: true, user: updated });
+});
+
 router.post("/check-inventory", requireAdmin, async (req, res) => {
   const db = getDb();
   const lowItems = await db.all(

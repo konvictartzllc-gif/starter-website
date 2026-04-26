@@ -8,6 +8,7 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref") || "";
+  const recoveryReason = searchParams.get("reason") || "";
 
   const [form, setForm] = useState({ name: "", email: "", password: "", promoCode: refCode });
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,11 @@ export function RegisterPage() {
       <div className="bg-gray-900 rounded-2xl p-8 w-full max-w-md border border-gray-700">
         <h1 className="text-2xl font-bold text-white mb-1">Create Your Account</h1>
         <p className="text-gray-400 text-sm mb-6">Start your free 3-day trial — no credit card needed</p>
+        {recoveryReason === "no_access" && (
+          <p className="text-blue-300 text-sm mb-4 bg-blue-900/20 rounded-lg px-3 py-2">
+            Create your account to start Dex with a free 3-day trial.
+          </p>
+        )}
         {error && <p className="text-red-400 text-sm mb-4 bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <input placeholder="Your Name" value={form.name} onChange={e => setForm(p => ({...p, name: e.target.value}))}
@@ -59,9 +65,19 @@ export function RegisterPage() {
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const recoveryReason = searchParams.get("reason") || "";
+  const recoveryMessage =
+    recoveryReason === "trial_expired"
+      ? "Your free trial has ended. Log in and Dex will take you straight to billing recovery."
+      : recoveryReason === "subscription_expired"
+        ? "Your Dex subscription needs attention. Log in and we’ll take you straight to billing."
+        : recoveryReason === "billing_required"
+          ? "Log in to restart or manage your Dex subscription."
+          : "";
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -72,6 +88,7 @@ export function LoginPage() {
       login(data.token, data.user);
       if (data.user.role === "admin") navigate("/admin");
       else if (data.user.role === "affiliate") navigate("/affiliate");
+      else if (data.user.access_type === "expired") navigate("/settings?billing=recovery");
       else navigate("/");
     } catch (err) {
       setError(err.error || "Login failed");
@@ -85,6 +102,7 @@ export function LoginPage() {
       <div className="bg-gray-900 rounded-2xl p-8 w-full max-w-md border border-gray-700">
         <h1 className="text-2xl font-bold text-white mb-1">Welcome Back</h1>
         <p className="text-gray-400 text-sm mb-6">Log in to your Konvict Artz account</p>
+        {recoveryMessage && <p className="text-blue-300 text-sm mb-4 bg-blue-900/20 rounded-lg px-3 py-2">{recoveryMessage}</p>}
         {error && <p className="text-red-400 text-sm mb-4 bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <input type="email" placeholder="Email Address" value={form.email} onChange={e => setForm(p => ({...p, email: e.target.value}))}

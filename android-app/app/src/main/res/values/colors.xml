@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dex_background">#10131A</color>
+    <color name="dex_panel">#191F2A</color>
+    <color name="dex_border">#2C3645</color>
+    <color name="dex_accent">#6ED0FF</color>
+    <color name="dex_text_secondary">#B7C2D0</color>
+</resources>

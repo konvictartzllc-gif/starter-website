@@ -2,6 +2,7 @@ services:
   - type: web
     name: konvict-artz-backend
     env: node
+    rootDir: server
     buildCommand: npm install
     startCommand: node src/index.js
     envVars:
@@ -9,8 +10,12 @@ services:
         value: production
       - key: PORT
         value: 3001
+      - key: PUBLIC_SITE_URL
+        value: https://www.konvict-artz.com
       - key: CLIENT_ORIGIN
         value: https://www.konvict-artz.com
+      - key: ALLOWED_ORIGINS
+        value: https://www.konvict-artz.com,https://konvict-artz.com
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
@@ -19,12 +24,34 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      - key: ADMIN_PHONE
+        sync: false
+      - key: EMERGENCY_PHONE
+        sync: false
+      - key: AI_PROVIDER
+        value: openai
       - key: OPENAI_API_KEY
         sync: false
-      - key: SQUARE_ACCESS_TOKEN
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: STRIPE_SECRET_KEY
         sync: false
-      - key: SQUARE_LOCATION_ID
+      - key: STRIPE_PUBLISHABLE_KEY
         sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_SUCCESS_URL
+        value: https://www.konvict-artz.com/settings?billing=success
+      - key: STRIPE_CANCEL_URL
+        value: https://www.konvict-artz.com/settings?billing=cancelled
+      - key: STRIPE_PORTAL_RETURN_URL
+        value: https://www.konvict-artz.com/settings
+      - key: DEX_PRICE_CENTS
+        value: "999"
+      - key: DEX_CURRENCY
+        value: usd
       - key: RC_CLIENT_ID
         sync: false
       - key: RC_CLIENT_SECRET
@@ -37,13 +64,15 @@ services:
         sync: false
       - key: RC_SERVER
         value: https://platform.ringcentral.com
-      - key: EMERGENCY_PHONE
-        value: "2057492403"
-      - key: ADMIN_PHONE
-        value: "2056239541"
       - key: SMTP_HOST
         sync: false
+      - key: SMTP_PORT
+        value: "587"
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS
+        sync: false
+      - key: SENDER_NAME
+        value: Konvict Artz
+      - key: SENDER_EMAIL
         sync: false

@@ -18,10 +18,20 @@ export async function sendAdEmail(to, subject, ad) {
 import nodemailer from "nodemailer";
 
 let transporter = null;
+let emailStatus = {
+  configured: false,
+  ready: false,
+  reason: "not_configured",
+};
 
 export function initEmail() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    emailStatus = {
+      configured: false,
+      ready: false,
+      reason: "missing_credentials",
+    };
     console.warn("⚠️  Email not configured.");
     return;
   }
@@ -30,7 +40,15 @@ export function initEmail() {
     port: parseInt(SMTP_PORT || "587", 10),
     secure: parseInt(SMTP_PORT || "587", 10) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
+  emailStatus = {
+    configured: true,
+    ready: true,
+    reason: "ok",
+  };
   console.log("✅ Email initialized");
 }
 
@@ -43,6 +61,21 @@ async function send(to, subject, html) {
   } catch (err) {
     console.error("Email error:", err.message);
   }
+}
+
+export function getEmailStatus() {
+  return { ...emailStatus };
+}
+
+export async function sendCustomEmail({ to, subject, body }) {
+  const safeSubject = subject || "Message from Dex";
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;line-height:1.6;">
+      <h2>${safeSubject}</h2>
+      <p>${String(body || "").replace(/\n/g, "<br />")}</p>
+    </div>
+  `;
+  await send(to, safeSubject, html);
 }
 
 export async function sendWelcomeEmail(email, name) {

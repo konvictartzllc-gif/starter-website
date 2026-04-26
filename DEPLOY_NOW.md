@@ -1,185 +1,115 @@
-# ⚡ Quick Production Setup (5 mins)
+# Deploy Dex Now
 
-## 🎯 Goal
-Get Dex AI live at https://www.konvict-artz.com with:
-- ✅ Voice chat ("Hey Dex")
-- ✅ 3-day free trial
-- ✅ Promoter program with email
-- ✅ Payment subscription
-- ✅ Gmail integration
+This is the shortest reliable deployment path for the current Dex stack.
 
----
+## 1. Backend on Render
 
-## 🚀 Deploy Now
+Create or update a Render web service with:
 
-### Step 1: Deploy Backend to Render (2 minutes)
-```bash
-# 1. Go to https://render.com/dashboard
-# 2. Click "New Web Service"
-# 3. Connect GitHub (or upload ZIP)
-# 4. Name: konvict-artz-dex-api
-# 5. Runtime: Node
-# 6. Start: node src/index.js
-# 7. Click Create
-```
+- **Name:** `konvict-artz-backend`
+- **Root Directory:** `server`
+- **Build Command:** `npm install`
+- **Start Command:** `node src/index.js`
 
-### Step 2: Add Environment (1 minute)
-In Render dashboard → Settings → Environment:
-```
-JWT_SECRET=xxxxxxxxxxxxxxx (generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+Use the current Render config files as reference:
+
+- [render.yaml](./render.yaml)
+- [server/render.yaml](./server/render.yaml)
+
+## 2. Required Render environment variables
+
+Set these before testing:
+
+```env
+PUBLIC_SITE_URL=https://www.konvict-artz.com
 CLIENT_ORIGIN=https://www.konvict-artz.com
-ADMIN_USERNAME=KonvictArtz
-ADMIN_PASSWORD=K0nv1ctArtz2026Launch
+ALLOWED_ORIGINS=https://www.konvict-artz.com,https://konvict-artz.com
+
+JWT_SECRET=...
+ADMIN_EMAIL=...
+ADMIN_PASSWORD=...
+
+AI_PROVIDER=openai
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
+
+STRIPE_SECRET_KEY=...
+STRIPE_PUBLISHABLE_KEY=...
+STRIPE_PRICE_ID=...
+STRIPE_WEBHOOK_SECRET=...
+STRIPE_SUCCESS_URL=https://www.konvict-artz.com/settings?billing=success
+STRIPE_CANCEL_URL=https://www.konvict-artz.com/settings?billing=cancelled
+STRIPE_PORTAL_RETURN_URL=https://www.konvict-artz.com/settings
+
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-OPENAI_API_KEY=sk-xxxxxx (optional)
+SMTP_USER=...
+SMTP_PASS=...
+SENDER_EMAIL=...
+SENDER_NAME=Konvict Artz
+
+RC_CLIENT_ID=...
+RC_CLIENT_SECRET=...
+RC_USERNAME=...
+RC_PASSWORD=...
+RC_PHONE_NUMBER=...
+RC_SERVER=https://platform.ringcentral.com
 ```
 
-### Step 3: Wire Backend to Frontend (1 minute)
-1. Copy your Render URL: `https://xxxx.onrender.com`
-2. Edit `vercel.json`:
+## 3. Verify backend deployment
+
+Once deployed, test:
+
+- `https://YOUR_RENDER_URL/`
+- `https://YOUR_RENDER_URL/health`
+- `https://YOUR_RENDER_URL/api/health`
+- `https://YOUR_RENDER_URL/api/diagnostics/providers`
+
+What you want to see:
+
+- root route returns JSON
+- health returns `status: ok`
+- diagnostics shows Stripe configured
+
+## 4. Frontend wiring
+
+Make sure the frontend points `/api/*` to the deployed backend URL.
+
+If you are using Vercel rewrites, the destination should be:
+
 ```json
 {
-  "rewrites": [{
-    "source": "/api/:path*",
-    "destination": "https://xxxx.onrender.com/api/:path*"
-  }]
-}
-```
-3. Push to GitHub → Vercel auto-deploys
-
-### Step 4: Test (1 minute)
-```bash
-# Test backend health
-curl https://xxxx.onrender.com/api/health
-
-# Test from frontend
-# Visit https://www.konvict-artz.com
-# Login → Click "💬 Start Chat"
-# Say "Hey Dex" → Should work!
-```
-
----
-
-## 📋 Features Now Live
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| User Registration | ✅ | Auto 3-day trial |
-| Voice "Hey Dex" | ✅ | Chrome/Edge only |
-| AI Chat | ✅ | Needs OpenAI key for advanced |
-| Trial System | ✅ | Auto-enforced |
-| Promoters | ✅ | Emails if SMTP set |
-| Payments | ✅ | Square integration ready |
-| **Live URL** | ✅ | https://www.konvict-artz.com |
-
----
-
-## 🔐 Gmail App Password Setup
-
-For email notifications to work:
-1. Go to myaccount.google.com/apppasswords
-2. Select: Mail & Windows PC (or Device)
-3. Copy generated password → `SMTP_PASS`
-4. ⚠️ NOT your regular Gmail password!
-
----
-
-## 🎬 Test User Flow
-
-```bash
-# 1. Register
-POST https://www.konvict-artz.com/api/auth/user/register
-{
-  "username": "TestUser",
-  "email": "test@example.com",
-  "password": "TestPass123456!"
-}
-
-# 2. Login
-POST https://www.konvict-artz.com/api/auth/user/login
-{
-  "email": "test@example.com",
-  "password": "TestPass123456!"
-}
-
-# 3. Check Trial Access
-POST https://www.konvict-artz.com/api/dex/access-ai
-Header: Authorization: Bearer TOKEN
-
-# Response: {"access": true, "type": "trial", "expiresAt": "2026-04-10T..."}
-
-# 4. Chat
-POST https://www.konvict-artz.com/api/dex/chat
-Header: Authorization: Bearer TOKEN
-{
-  "message": "What services do you offer?"
+  "source": "/api/:path*",
+  "destination": "https://YOUR_RENDER_URL/api/:path*"
 }
 ```
 
----
+## 5. Payment proof
 
-## 🎤 Voice Features
+Once backend health is good:
 
-Works in:
-- ✅ Chrome 25+
-- ✅ Edge 79+
-- ⚠️ Safari (iOS 14.7+, limited)
-- ❌ Firefox
+1. create a fresh user
+2. confirm trial access
+3. click upgrade / subscribe
+4. confirm Stripe Checkout opens
+5. complete checkout
+6. confirm account changes to `paid`
+7. open billing portal
 
-For voice to work:
-- Must be HTTPS (production)
-- Browser must have microphone access
-- Say "Hey Dex" clearly
+## 6. Android
 
----
+For Android testing:
 
-## 💰 Costs
+1. open [android-app/](./android-app/) in Android Studio
+2. build/install on your phone
+3. point it to the live backend URL
+4. test login, permissions, voice, and call flows
 
-- **Backend**: Free (Render)
-- **Frontend**: Free (Vercel)
-- **Email**: Free (Gmail)
-- **AI**: $0-5/month (OpenAI, optional)
-- **Total**: $0-5/month
+## 7. Reality check
 
-No credit card needed for free tier!
+If something disagrees with older docs, trust the current files:
 
----
-
-## ❓ Issues?
-
-### Render service not starting?
-```bash
-# Check logs in Render dashboard
-# Likely missing env variables
-```
-
-### "Chat endpoint not found (404)"?
-```bash
-# Vercel proxy not wired correctly
-# Check vercel.json has correct API URL
-```
-
-### Voice not working?
-```bash
-# Chrome only in production
-# HTTPS required
-# Allow microphone access when prompted
-```
-
----
-
-## 📞 Next Steps
-
-1. ✅ Deploy backend to Render
-2. ✅ Configure environment variables
-3. ✅ Update `vercel.json` with Render URL
-4. ✅ Test all features
-5. ✅ Monitor for errors
-6. 🎉 Go live!
-
-**Estimated time: 10 minutes**
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
+- [server/.env.example](./server/.env.example)
+- [render.yaml](./render.yaml)
+- [server/render.yaml](./server/render.yaml)
+- [server/src/index.js](./server/src/index.js)

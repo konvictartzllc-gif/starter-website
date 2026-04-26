@@ -9,12 +9,51 @@ import { generateOta } from "../middleware/security.js";
 
 const router = Router();
 
+function fireAndForget(label, task) {
+  Promise.resolve()
+    .then(task)
+    .catch((err) => {
+      console.error(`${label} failed:`, err?.message || err);
+    });
+}
+
 function signToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role, name: user.name },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
+}
+
+async function resolveUserAccess(db, user) {
+  if (!user) return null;
+  if (user.role === "admin" || user.access_type === "unlimited") {
+    return { ...user, access_type: "unlimited", trialDaysLeft: null };
+  }
+
+  let accessType = user.access_type;
+  let trialDaysLeft = null;
+
+  if (accessType === "trial" && user.trial_start) {
+    const trialEnd = new Date(user.trial_start);
+    trialEnd.setDate(trialEnd.getDate() + 3);
+    const now = new Date();
+    if (now > trialEnd) {
+      accessType = "expired";
+    } else {
+      trialDaysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
+    }
+  }
+
+  if (accessType === "paid" && user.sub_expires && new Date() > new Date(user.sub_expires)) {
+    accessType = "expired";
+  }
+
+  if (accessType !== user.access_type) {
+    await db.run("UPDATE users SET access_type = ? WHERE id = ?", [accessType, user.id]);
+  }
+
+  return { ...user, access_type: accessType, trialDaysLeft };
 }
 // POST /api/auth/register
 router.post(
@@ -33,8 +72,39 @@ router.post(
     const db = getDb();
 
     try {
-      const existing = await db.get("SELECT id FROM users WHERE email = ?", [email]);
-      if (existing) return res.status(409).json({ error: "Email already registered" });
+      const existing = await db.get("SELECT * FROM users WHERE email = ?", [email]);
+      if (existing) {
+        const canClaimInvitedAffiliate =
+          existing.role === "affiliate" &&
+          !existing.password;
+
+        if (!canClaimInvitedAffiliate) {
+          return res.status(409).json({ error: "Email already registered" });
+        }
+
+        const hashed = await bcrypt.hash(password, 12);
+        await db.run(
+          `UPDATE users
+              SET password = ?,
+                  name = COALESCE(NULLIF(?, ''), name),
+                  access_type = 'unlimited'
+            WHERE id = ?`,
+          [hashed, name || null, existing.id]
+        );
+
+        const invitedAffiliate = await db.get("SELECT * FROM users WHERE id = ?", [existing.id]);
+        const resolvedAffiliate = await resolveUserAccess(db, invitedAffiliate);
+        return res.json({
+          token: signToken(resolvedAffiliate),
+          user: {
+            id: resolvedAffiliate.id,
+            email: resolvedAffiliate.email,
+            name: resolvedAffiliate.name,
+            role: resolvedAffiliate.role,
+            access_type: resolvedAffiliate.access_type,
+          },
+        });
+      }
       // Validate promo code if provided
       let referredBy = null;
       if (promoCode) {
@@ -51,9 +121,28 @@ router.post(
         [email, name || null, hashed, trialStart, referredBy]
       );
       const user = await db.get("SELECT * FROM users WHERE id = ?", [result.lastID]);
-      await sendWelcomeEmail(email, name);
+      const resolvedUser = await resolveUserAccess(db, user);
+      if (referredBy) {
+        await db.run(
+          `UPDATE affiliates
+              SET signups = signups + 1
+            WHERE promo_code = ?`,
+          [referredBy]
+        );
+      }
+      fireAndForget("Welcome email", () => sendWelcomeEmail(email, name));
 
-      return res.json({ token: signToken(user), user: { id: user.id, email, name, role: user.role, access_type: user.access_type } });
+      return res.json({
+        token: signToken(resolvedUser),
+        user: {
+          id: resolvedUser.id,
+          email: resolvedUser.email,
+          name: resolvedUser.name,
+          role: resolvedUser.role,
+          access_type: resolvedUser.access_type,
+          trialDaysLeft: resolvedUser.trialDaysLeft,
+        },
+      });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Server error" });
@@ -75,23 +164,21 @@ router.post(
     try {
       const user = await db.get("SELECT * FROM users WHERE email = ?", [email]);
       if (!user) return res.status(401).json({ error: "Invalid credentials" });
+      if (!user.password) return res.status(401).json({ error: "Invalid credentials" });
 
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) return res.status(401).json({ error: "Invalid credentials" });
-
-      // Check trial expiry
-      let access_type = user.access_type;
-      if (access_type === "trial" && user.trial_start) {
-        const trialEnd = new Date(user.trial_start);
-        trialEnd.setDate(trialEnd.getDate() + 3);
-        if (new Date() > trialEnd) {
-          access_type = "expired";
-          await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [user.id]);
-        }
-      }
+      const resolvedUser = await resolveUserAccess(db, user);
       return res.json({
-        token: signToken({ ...user, access_type }),
-        user: { id: user.id, email: user.email, name: user.name, role: user.role, access_type },
+        token: signToken(resolvedUser),
+        user: {
+          id: resolvedUser.id,
+          email: resolvedUser.email,
+          name: resolvedUser.name,
+          role: resolvedUser.role,
+          access_type: resolvedUser.access_type,
+          trialDaysLeft: resolvedUser.trialDaysLeft,
+        },
       });
     } catch (err) {
       console.error(err);
@@ -99,6 +186,28 @@ router.post(
     }
   }
 );
+
+router.get("/me", requireUser, async (req, res) => {
+  const db = getDb();
+  const user = await db.get(
+    "SELECT id, email, name, role, access_type, trial_start, sub_expires FROM users WHERE id = ?",
+    [req.user.id]
+  );
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const resolvedUser = await resolveUserAccess(db, user);
+  return res.json({
+    user: {
+      id: resolvedUser.id,
+      email: resolvedUser.email,
+      name: resolvedUser.name,
+      role: resolvedUser.role,
+      access_type: resolvedUser.access_type,
+      trialDaysLeft: resolvedUser.trialDaysLeft,
+      sub_expires: resolvedUser.sub_expires || null,
+    },
+  });
+});
 
 // ── Update Phone ───────────────────────────────────────────────────────────
 router.put("/phone", requireUser, [body("phone").notEmpty().trim()], async (req, res) => {

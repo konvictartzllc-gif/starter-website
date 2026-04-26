@@ -8,3 +8,23 @@ client/.env
 client/dist/
 .vercel
 *.db
+# Firebase service account keys
+firebase-key.json
+firebase-key.json.json
+
+# Local editor and temp files
+.vscode/
+*.pid
+
+# SQLite runtime churn
+*.db-shm
+*.db-wal
+
+# Android local/build artifacts
+android-app/.android-user/
+android-app/.gradle/
+android-app/.gradle-user/
+android-app/.gradle-user-home/
+android-app/.idea/
+android-app/build/
+android-app/local.properties

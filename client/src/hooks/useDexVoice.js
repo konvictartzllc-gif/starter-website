@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const WAKE_WORD = "hey dex";
+const VOICE_STORAGE_KEY = "dex_voice_name";
 
 export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
   const [status, setStatus] = useState("idle"); // idle | listening | active | speaking
@@ -124,9 +125,15 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
       utterance.volume = 1.0;
       // Try to pick a natural voice
       const voices = synth.getVoices();
-      const preferred = voices.find(
-        (v) => v.name.includes("Google US English") || v.name.includes("Samantha") || v.lang === "en-US"
-      );
+      const savedVoiceName = window.localStorage.getItem(VOICE_STORAGE_KEY);
+      const preferred =
+        voices.find((voice) => voice.name === savedVoiceName) ||
+        voices.find(
+          (voice) =>
+            voice.name.includes("Google US English") ||
+            voice.name.includes("Samantha") ||
+            voice.lang === "en-US"
+        );
       if (preferred) utterance.voice = preferred;
       setStatus("speaking");
       utterance.onend = () => setStatus("listening");

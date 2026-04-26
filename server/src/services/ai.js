@@ -2,6 +2,12 @@ import OpenAI from "openai";
 
 let aiClient = null;
 let aiProvider = null;
+let aiStatus = {
+  configured: false,
+  ready: false,
+  reason: "not_initialized",
+  provider: null,
+};
 
 export async function initAI() {
   const provider = process.env.AI_PROVIDER || "openai";
@@ -9,6 +15,17 @@ export async function initAI() {
 
   try {
     if (aiProvider === "groq") {
+      if (!process.env.GROQ_API_KEY) {
+        aiStatus = {
+          configured: false,
+          ready: false,
+          reason: "missing_api_key",
+          provider: aiProvider,
+        };
+        console.warn("AI Provider Groq is selected but GROQ_API_KEY is missing.");
+        aiClient = null;
+        return;
+      }
       aiClient = new OpenAI({
         apiKey: process.env.GROQ_API_KEY,
         baseURL: "https://api.groq.com/openai/v1",
@@ -22,14 +39,37 @@ export async function initAI() {
       console.log("✅ AI Provider: Ollama (Self-Hosted)");
     } else {
       // Default to OpenAI
+      if (!process.env.OPENAI_API_KEY) {
+        aiStatus = {
+          configured: false,
+          ready: false,
+          reason: "missing_api_key",
+          provider: aiProvider,
+        };
+        console.warn("AI Provider OpenAI is selected but OPENAI_API_KEY is missing.");
+        aiClient = null;
+        return;
+      }
       aiClient = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
       });
       console.log("✅ AI Provider: OpenAI");
     }
+    aiStatus = {
+      configured: true,
+      ready: true,
+      reason: "ok",
+      provider: aiProvider,
+    };
   } catch (err) {
     console.error("AI initialization error:", err.message);
     aiClient = null;
+    aiStatus = {
+      configured: true,
+      ready: false,
+      reason: "init_failed",
+      provider: aiProvider,
+    };
   }
 }
 
@@ -42,6 +82,10 @@ export function getAIClient() {
 
 export function getAIProvider() {
   return aiProvider || "openai";
+}
+
+export function getAIStatus() {
+  return { ...aiStatus };
 }
 
 export async function chat(messages, options = {}) {

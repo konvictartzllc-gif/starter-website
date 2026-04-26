@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext } from "react";
+import { api } from "../utils/api.js";
 
 const AuthContext = createContext(null);
 
@@ -8,10 +9,36 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const stored = localStorage.getItem("dex_user");
+    const token = localStorage.getItem("dex_token");
     if (stored) {
       try { setUser(JSON.parse(stored)); } catch {}
     }
-    setLoading(false);
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+    api.me()
+      .then(({ user: freshUser }) => {
+        if (!active || !freshUser) return;
+        localStorage.setItem("dex_user", JSON.stringify(freshUser));
+        setUser(freshUser);
+      })
+      .catch(() => {
+        if (!active) return;
+        localStorage.removeItem("dex_token");
+        localStorage.removeItem("dex_user");
+        setUser(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   function login(token, userData) {

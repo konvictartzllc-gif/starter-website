@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Dex" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/dex_accent</item>
+        <item name="colorSecondary">@color/dex_accent</item>
+        <item name="android:statusBarColor" tools:targetApi="l">@color/dex_background</item>
+        <item name="android:navigationBarColor">@color/dex_background</item>
+    </style>
+</resources>

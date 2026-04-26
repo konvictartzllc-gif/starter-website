@@ -1,256 +1,158 @@
-# 🚀 Dex Backend Deployment Guide
+# Dex Backend Deployment Guide
 
-## 📋 Pre-Deployment Requirements
+This is the longer deployment guide for the current Dex backend.
 
-1. **Node.js 18+**: Required for production
-2. **Render Account**: https://render.com (free tier available)
-3. **Database**: SQLite (included, stored in `/data/`)
-4. **Environment Variables**: See section below
+## Pre-deployment checklist
 
----
+You should have:
 
-## 🔧 Environment Variables
+- a Render account
+- access to your GitHub repo
+- Stripe keys and webhook secret
+- OpenAI key
+- SMTP credentials if you want email features live
+- RingCentral credentials if you want live telephony features
 
-Add these to Render's Environment Variables panel:
+## Backend service settings
+
+Create a Render web service with:
+
+- **Name:** `konvict-artz-backend`
+- **Environment:** `Node`
+- **Root Directory:** `server`
+- **Build Command:** `npm install`
+- **Start Command:** `node src/index.js`
+
+The Render config files in this repo are:
+
+- [render.yaml](./render.yaml)
+- [server/render.yaml](./server/render.yaml)
+
+## Required environment variables
+
+Use [server/.env.example](./server/.env.example) as the source of truth.
+
+At minimum, set:
 
 ```env
-# Server
-PORT=4000
 NODE_ENV=production
-
-# Auth
-JWT_SECRET=your-random-64-character-secret-here-generate-one-now
-
-# Admin Credentials
-ADMIN_USERNAME=KonvictArtz
-ADMIN_PASSWORD=K0nv1ctArtz2026Launch
-
-# API Origins
+PORT=3001
+PUBLIC_SITE_URL=https://www.konvict-artz.com
 CLIENT_ORIGIN=https://www.konvict-artz.com
+ALLOWED_ORIGINS=https://www.konvict-artz.com,https://konvict-artz.com
 
-# Square Payment (Optional - for production)
-SQUARE_ENVIRONMENT=production
-SQUARE_ACCESS_TOKEN=sq_live_your_token_here
-SQUARE_LOCATION_ID=your_location_id
+JWT_SECRET=...
+ADMIN_EMAIL=...
+ADMIN_PASSWORD=...
 
-# Dex Pricing
-DEX_PRICE_CENTS=999
-DEX_CURRENCY=USD
+AI_PROVIDER=openai
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
 
-# Email Notifications (Optional but Recommended)
+STRIPE_SECRET_KEY=...
+STRIPE_PUBLISHABLE_KEY=...
+STRIPE_PRICE_ID=...
+STRIPE_WEBHOOK_SECRET=...
+STRIPE_SUCCESS_URL=https://www.konvict-artz.com/settings?billing=success
+STRIPE_CANCEL_URL=https://www.konvict-artz.com/settings?billing=cancelled
+STRIPE_PORTAL_RETURN_URL=https://www.konvict-artz.com/settings
+```
+
+Recommended if used by your launch flow:
+
+```env
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-SENDER_EMAIL=noreply@konvict-artz.com
+SMTP_USER=...
+SMTP_PASS=...
+SENDER_EMAIL=...
 SENDER_NAME=Konvict Artz
 
-# AI Chat (Optional)
-OPENAI_API_KEY=sk-your-key-here
-OPENAI_MODEL=gpt-3.5-turbo
+RC_CLIENT_ID=...
+RC_CLIENT_SECRET=...
+RC_USERNAME=...
+RC_PASSWORD=...
+RC_PHONE_NUMBER=...
+RC_SERVER=https://platform.ringcentral.com
 ```
 
-⚠️ **Generate JWT Secret:**
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+## Verify the deployed backend
 
----
+After deployment, test these routes:
 
-## 📦 Step 1: Create Render Service (Free Tier)
+- `https://YOUR_RENDER_URL/`
+- `https://YOUR_RENDER_URL/health`
+- `https://YOUR_RENDER_URL/api/health`
+- `https://YOUR_RENDER_URL/api/diagnostics/providers`
 
-### Option A: From GitHub (Recommended)
-1. Push code to GitHub
-2. Go to https://dashboard.render.com
-3. Click **"New+" → "Web Service"**
-4. Connect GitHub repository
-5. Choose branch: `main`
-6. Name: `konvict-artz-dex-backend`
-7. Runtime: `Node`
-8. Build Command: `npm install`
-9. Start Command: `node src/index.js`
-10. Instance Type: **Free** ($0/month)
-11. Click **"Create Web Service"**
+Expected:
 
-### Option B: Manual Deployment
-1. Go to https://dashboard.render.com
-2. Deploy as Docker container or from Git
+- `/` returns backend JSON
+- `/health` returns `status: ok`
+- diagnostics shows Stripe configured
 
----
+## Frontend wiring
 
-## 🔐 Step 2: Add Environment Variables
+Your frontend should send `/api/*` to the deployed backend.
 
-In Render dashboard for your service:
-1. Go to **Settings → Environment**
-2. Add all variables from the `.env.example`
-3. Save and **service will auto-redeploy**
-
----
-
-## 🔗 Step 3: Update Vercel API Proxy
-
-Once Render backend is running, update `vercel.json`:
+If you use a Vercel rewrite, the destination should look like:
 
 ```json
 {
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://YOUR_RENDER_SERVICE.onrender.com/api/:path*"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  "source": "/api/:path*",
+  "destination": "https://YOUR_RENDER_URL/api/:path*"
 }
 ```
 
-Replace `YOUR_RENDER_SERVICE` with your actual Render URL (shown in Render dashboard).
+## Billing proof
 
-Then redeploy Vercel:
-```bash
-npx vercel deploy --prod
-```
+Once health is good, verify the real Stripe flow:
 
----
+1. create a fresh user
+2. confirm the account is on the 3-day trial
+3. click subscribe
+4. confirm Stripe Checkout opens
+5. complete checkout
+6. confirm the webhook updates the user to `paid`
+7. confirm the billing portal opens
 
-## ✅ Step 4: Verify Deployment
+## Diagnostics route
 
-### Test Health Endpoint
-```bash
-curl https://your-render-service.onrender.com/api/health
-# Should return: {"ok":true}
-```
+Dex now includes:
 
-### Test From Frontend
-1. Visit https://www.konvict-artz.com
-2. Register a new account
-3. Should see "Trial" access granted
-4. Click "💬 Start Chat" → Should work
+- `GET /api/diagnostics/providers`
 
-### Test Admin Panel
-1. Admin Login at homepage
-2. Should be able to promote users to Dex
-3. Emails will send if SMTP configured
+This helps you confirm:
 
----
+- AI status
+- email status
+- RingCentral status
+- Stripe config status
+- site/origin config
+- auth config
 
-## 🐛 Troubleshooting
+## Android testing against production
 
-### "Cold Start" Takes 30+ seconds on Free Tier
-- Normal for Render free tier—service spins down after 15 minutes
-- Upgrade to Starter ($8/month) for always-on
+For the Android companion:
 
-### Chat endpoint returns 500
-- Check OPENAI_API_KEY in environment
-- Falls back to template response if not configured
+1. build/install from [android-app/](./android-app/)
+2. point the app to the live backend URL
+3. test login, permissions, caller announce, voice, and billing-related access
 
-### Email not sending
-- Verify SMTP credentials
-- For Gmail: Use **App Password**, not regular password
-- Check Render logs: **Logs → stderr**
+## Common pitfalls
 
-### Database grows large
-- Delete `server/data/konvict_artz.db` to reset
-- Render will recreate it on next deploy
+- wrong Render service URL
+- Render service deployed from the repo root instead of `server`
+- old env names like `ADMIN_USERNAME`
+- old Square-era env names instead of Stripe keys
+- Vercel still pointing `/api/*` at an old backend
 
----
+## Current source of truth
 
-## 📊 Monitoring
+If any document disagrees with code, trust these first:
 
-### View Logs
-```bash
-# In Render dashboard: Logs tab
-tail -f /var/log/app.log
-```
-
-### Check Database
-SSH into Render service and run:
-```bash
-sqlite3 server/data/konvict_artz.db ".tables"
-```
-
----
-
-## 🔄 Auto-Reup When Idle (Free Tier Issue)
-
-Free tier services sleep after 15 minutes. Add this to `client/app.js`:
-
-```javascript
-// Ping backend every 10 minutes to keep it warm
-setInterval(() => {
-  fetch('/api/health').catch(() => {});
-}, 10 * 60 * 1000);
-```
-
----
-
-## 📱 Full Production Checklist
-
-- [ ] Create Render service
-- [ ] Add all env variables
-- [ ] Test health endpoint
-- [ ] Update Vercel `vercel.json` with Render URL
-- [ ] Redeploy Vercel
-- [ ] Test user registration → trial
-- [ ] Test chat endpoint
-- [ ] Test admin promoter creation
-- [ ] Verify email sends (if configured)
-- [ ] Load test with 100+ concurrent users
-- [ ] Monitor error rates
-
----
-
-## 🚀 Quick Deploy Script
-
-```bash
-#!/bin/bash
-# Deploy to production
-
-# 1. Commit changes
-git add -A
-git commit -m "Production deployment: Dex implementation complete"
-git push origin main
-
-# 2. Render auto-deploys from GitHub
-# Monitor: https://dashboard.render.com
-
-# 3. Get Render URL from dashboard, then:
-npx vercel env add API_BACKEND_URL
-# Enter: https://your-render-service.onrender.com
-
-# 4. Update vercel.json with the URL
-# 5. Redeploy Vercel
-npx vercel deploy --prod
-
-echo "✅ Deployment complete!"
-```
-
----
-
-## 💰 Cost Estimate
-
-### Free Tier
-- Render Backend: $0/month (limited)
-- Vercel Frontend: $0/month (generous free tier)
-- Email: $0 (Gmail SMTP)
-- OpenAI: $0.002 - $0.01 per chat (if enabled)
-- **Total: $0-5/month**
-
-### Production Tier (Growth)
-- Render Backend Starter: $8/month (always-on)
-- Vercel Pro: $20/month (advanced features)
-- SendGrid Email: $20/month (high volume)
-- OpenAI API: Pay as you go ($0.002-$0.05 per request)
-- **Total: $50-100/month**
-
----
-
-## 📞 Support
-
-- Render Issues: https://render.com/docs
-- Vercel Issues: https://vercel.com/support
-- Local Testing: `npm run start` in project root
+- [server/.env.example](./server/.env.example)
+- [render.yaml](./render.yaml)
+- [server/render.yaml](./server/render.yaml)
+- [server/src/index.js](./server/src/index.js)
+- [server/src/routes/payments.js](./server/src/routes/payments.js)

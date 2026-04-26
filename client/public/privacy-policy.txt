@@ -1,14 +1,9 @@
 # Privacy Policy
 
-**Your Privacy Matters**
+Dex AI Assistant collects and uses account data, assistant inputs, optional phone and calendar data, and billing metadata only to deliver the Dex features you enable. Dex does not sell your personal data, does not store full payment card numbers, and is designed to avoid storing highly sensitive information such as passwords, Social Security numbers, or bank details in Dex memory.
 
-- We never store or have access to your credit card numbers. All payments are processed securely by Square; only payment status and transaction IDs are stored.
-- Your password is encrypted and never stored in plain text. No one, including admins, can view or retrieve your password.
-- Personal information (name, email, preferences) is stored securely and is only used to provide Dex AI services. Admins can see your email and name for account management, but never your password or card info.
-- We do not sell or share your personal data with third parties.
-- You can request deletion of your account and all associated data at any time.
+Read the full in-app Privacy Policy for details about permissions, data sharing, retention, and deletion requests.
 
-**Contact**
-For privacy questions or data requests, contact: support@konvict-artz.com
+Contact: Konvictartzllc@gmail.com
 
-_Last updated: April 17, 2026_
+Last updated: April 25, 2026
