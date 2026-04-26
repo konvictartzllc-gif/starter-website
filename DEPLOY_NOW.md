@@ -95,7 +95,7 @@ If you are using Vercel rewrites, the destination should be:
 
 ## 5. Payment proof
 
-Once backend health is good:
+Once backend health is good and diagnostics no longer show missing core config:
 
 1. create a fresh user
 2. confirm trial access

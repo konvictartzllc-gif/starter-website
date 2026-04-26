@@ -85,16 +85,16 @@ After deployment, test these routes:
 - `https://YOUR_RENDER_URL/api/health`
 - `https://YOUR_RENDER_URL/api/diagnostics/providers`
 
-Expected:
+Expected baseline:
 
 - `/` returns backend JSON
 - `/health` returns `status: ok`
-- diagnostics reflects the environment variables you actually added
+- diagnostics should reflect the environment variables you actually added
 
 Important:
 
-- a healthy `/health` route only proves the server booted
-- if `/api/diagnostics/providers` shows missing config, auth and billing can still fail even though health is green
+- a healthy `/health` route confirms deployment and server boot
+- `/api/diagnostics/providers` is the deeper config check for auth, AI, billing, email, and phone integrations
 
 ## Frontend wiring
 

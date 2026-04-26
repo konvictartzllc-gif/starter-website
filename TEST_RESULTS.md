@@ -61,7 +61,7 @@ What has been proven locally:
 - billing status route
 - checkout route reaches Stripe code path
 
-What still needs live environment proof:
+What still needs live environment proof from the deployed backend:
 
 - Stripe Checkout opening from the deployed backend
 - webhook reaching `/api/payments/webhook`
