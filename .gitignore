@@ -11,6 +11,8 @@ client/dist/
 # Firebase service account keys
 firebase-key.json
 firebase-key.json.json
+env.file
+env/
 
 # Local editor and temp files
 .vscode/
