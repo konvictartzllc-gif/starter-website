@@ -69,7 +69,16 @@ What you want to see:
 
 - root route returns JSON
 - health returns `status: ok`
-- diagnostics shows Stripe configured
+- diagnostics shows the env you expect as configured
+
+Do not stop at `/health`.
+
+If `/health` works but `/api/diagnostics/providers` shows missing config, the app can still fail at:
+
+- signup
+- login
+- Stripe checkout
+- email or phone features
 
 ## 4. Frontend wiring
 
@@ -96,6 +105,9 @@ Once backend health is good:
 6. confirm account changes to `paid`
 7. open billing portal
 
+If signup or login fails on live, check `/api/diagnostics/providers` before anything else.
+That route is the fastest way to spot missing Render environment variables.
+
 ## 6. Android
 
 For Android testing:
@@ -113,3 +125,7 @@ If something disagrees with older docs, trust the current files:
 - [render.yaml](./render.yaml)
 - [server/render.yaml](./server/render.yaml)
 - [server/src/index.js](./server/src/index.js)
+
+Current known live backend URL:
+
+- `https://konvict-artz.onrender.com`

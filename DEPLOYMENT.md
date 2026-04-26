@@ -89,7 +89,12 @@ Expected:
 
 - `/` returns backend JSON
 - `/health` returns `status: ok`
-- diagnostics shows Stripe configured
+- diagnostics reflects the environment variables you actually added
+
+Important:
+
+- a healthy `/health` route only proves the server booted
+- if `/api/diagnostics/providers` shows missing config, auth and billing can still fail even though health is green
 
 ## Frontend wiring
 
@@ -115,6 +120,13 @@ Once health is good, verify the real Stripe flow:
 5. complete checkout
 6. confirm the webhook updates the user to `paid`
 7. confirm the billing portal opens
+
+Do not call billing launch-ready until:
+
+- `/api/diagnostics/providers` shows Stripe configured
+- register works on the live backend
+- login works on the live backend
+- checkout session creation works on the live backend
 
 ## Diagnostics route
 
@@ -146,6 +158,9 @@ For the Android companion:
 - old env names like `ADMIN_USERNAME`
 - old Square-era env names instead of Stripe keys
 - Vercel still pointing `/api/*` at an old backend
+- environment variables added to the wrong Render service
+- environment variables not saved before redeploy
+- assuming `/health` means auth and Stripe are ready
 
 ## Current source of truth
 
