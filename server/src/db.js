@@ -81,6 +81,20 @@
         created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS affiliate_invite_codes (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        code         TEXT    UNIQUE NOT NULL,
+        email        TEXT,
+        name         TEXT,
+        created_by   INTEGER REFERENCES users(id),
+        claimed_by   INTEGER REFERENCES users(id),
+        used         INTEGER NOT NULL DEFAULT 0,
+        used_at      TEXT,
+        expires_at   TEXT,
+        created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
     // ── Inventory ─────────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS inventory (

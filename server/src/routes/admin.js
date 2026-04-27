@@ -12,6 +12,14 @@ function getReferralLink(promoCode) {
   return `${process.env.CLIENT_ORIGIN || "https://www.konvict-artz.com"}?ref=${promoCode}`;
 }
 
+function getAffiliateInviteLink(inviteCode) {
+  return `${process.env.CLIENT_ORIGIN || "https://www.konvict-artz.com"}/register?affiliateInvite=${inviteCode}`;
+}
+
+function generateAffiliateInviteCode() {
+  return `AFF-${uuidv4().replace(/-/g, "").slice(0, 10).toUpperCase()}`;
+}
+
 async function ensureFeatureFlagsTable(db) {
   await db.run(`
     CREATE TABLE IF NOT EXISTS feature_flags (
@@ -170,6 +178,55 @@ router.get("/affiliates", requireAdmin, async (req, res) => {
       ORDER BY a.paid_subs DESC, a.signups DESC`
   );
   return res.json(affiliates);
+});
+
+router.get("/affiliate-invites", requireAdmin, async (req, res) => {
+  const db = getDb();
+  const invites = await db.all(
+    `SELECT aic.*,
+            creator.email AS created_by_email,
+            claimant.email AS claimed_by_email
+       FROM affiliate_invite_codes aic
+       LEFT JOIN users creator ON creator.id = aic.created_by
+       LEFT JOIN users claimant ON claimant.id = aic.claimed_by
+      ORDER BY aic.created_at DESC
+      LIMIT 50`
+  );
+
+  return res.json(
+    invites.map((invite) => ({
+      ...invite,
+      registerLink: getAffiliateInviteLink(invite.code),
+    }))
+  );
+});
+
+router.post("/affiliate-invites/create", requireAdmin, [
+  body("email").optional({ values: "falsy" }).isEmail().normalizeEmail(),
+  body("name").optional().trim(),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const db = getDb();
+  const code = generateAffiliateInviteCode();
+  const email = req.body.email || null;
+  const name = req.body.name || null;
+
+  await db.run(
+    `INSERT INTO affiliate_invite_codes (code, email, name, created_by)
+     VALUES (?, ?, ?, ?)`,
+    [code, email, name, req.admin.id]
+  );
+
+  const invite = await db.get("SELECT * FROM affiliate_invite_codes WHERE code = ?", [code]);
+  return res.json({
+    success: true,
+    invite: {
+      ...invite,
+      registerLink: getAffiliateInviteLink(code),
+    },
+  });
 });
 
 router.post("/affiliates/create", requireAdmin, [

@@ -8,9 +8,16 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref") || "";
+  const affiliateInvite = searchParams.get("affiliateInvite") || "";
   const recoveryReason = searchParams.get("reason") || "";
 
-  const [form, setForm] = useState({ name: "", email: "", password: "", promoCode: refCode });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    promoCode: refCode,
+    affiliateInviteCode: affiliateInvite,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -21,7 +28,8 @@ export function RegisterPage() {
     try {
       const data = await api.register(form);
       login(data.token, data.user);
-      navigate("/");
+      if (data.user.role === "affiliate") navigate("/affiliate");
+      else navigate("/");
     } catch (err) {
       setError(err.error || err.errors?.[0]?.msg || "Registration failed");
     } finally {
@@ -33,25 +41,63 @@ export function RegisterPage() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="bg-gray-900 rounded-2xl p-8 w-full max-w-md border border-gray-700">
         <h1 className="text-2xl font-bold text-white mb-1">Create Your Account</h1>
-        <p className="text-gray-400 text-sm mb-6">Start your free 3-day trial — no credit card needed</p>
+        <p className="text-gray-400 text-sm mb-6">
+          {affiliateInvite
+            ? "Finish your affiliate setup and unlock your promoter dashboard."
+            : "Start your free 3-day trial - no credit card needed"}
+        </p>
         {recoveryReason === "no_access" && (
           <p className="text-blue-300 text-sm mb-4 bg-blue-900/20 rounded-lg px-3 py-2">
             Create your account to start Dex with a free 3-day trial.
           </p>
         )}
+        {affiliateInvite && (
+          <p className="text-green-300 text-sm mb-4 bg-green-900/20 rounded-lg px-3 py-2">
+            Affiliate invite detected. Register with this code to activate your affiliate dashboard and unlimited Dex access.
+          </p>
+        )}
         {error && <p className="text-red-400 text-sm mb-4 bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input placeholder="Your Name" value={form.name} onChange={e => setForm(p => ({...p, name: e.target.value}))}
-            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm" />
-          <input type="email" placeholder="Email Address *" value={form.email} onChange={e => setForm(p => ({...p, email: e.target.value}))}
-            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm" required />
-          <input type="password" placeholder="Password (min 6 chars) *" value={form.password} onChange={e => setForm(p => ({...p, password: e.target.value}))}
-            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm" required />
-          <input placeholder="Promo / Referral Code (optional)" value={form.promoCode} onChange={e => setForm(p => ({...p, promoCode: e.target.value}))}
-            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm" />
-          <button type="submit" disabled={loading}
-            className="w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50">
-            {loading ? "Creating account..." : "Start Free Trial"}
+          <input
+            placeholder="Your Name"
+            value={form.name}
+            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+          />
+          <input
+            type="email"
+            placeholder="Email Address *"
+            value={form.email}
+            onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password (min 6 chars) *"
+            value={form.password}
+            onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+            required
+          />
+          <input
+            placeholder="Promo / Referral Code (optional)"
+            value={form.promoCode}
+            onChange={(e) => setForm((p) => ({ ...p, promoCode: e.target.value }))}
+            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+          />
+          <input
+            placeholder="Affiliate Invite Code (optional)"
+            value={form.affiliateInviteCode}
+            onChange={(e) => setForm((p) => ({ ...p, affiliateInviteCode: e.target.value }))}
+            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50"
+          >
+            {loading ? "Creating account..." : affiliateInvite ? "Activate Affiliate Access" : "Start Free Trial"}
           </button>
         </form>
         <p className="text-center text-gray-500 text-sm mt-4">
@@ -74,7 +120,7 @@ export function LoginPage() {
     recoveryReason === "trial_expired"
       ? "Your free trial has ended. Log in and Dex will take you straight to billing recovery."
       : recoveryReason === "subscription_expired"
-        ? "Your Dex subscription needs attention. Log in and we’ll take you straight to billing."
+        ? "Your Dex subscription needs attention. Log in and we'll take you straight to billing."
         : recoveryReason === "billing_required"
           ? "Log in to restart or manage your Dex subscription."
           : "";
@@ -105,12 +151,27 @@ export function LoginPage() {
         {recoveryMessage && <p className="text-blue-300 text-sm mb-4 bg-blue-900/20 rounded-lg px-3 py-2">{recoveryMessage}</p>}
         {error && <p className="text-red-400 text-sm mb-4 bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input type="email" placeholder="Email Address" value={form.email} onChange={e => setForm(p => ({...p, email: e.target.value}))}
-            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm" required />
-          <input type="password" placeholder="Password" value={form.password} onChange={e => setForm(p => ({...p, password: e.target.value}))}
-            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm" required />
-          <button type="submit" disabled={loading}
-            className="w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50">
+          <input
+            type="email"
+            placeholder="Email Address"
+            value={form.email}
+            onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+            className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+            required
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50"
+          >
             {loading ? "Logging in..." : "Log In"}
           </button>
         </form>

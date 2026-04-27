@@ -8,6 +8,7 @@ export default function AdminPortal() {
   const [stats, setStats] = useState(null);
   const [inventory, setInventory] = useState([]);
   const [affiliates, setAffiliates] = useState([]);
+  const [affiliateInvites, setAffiliateInvites] = useState([]);
   const [users, setUsers] = useState([]);
   const [featureFlags, setFeatureFlags] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -27,6 +28,8 @@ export default function AdminPortal() {
 
   const [affEmail, setAffEmail] = useState("");
   const [affName, setAffName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
 
   const [promoEmail, setPromoEmail] = useState("");
   const [promoCode, setPromoCode] = useState("");
@@ -63,6 +66,10 @@ export default function AdminPortal() {
     try { setAffiliates(await api.getAffiliates()); } catch {}
   }
 
+  async function loadAffiliateInvites() {
+    try { setAffiliateInvites(await api.getAffiliateInvites()); } catch {}
+  }
+
   async function loadUsers() {
     try { setUsers(await api.getUsers()); } catch {}
   }
@@ -76,6 +83,7 @@ export default function AdminPortal() {
     loadStats();
     loadInventory();
     loadAffiliates();
+    loadAffiliateInvites();
     loadUsers();
     loadFeatureFlags();
   }, [isAdmin]);
@@ -125,8 +133,22 @@ export default function AdminPortal() {
       setAffEmail("");
       setAffName("");
       loadAffiliates();
+      loadAffiliateInvites();
       loadUsers();
       loadStats();
+    } catch (err) {
+      setMsg("Error: " + (err.error || "Failed"));
+    }
+  }
+
+  async function handleCreateAffiliateInvite(e) {
+    e.preventDefault();
+    try {
+      const data = await api.createAffiliateInvite({ email: inviteEmail, name: inviteName });
+      setMsg(`Affiliate invite ready. Code: ${data.invite.code}. Signup link: ${data.invite.registerLink}`);
+      setInviteEmail("");
+      setInviteName("");
+      loadAffiliateInvites();
     } catch (err) {
       setMsg("Error: " + (err.error || "Failed"));
     }
@@ -378,6 +400,24 @@ export default function AdminPortal() {
             <p className="text-sm text-gray-400 mb-4">
               Invite an affiliate here. They will then use the normal register page with that same email to finish their account and get Dex access while promoting it.
             </p>
+            <form onSubmit={handleCreateAffiliateInvite} className="bg-gray-800 rounded-xl p-4 mb-6 flex gap-3 flex-wrap">
+              <input
+                placeholder="Invite Email (optional)"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                className="flex-1 bg-gray-700 rounded-lg px-3 py-2 text-sm outline-none"
+              />
+              <input
+                placeholder="Invite Name (optional)"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                className="flex-1 bg-gray-700 rounded-lg px-3 py-2 text-sm outline-none"
+              />
+              <button type="submit" className="bg-green-600 text-white rounded-lg px-4 py-2 font-semibold text-sm">
+                Generate One-Time Code
+              </button>
+            </form>
             <form onSubmit={handleCreateAffiliate} className="bg-gray-800 rounded-xl p-4 mb-6 flex gap-3 flex-wrap">
               <input
                 placeholder="Affiliate Email *"
@@ -397,6 +437,33 @@ export default function AdminPortal() {
                 Create Affiliate
               </button>
             </form>
+
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 mb-6">
+              <h3 className="font-semibold mb-3">Recent One-Time Affiliate Invites</h3>
+              <div className="space-y-2">
+                {affiliateInvites.length === 0 && (
+                  <p className="text-sm text-gray-500">No invite codes generated yet.</p>
+                )}
+                {affiliateInvites.map((invite) => (
+                  <div key={invite.id} className="bg-gray-800 rounded-xl p-3 text-sm">
+                    <div className="flex justify-between items-start gap-3">
+                      <div>
+                        <p className="font-semibold text-white">{invite.name || invite.email || "Open affiliate invite"}</p>
+                        <p className="text-xs text-gray-400">{invite.email || "Any email can claim this code."}</p>
+                      </div>
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${invite.used ? "bg-gray-700 text-gray-300" : "bg-green-900/40 text-green-300"}`}>
+                        {invite.used ? "used" : "open"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-brand font-mono">{invite.code}</p>
+                    <p className="text-xs text-gray-400 break-all">{invite.registerLink}</p>
+                    {invite.claimed_by_email && (
+                      <p className="mt-1 text-xs text-gray-500">Claimed by {invite.claimed_by_email}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="space-y-2">
               {affiliates.map((a) => (

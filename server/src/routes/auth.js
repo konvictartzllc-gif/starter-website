@@ -52,7 +52,56 @@ function sendAuthFailure(res, context, err, details = {}) {
     return res.status(500).json({ error: "This account password is stored incorrectly. Reset or recreate the account." });
   }
 
+  if (err?.statusCode && err?.message) {
+    return res.status(err.statusCode).json({ error: err.message });
+  }
+
   return res.status(500).json({ error: "Server error" });
+}
+
+async function ensureAffiliateRecord(db, userId) {
+  const existing = await db.get("SELECT * FROM affiliates WHERE user_id = ?", [userId]);
+  if (existing) return existing;
+
+  const promoCode = `DEX${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  await db.run(
+    "INSERT INTO affiliates (user_id, promo_code) VALUES (?, ?)",
+    [userId, promoCode]
+  );
+  return db.get("SELECT * FROM affiliates WHERE user_id = ?", [userId]);
+}
+
+async function consumeAffiliateInviteCode(db, inviteCode, email, userId) {
+  if (!inviteCode) return null;
+  const normalized = String(inviteCode).trim().toUpperCase();
+  if (!normalized) return null;
+
+  const invite = await db.get(
+    "SELECT * FROM affiliate_invite_codes WHERE UPPER(code) = ?",
+    [normalized]
+  );
+  if (!invite) return null;
+  if (invite.used) {
+    const error = new Error("That affiliate invite code has already been used.");
+    error.statusCode = 409;
+    throw error;
+  }
+  if (invite.email && invite.email.toLowerCase() !== String(email).trim().toLowerCase()) {
+    const error = new Error("That affiliate invite code is assigned to a different email address.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  await db.run(
+    `UPDATE affiliate_invite_codes
+        SET used = 1,
+            claimed_by = ?,
+            used_at = datetime('now')
+      WHERE id = ?`,
+    [userId, invite.id]
+  );
+
+  return invite;
 }
 
 async function resolveUserAccess(db, user) {
@@ -94,12 +143,13 @@ router.post(
     body("password").isLength({ min: 6 }),
     body("name").optional().trim(),
     body("promoCode").optional().trim(),
+    body("affiliateInviteCode").optional().trim(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { email, password, name, promoCode } = req.body;
+    const { email, password, name, promoCode, affiliateInviteCode } = req.body;
     const db = getDb();
 
     try {
@@ -136,7 +186,11 @@ router.post(
       }
 
       let referredBy = null;
-      if (promoCode) {
+      const requestedAffiliateInvite = String(affiliateInviteCode || "").trim();
+      const requestedPromoCode = String(promoCode || "").trim();
+      const isAffiliateInviteSignup = requestedAffiliateInvite.length > 0;
+
+      if (requestedPromoCode) {
         const aff = await db.get("SELECT id, user_id FROM affiliates WHERE promo_code = ?", [promoCode.toUpperCase()]);
         if (aff) {
           referredBy = promoCode.toUpperCase();
@@ -147,10 +201,22 @@ router.post(
       const trialStart = new Date().toISOString();
       const result = await db.run(
         `INSERT INTO users (email, name, password, role, access_type, trial_start, referred_by)
-         VALUES (?, ?, ?, 'user', 'trial', ?, ?)`,
-        [email, name || null, hashed, trialStart, referredBy]
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          email,
+          name || null,
+          hashed,
+          isAffiliateInviteSignup ? "affiliate" : "user",
+          isAffiliateInviteSignup ? "unlimited" : "trial",
+          isAffiliateInviteSignup ? null : trialStart,
+          referredBy,
+        ]
       );
       const user = await db.get("SELECT * FROM users WHERE id = ?", [result.lastID]);
+      if (isAffiliateInviteSignup) {
+        await consumeAffiliateInviteCode(db, requestedAffiliateInvite, email, user.id);
+        await ensureAffiliateRecord(db, user.id);
+      }
       const resolvedUser = await resolveUserAccess(db, user);
 
       if (referredBy) {
