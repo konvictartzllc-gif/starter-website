@@ -87,12 +87,12 @@
     <string name="no_appointments_found">You do not have any Dex appointments yet.</string>
     <string name="no_matching_appointments">You do not have any matching appointments for that day.</string>
     <string name="call_monitor_title">Call monitoring</string>
-    <string name="call_monitor_summary">When phone access is enabled and Android permissions are granted, Dex can monitor calls, block likely spam, and auto-answer non-spam calls while the app and background service are running.</string>
+    <string name="call_monitor_summary">When phone access is enabled and Android permissions are granted, Dex can monitor calls, block likely spam, and help you handle calls while the app and background service are running.</string>
     <string name="call_monitor_waiting">Call monitoring is waiting for login, backend phone permission, and Android runtime access.</string>
-    <string name="call_monitor_active">Dex call monitoring is active and ready to auto-answer allowed calls on this device.</string>
+    <string name="call_monitor_active">Dex call monitoring is active and ready to help with allowed calls on this device.</string>
     <string name="call_event_sent">Last call event sent: %1$s</string>
-    <string name="call_prompt_template">Incoming call from %1$s. Say answer or decline, or use the buttons on screen.</string>
-    <string name="call_background_prompt_template">Incoming call from %1$s. Dex is answering now.</string>
+    <string name="call_prompt_template">Incoming call from %1$s. Say pick up, reject, answer on speaker, or take a message. You can also use the buttons on screen.</string>
+    <string name="call_background_prompt_template">Incoming call from %1$s. Open Dex to answer or decline.</string>
     <string name="call_speaking">Dex is speaking the incoming call prompt.</string>
     <string name="call_answering">Dex is trying to answer the ringing call.</string>
     <string name="call_answered">Dex answered the ringing call.</string>
@@ -101,10 +101,19 @@
     <string name="call_answer_permission_missing">Dex is missing the Android call-answer permission on this device.</string>
     <string name="call_not_ringing">Dex did not find a ringing call to answer.</string>
     <string name="call_decline_failed">Dex could not decline the ringing call.</string>
-    <string name="call_listening">Dex is listening for answer or decline.</string>
-    <string name="call_listening_retry">Dex is still listening for answer or decline.</string>
+    <string name="call_listening">Dex is listening for a call command.</string>
+    <string name="call_listening_retry">Dex is still listening for your call command.</string>
     <string name="call_voice_unavailable">Voice commands are not available on this device right now.</string>
     <string name="call_spam_blocked">Dex blocked a likely spam call.</string>
+    <string name="call_speaker_enabled">I turned on speaker for this call.</string>
+    <string name="call_speaker_unavailable">There is no active call for me to put on speaker.</string>
+    <string name="call_message_unavailable">There is no ringing call for me to take a message from right now.</string>
+    <string name="call_message_taken">I declined the call from %1$s, saved a follow-up task, and drafted a text so you can ask for the message.</string>
+    <string name="call_message_taken_no_number">I declined the call from %1$s and saved a follow-up task for you.</string>
+    <string name="call_message_task_title">Follow up with %1$s</string>
+    <string name="call_message_draft_summary">I saved a follow-up task and drafted a text for %1$s.</string>
+    <string name="call_message_draft_detail">Approve this and Android will open a text draft asking %1$s to send their message.</string>
+    <string name="call_message_sms_body">I am tied up right now. Please text me the message you wanted to leave and I will get back to you as soon as I can.</string>
     <string name="answer_call">Answer</string>
     <string name="decline_call">Decline</string>
     <string name="logged_in_message">Dex account connected on this phone.</string>
@@ -131,4 +140,8 @@
     <string name="briefing_next_lesson">Dex also recommends a quick %1$s lesson.</string>
     <string name="briefing_default_event">your next event</string>
     <string name="briefing_default_task">your next task</string>
+    <string name="youtube_opened">I opened YouTube.</string>
+    <string name="youtube_search_opened">I opened YouTube for %1$s.</string>
+    <string name="music_opened">I opened music for you.</string>
+    <string name="music_search_opened">I opened music for %1$s.</string>
 </resources>

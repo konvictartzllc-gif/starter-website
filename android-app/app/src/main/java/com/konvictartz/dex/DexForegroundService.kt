@@ -41,15 +41,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var ttsReady = false
     private var lastCallState = TelephonyManager.CALL_STATE_IDLE
     private var lastCaller = "Unknown caller"
+    private var currentCallWasAnswered = false
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var autoAnswerPending = false
-    private val autoAnswerRunnable = Runnable {
-        if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
-            autoAnswerPending = true
-            answerRingingCall()
-        }
-    }
-
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -68,7 +61,6 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
-        mainHandler.removeCallbacks(autoAnswerRunnable)
         stopCallMonitoring()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
@@ -123,15 +115,20 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun startCallMonitoringIfReady() {
-        if (!shouldMonitorCalls()) return
-        startCallMonitoring()
+        if (shouldMonitorCalls()) {
+            startCallMonitoring()
+        } else {
+            stopCallMonitoring()
+        }
     }
 
     private fun shouldMonitorCalls(): Boolean {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val phoneBackendEnabled = prefs.getBoolean(MainActivity.KEY_PHONE_BACKEND_ENABLED, false)
         val hasToken = !prefs.getString(MainActivity.KEY_TOKEN, null).isNullOrBlank()
+        val appInForeground = prefs.getBoolean(MainActivity.KEY_APP_IN_FOREGROUND, false)
         return hasToken &&
+            !appInForeground &&
             phoneBackendEnabled &&
             hasPermission(Manifest.permission.READ_PHONE_STATE) &&
             hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)
@@ -161,45 +158,37 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val manager = telephonyManager ?: return
         phoneStateListener?.let { manager.listen(it, PhoneStateListener.LISTEN_NONE) }
         phoneStateListener = null
-        mainHandler.removeCallbacks(autoAnswerRunnable)
-        autoAnswerPending = false
         lastCallState = TelephonyManager.CALL_STATE_IDLE
         lastCaller = "Unknown caller"
+        currentCallWasAnswered = false
     }
 
     private fun handleCallStateChanged(state: Int, phoneNumber: String?) {
         val resolvedCaller = resolveCallerLabel(phoneNumber)
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
+                currentCallWasAnswered = false
                 lastCaller = resolvedCaller
                 if (isLikelySpamCaller(resolvedCaller, phoneNumber)) {
-                    mainHandler.removeCallbacks(autoAnswerRunnable)
-                    autoAnswerPending = false
                     postCallEvent("declined", resolvedCaller)
                     declineRingingCall()
                 } else {
                     postCallEvent("incoming", resolvedCaller)
                     speakIncomingCallPrompt(resolvedCaller)
-                    mainHandler.removeCallbacks(autoAnswerRunnable)
-                    mainHandler.postDelayed(autoAnswerRunnable, AUTO_ANSWER_DELAY_MS)
                 }
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
-                mainHandler.removeCallbacks(autoAnswerRunnable)
+                currentCallWasAnswered = true
                 if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                     postCallEvent("answered", resolvedCaller)
                 }
-                autoAnswerPending = false
             }
             TelephonyManager.CALL_STATE_IDLE -> {
-                mainHandler.removeCallbacks(autoAnswerRunnable)
-                if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
-                    if (!autoAnswerPending) {
-                        postCallEvent("declined", resolvedCaller)
-                    }
+                if (lastCallState == TelephonyManager.CALL_STATE_RINGING && !currentCallWasAnswered) {
+                    postCallEvent("declined", resolvedCaller)
                 }
-                autoAnswerPending = false
                 lastCaller = "Unknown caller"
+                currentCallWasAnswered = false
             }
         }
         lastCallState = state
@@ -208,7 +197,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun resolveCallerLabel(phoneNumber: String?): String {
         val rawNumber = phoneNumber?.trim().orEmpty()
         if (rawNumber.isBlank()) {
-            return if (lastCaller.isNotBlank()) lastCaller else "Unknown caller"
+            return lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" } ?: "Unknown caller"
         }
         val contactName = lookupContactName(rawNumber)
         return contactName ?: rawNumber
@@ -216,12 +205,16 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun lookupContactName(phoneNumber: String): String? {
         if (!hasPermission(Manifest.permission.READ_CONTACTS)) return null
-        val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber))
         val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
-        val cursor: Cursor? = contentResolver.query(uri, projection, null, null, null)
-        cursor?.use {
-            if (it.moveToFirst()) {
-                return it.getString(0)
+        val candidates = linkedSetOf(phoneNumber, phoneNumber.filter { it.isDigit() || it == '+' })
+        for (candidate in candidates) {
+            if (candidate.isBlank()) continue
+            val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(candidate))
+            val cursor: Cursor? = contentResolver.query(uri, projection, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    return it.getString(0)
+                }
             }
         }
         return null
@@ -306,6 +299,5 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     companion object {
         private const val CHANNEL_ID = "dex_background_service"
         private const val NOTIFICATION_ID = 4107
-        private const val AUTO_ANSWER_DELAY_MS = 1200L
     }
 }

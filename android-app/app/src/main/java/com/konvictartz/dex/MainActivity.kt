@@ -6,12 +6,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.media.AudioManager
 import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.ContactsContract
 import android.provider.ContactsContract.Intents.Insert
 import android.provider.Settings
@@ -49,12 +51,20 @@ import java.time.DayOfWeek
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.max
 
 private enum class PendingActionKind {
     SMS_DRAFT,
     EMAIL_DRAFT,
     APPOINTMENT_CREATE,
     CONTACT_SAVE,
+}
+
+private enum class CallVoiceAction {
+    ANSWER,
+    DECLINE,
+    ANSWER_ON_SPEAKER,
+    TAKE_MESSAGE,
 }
 
 private data class PendingAction(
@@ -97,6 +107,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var lastCaller = "Unknown caller"
     private var lastIncomingNumber: String? = null
     private var lastIncomingNeedsSave = false
+    private var currentCallWasAnswered = false
+    private var enableSpeakerAfterAnswer = false
     private var textToSpeech: TextToSpeech? = null
     private var ttsReady = false
     private var ttsStatusMessage: String? = null
@@ -110,6 +122,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingAction: PendingAction? = null
     private var autoWakeStarted = false
     private var relationshipAliases: Map<String, String> = emptyMap()
+    private var lastWakeListenStartedAt = 0L
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -147,11 +160,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 runOnUiThread {
                     if (resumeWakeListeningAfterSpeech && wakeModeEnabled) {
                         resumeWakeListeningAfterSpeech = false
-                        scheduleWakeListeningRestart(250)
+                        scheduleWakeListeningRestart(1200)
                     }
                     if (shouldResumeCallListeningAfterSpeech && lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                         shouldResumeCallListeningAfterSpeech = false
-                        startListeningForCallCommand()
+                        mainHandler.postDelayed({ startListeningForCallCommand() }, CALL_COMMAND_PROMPT_GUARD_DELAY_MS)
                     }
                 }
             }
@@ -160,11 +173,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 runOnUiThread {
                     if (resumeWakeListeningAfterSpeech && wakeModeEnabled) {
                         resumeWakeListeningAfterSpeech = false
-                        scheduleWakeListeningRestart(250)
+                        scheduleWakeListeningRestart(1200)
                     }
                     if (shouldResumeCallListeningAfterSpeech && lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                         shouldResumeCallListeningAfterSpeech = false
-                        startListeningForCallCommand()
+                        mainHandler.postDelayed({ startListeningForCallCommand() }, CALL_COMMAND_PROMPT_GUARD_DELAY_MS)
                     }
                 }
             }
@@ -193,6 +206,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             fetchLearningReminderPreferences()
             fetchRelationshipAliases()
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        setAppForegroundState(true)
+        maintainBackgroundService()
+    }
+
+    override fun onStop() {
+        setAppForegroundState(false)
+        maintainBackgroundService()
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -300,9 +325,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     val transcript = matches.joinToString(" ").lowercase(Locale.US)
                     if (isListeningForCallCommand) {
                         isListeningForCallCommand = false
+                        val action = parseCallVoiceAction(transcript)
                         when {
-                            transcript.contains("answer") || transcript.contains("accept") -> answerRingingCall()
-                            transcript.contains("decline") || transcript.contains("reject") || transcript.contains("hang up") -> declineRingingCall()
+                            action == CallVoiceAction.ANSWER -> answerRingingCall()
+                            action == CallVoiceAction.ANSWER_ON_SPEAKER -> {
+                                enableSpeakerAfterAnswer = true
+                                answerRingingCall()
+                            }
+                            action == CallVoiceAction.DECLINE -> declineRingingCall()
+                            action == CallVoiceAction.TAKE_MESSAGE -> takeMessageForCurrentCaller()
                             lastCallState == TelephonyManager.CALL_STATE_RINGING -> {
                                 binding.callMonitorStatus.text = getString(R.string.call_voice_unavailable)
                             }
@@ -401,7 +432,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_SERVER_URL, serverUrl)
-            .apply()
+            .commit()
     }
 
     private fun saveSession(token: String, email: String) {
@@ -412,7 +443,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_EMAIL, email)
             .putString(KEY_SERVER_URL, currentServerUrl())
             .putBoolean(KEY_AUTO_START_ASSISTANT, true)
-            .apply()
+            .commit()
         refreshLoggedInState()
         fetchPermissions()
         maintainBackgroundService()
@@ -429,7 +460,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putBoolean(KEY_BACKGROUND_SERVICE_ENABLED, false)
             .putBoolean(KEY_AUTO_START_ASSISTANT, false)
             .putBoolean(KEY_PHONE_BACKEND_ENABLED, false)
-            .apply()
+            .commit()
         binding.authMessage.text = getString(R.string.logged_out_message)
         DexLearningReminderScheduler.cancelReminder(this)
         stopDexBackgroundService()
@@ -764,6 +795,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return autoStartEnabled && hasToken && hasAllAndroidPermissions()
     }
 
+    private fun setAppForegroundState(inForeground: Boolean) {
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_APP_IN_FOREGROUND, inForeground)
+            .apply()
+    }
+
     private fun maintainBackgroundService() {
         if (shouldRunBackgroundService()) {
             startDexBackgroundService()
@@ -793,7 +831,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.conversationStatus.text =
                     if (awaitingWakeCommand || conversationActive) getString(R.string.wake_mode_command_ready)
                     else getString(R.string.wake_mode_waiting)
-                scheduleWakeListeningRestart()
+                scheduleWakeListeningRestart(2500)
             }
             else -> binding.conversationStatus.text = getString(R.string.wake_mode_unavailable)
         }
@@ -803,7 +841,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!wakeModeEnabled) return
         val normalized = transcript.trim().lowercase(Locale.US)
         if (normalized.isBlank()) {
-            scheduleWakeListeningRestart()
+            scheduleWakeListeningRestart(2500)
             return
         }
 
@@ -818,7 +856,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!awaitingWakeCommand && !conversationActive) {
             if (!normalized.contains(WAKE_WORD)) {
                 binding.conversationStatus.text = getString(R.string.wake_mode_waiting)
-                scheduleWakeListeningRestart()
+                scheduleWakeListeningRestart(2500)
                 return
             }
 
@@ -846,7 +884,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (normalized.contains(WAKE_WORD)) normalized.replace(WAKE_WORD, "").trim() else normalized
         if (cleanedTranscript.isBlank()) {
             binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
-            scheduleWakeListeningRestart()
+            scheduleWakeListeningRestart(2500)
             return
         }
         processDexCommand(cleanedTranscript)
@@ -875,6 +913,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         lastCaller = "Unknown caller"
         stopListeningForCallCommand()
         updateCallActionVisibility(false)
+        currentCallWasAnswered = false
+        enableSpeakerAfterAnswer = false
     }
 
     private fun handleCallStateChanged(state: Int, phoneNumber: String?) {
@@ -882,6 +922,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
                 mainHandler.removeCallbacks(restartWakeListeningRunnable)
+                currentCallWasAnswered = false
                 lastCaller = resolvedCaller
                 lastIncomingNumber = phoneNumber?.trim()?.takeIf { it.isNotBlank() }
                 lastIncomingNeedsSave = lastIncomingNumber != null && lookupContactName(lastIncomingNumber!!) == null
@@ -898,6 +939,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             TelephonyManager.CALL_STATE_OFFHOOK -> {
                 stopListeningForCallCommand()
                 updateCallActionVisibility(false)
+                currentCallWasAnswered = true
+                if (enableSpeakerAfterAnswer) {
+                    setSpeakerphoneEnabled(true)
+                    enableSpeakerAfterAnswer = false
+                }
                 if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                     postCallEvent("answered", resolvedCaller)
                 }
@@ -905,13 +951,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             TelephonyManager.CALL_STATE_IDLE -> {
                 stopListeningForCallCommand()
                 updateCallActionVisibility(false)
-                if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
+                if (lastCallState == TelephonyManager.CALL_STATE_RINGING && !currentCallWasAnswered) {
                     postCallEvent("declined", resolvedCaller)
                 }
                 maybeQueueUnknownCallerSave()
                 lastCaller = "Unknown caller"
                 lastIncomingNumber = null
                 lastIncomingNeedsSave = false
+                currentCallWasAnswered = false
+                enableSpeakerAfterAnswer = false
                 if (wakeModeEnabled) {
                     scheduleWakeListeningRestart(500)
                 }
@@ -923,7 +971,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun resolveCallerLabel(phoneNumber: String?): String {
         val rawNumber = phoneNumber?.trim().orEmpty()
         if (rawNumber.isBlank()) {
-            return if (lastCaller.isNotBlank()) lastCaller else "Unknown caller"
+            return lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" } ?: "Unknown caller"
         }
         val contactName = lookupContactName(rawNumber)
         return contactName ?: rawNumber
@@ -933,12 +981,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             return null
         }
-        val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber))
         val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
-        val cursor: Cursor? = contentResolver.query(uri, projection, null, null, null)
-        cursor?.use {
-            if (it.moveToFirst()) {
-                return it.getString(0)
+        val candidates = linkedSetOf(phoneNumber, phoneNumber.filter { it.isDigit() || it == '+' })
+        for (candidate in candidates) {
+            if (candidate.isBlank()) continue
+            val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(candidate))
+            val cursor: Cursor? = contentResolver.query(uri, projection, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    return it.getString(0)
+                }
             }
         }
         return null
@@ -958,6 +1010,36 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun speakIncomingCallPrompt(caller: String) {
         shouldResumeCallListeningAfterSpeech = true
         speakDex(getString(R.string.call_prompt_template, caller), R.string.call_speaking)
+    }
+
+    private fun parseCallVoiceAction(transcript: String): CallVoiceAction? {
+        val normalized = transcript.trim().lowercase(Locale.US)
+        if (normalized.isBlank()) return null
+        if (normalized.contains("incoming call") || (normalized.contains("answer") && normalized.contains("decline"))) {
+            return null
+        }
+        return when {
+            normalized.contains("take a message") ||
+                normalized.contains("take the message") ||
+                normalized.contains("message them instead") ||
+                normalized.contains("send it to voicemail") -> CallVoiceAction.TAKE_MESSAGE
+            normalized.contains("answer on speaker") ||
+                normalized.contains("pick up on speaker") ||
+                normalized.contains("take the call on speaker") -> CallVoiceAction.ANSWER_ON_SPEAKER
+            normalized == "answer" ||
+                normalized.startsWith("answer ") ||
+                normalized == "accept" ||
+                normalized.startsWith("accept ") ||
+                normalized.contains("pick up") ||
+                normalized.contains("take the call") -> CallVoiceAction.ANSWER
+            normalized == "decline" ||
+                normalized.startsWith("decline ") ||
+                normalized == "reject" ||
+                normalized.startsWith("reject ") ||
+                normalized.contains("hang up") ||
+                normalized.contains("ignore the call") -> CallVoiceAction.DECLINE
+            else -> null
+        }
     }
 
     private fun speakDex(
@@ -1026,6 +1108,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
         }
         isListeningForCallCommand = true
         recognizer.startListening(intent)
@@ -1066,7 +1150,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             else getString(R.string.wake_mode_waiting)
         updateWakeUi()
         maintainBackgroundService()
-        scheduleWakeListeningRestart(200)
+        scheduleWakeListeningRestart(1200)
     }
 
     private fun stopWakeMode() {
@@ -1092,24 +1176,179 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 10000L)
         }
         try {
             recognizer.cancel()
+            lastWakeListenStartedAt = SystemClock.elapsedRealtime()
             recognizer.startListening(intent)
         } catch (_: Exception) {
             binding.conversationStatus.text = getString(R.string.wake_mode_unavailable)
         }
     }
 
-    private fun scheduleWakeListeningRestart(delayMs: Long = 350L) {
+    private fun scheduleWakeListeningRestart(delayMs: Long = 3500L) {
         if (!wakeModeEnabled) return
+        val elapsed = SystemClock.elapsedRealtime() - lastWakeListenStartedAt
+        val adjustedDelay = max(delayMs, WAKE_LISTEN_MIN_GAP_MS - elapsed)
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
-        mainHandler.postDelayed(restartWakeListeningRunnable, delayMs)
+        mainHandler.postDelayed(restartWakeListeningRunnable, adjustedDelay)
     }
 
     private fun processDexCommand(message: String) {
         if (handleTaskIntent(message)) return
         sendDexChat(message)
+    }
+
+    private fun openYoutube(query: String?) {
+        val uri = if (query.isNullOrBlank()) {
+            Uri.parse("https://www.youtube.com")
+        } else {
+            Uri.parse("https://www.youtube.com/results?search_query=${Uri.encode(query)}")
+        }
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+        try {
+            startActivity(intent)
+            val reply = if (query.isNullOrBlank()) getString(R.string.youtube_opened) else getString(R.string.youtube_search_opened, query)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+        } catch (_: Exception) {
+            val reply = getString(R.string.action_open_failed)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+        }
+    }
+
+    private fun openYoutubeMusic(message: String) {
+        val query = message
+            .replace(Regex("^(?:play|open|put on)\\s+", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\b(?:some\\s+)?music\\b", RegexOption.IGNORE_CASE), "")
+            .trim()
+        val uri = if (query.isBlank()) {
+            Uri.parse("https://music.youtube.com")
+        } else {
+            Uri.parse("https://music.youtube.com/search?q=${Uri.encode(query)}")
+        }
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+        try {
+            startActivity(intent)
+            val reply = if (query.isBlank()) getString(R.string.music_opened) else getString(R.string.music_search_opened, query)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+        } catch (_: Exception) {
+            val reply = getString(R.string.action_open_failed)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+        }
+    }
+
+    private fun setSpeakerphoneEnabled(enabled: Boolean) {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        @Suppress("DEPRECATION")
+        runCatching {
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager.isSpeakerphoneOn = enabled
+        }
+    }
+
+    private fun handleMediaIntent(message: String): Boolean {
+        val normalized = message.trim().lowercase(Locale.US)
+        val youtubeSearch = Regex("^(?:open|pull up|search)\\s+youtube\\s*(?:for)?\\s*(.*)$", RegexOption.IGNORE_CASE)
+            .find(message.trim())
+        if (youtubeSearch != null) {
+            val query = youtubeSearch.groupValues[1].trim()
+            openYoutube(query.ifBlank { null })
+            return true
+        }
+        if (
+            normalized.contains("play some music") ||
+            normalized.contains("play music") ||
+            normalized.contains("open youtube music") ||
+            normalized.contains("put on some music")
+        ) {
+            openYoutubeMusic(message)
+            return true
+        }
+        return false
+    }
+
+    private fun handleSpeakerIntent(normalized: String): Boolean {
+        val speakerRequest =
+            normalized.contains("put it on speaker") ||
+                normalized.contains("put this on speaker") ||
+                normalized.contains("turn on speaker") ||
+                normalized.contains("answer on speaker") ||
+                normalized.contains("take the call on speaker")
+        if (!speakerRequest) return false
+
+        if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
+            enableSpeakerAfterAnswer = true
+            answerRingingCall()
+            return true
+        }
+
+        if (lastCallState == TelephonyManager.CALL_STATE_OFFHOOK) {
+            setSpeakerphoneEnabled(true)
+            val reply = getString(R.string.call_speaker_enabled)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return true
+        }
+
+        val reply = getString(R.string.call_speaker_unavailable)
+        binding.conversationStatus.text = reply
+        binding.lastReplyValue.text = reply
+        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+        return true
+    }
+
+    private fun buildCallMessageDraft(caller: String, phoneNumber: String?): PendingAction? {
+        val targetValue = phoneNumber?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val targetName = caller.takeUnless { it.isBlank() || it == "Unknown caller" }
+        return PendingAction(
+            kind = PendingActionKind.SMS_DRAFT,
+            summary = getString(R.string.call_message_draft_summary, targetName ?: targetValue),
+            detail = getString(R.string.call_message_draft_detail, targetName ?: targetValue),
+            targetName = targetName,
+            targetValue = targetValue,
+            body = getString(R.string.call_message_sms_body)
+        )
+    }
+
+    private fun takeMessageForCurrentCaller() {
+        if (lastCallState != TelephonyManager.CALL_STATE_RINGING) {
+            val reply = getString(R.string.call_message_unavailable)
+            binding.callMonitorStatus.text = reply
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return
+        }
+
+        val caller = lastCaller.takeUnless { it.isBlank() } ?: "Unknown caller"
+        val number = lastIncomingNumber
+        createCallFollowUpTask(caller, number)
+        declineRingingCall()
+        val draftedReply = buildCallMessageDraft(caller, number)?.also { queuePendingAction(it) } != null
+
+        val reply = if (number.isNullOrBlank()) {
+            getString(R.string.call_message_taken_no_number, caller)
+        } else {
+            getString(R.string.call_message_taken, caller)
+        }
+        binding.callMonitorStatus.text = reply
+        binding.conversationStatus.text = reply
+        binding.lastReplyValue.text = reply
+        if (!draftedReply) {
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+        }
     }
 
     private fun handleTaskIntent(message: String): Boolean {
@@ -1135,6 +1374,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized.contains("what should i focus on today")
         ) {
             fetchMorningBriefing()
+            return true
+        }
+
+        if (handleMediaIntent(message)) return true
+
+        if (handleSpeakerIntent(normalized)) return true
+
+        if (
+            normalized.contains("take a message") ||
+            normalized.contains("take the message") ||
+            normalized.contains("message them instead")
+        ) {
+            takeMessageForCurrentCaller()
             return true
         }
 
@@ -1571,6 +1823,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun createCallFollowUpTask(caller: String, phoneNumber: String?) {
+        val token = authToken ?: return
+        val serverUrl = currentServerUrl()
+        lifecycleScope.launch {
+            val details = buildString {
+                append("Caller: ").append(caller)
+                if (!phoneNumber.isNullOrBlank()) {
+                    append("\nNumber: ").append(phoneNumber)
+                }
+                append("\nRequested by Dex call screening on Android.")
+            }
+            val payload = JSONObject().apply {
+                put("title", getString(R.string.call_message_task_title, caller))
+                put("details", details)
+                put("kind", "call_follow_up")
+                put("source", "android_call_screening")
+            }
+            postJson("$serverUrl/dex/tasks", payload, token)
+        }
+    }
+
     private fun openSmsDraft(action: PendingAction) {
         val number = action.targetValue ?: return
         val body = action.body.orEmpty()
@@ -1958,6 +2231,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_BACKGROUND_SERVICE_ENABLED = "background_service_enabled"
         const val KEY_AUTO_START_ASSISTANT = "auto_start_assistant"
         const val KEY_PHONE_BACKEND_ENABLED = "phone_backend_enabled"
+        const val KEY_APP_IN_FOREGROUND = "app_in_foreground"
         const val KEY_LEARNING_REMINDER_ENABLED = "learning_reminder_enabled"
         const val KEY_LEARNING_REMINDER_TIME = "learning_reminder_time"
         const val KEY_LEARNING_REMINDER_TITLE = "learning_reminder_title"
@@ -1968,5 +2242,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val MAX_CALL_ANSWER_RETRIES = 2
         private const val CALL_ANSWER_RETRY_DELAY_MS = 350L
         private const val CALL_COMMAND_RETRY_DELAY_MS = 400L
+        private const val CALL_COMMAND_PROMPT_GUARD_DELAY_MS = 900L
+        private const val WAKE_LISTEN_MIN_GAP_MS = 3500L
     }
 }
