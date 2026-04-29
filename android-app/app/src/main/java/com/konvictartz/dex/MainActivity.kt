@@ -52,6 +52,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.max
+import java.net.URI
 
 private enum class PendingActionKind {
     SMS_DRAFT,
@@ -511,15 +512,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return normalizeServerUrl(rawValue)
     }
 
+    private fun isPrivateLanHost(host: String): Boolean {
+        if (host.startsWith("192.168.") || host.startsWith("10.")) return true
+        val match = Regex("^172\\.(\\d{1,2})\\.").find(host) ?: return false
+        val secondOctet = match.groupValues[1].toIntOrNull() ?: return false
+        return secondOctet in 16..31
+    }
+
     private fun normalizeServerUrl(serverUrl: String?): String {
         val trimmed = serverUrl?.trim()?.trimEnd('/').orEmpty()
         if (trimmed.isBlank()) return DEFAULT_SERVER_URL
         val lower = trimmed.lowercase(Locale.US)
+        val parsedUri = runCatching { URI(trimmed) }.getOrNull()
+        val host = parsedUri?.host?.lowercase(Locale.US).orEmpty()
+        val port = parsedUri?.port ?: -1
         return when {
             lower.startsWith("http://localhost") || lower.startsWith("http://127.0.0.1") -> DEFAULT_SERVER_URL
             lower.startsWith("http://konvict-artz.onrender.com") -> trimmed.replaceFirst("http://", "https://")
             lower.startsWith("http://www.konvict-artz.com") -> trimmed.replaceFirst("http://", "https://")
             lower.startsWith("http://konvict-artz.com") -> trimmed.replaceFirst("http://", "https://")
+            isPrivateLanHost(host) && port == 4000 -> trimmed.replace(":4000", ":3001")
             else -> trimmed
         }
     }
