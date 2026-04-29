@@ -5,6 +5,7 @@ import { requireAdmin } from "../middleware/auth.js";
 import { getDb } from "../db.js";
 import { sendPromoterNotification, sendPromoCode } from "../services/email.js";
 import { sendLowInventoryAlert } from "../services/ringcentral.js";
+import { ensureAffiliateRecord } from "../services/affiliates.js";
 
 const router = Router();
 
@@ -38,18 +39,6 @@ async function ensureFeatureFlagsTable(db) {
       ('learning_reminders', 1, 'Enable Dex daily learning reminder scheduling.')
     ON CONFLICT(key) DO NOTHING;
   `);
-}
-
-async function ensureAffiliateRecord(db, userId) {
-  const existing = await db.get("SELECT * FROM affiliates WHERE user_id = ?", [userId]);
-  if (existing) return existing;
-
-  const promoCode = `DEX${uuidv4().slice(0, 6).toUpperCase()}`;
-  await db.run(
-    "INSERT INTO affiliates (user_id, promo_code) VALUES (?, ?)",
-    [userId, promoCode]
-  );
-  return db.get("SELECT * FROM affiliates WHERE user_id = ?", [userId]);
 }
 
 router.get("/stats", requireAdmin, async (req, res) => {

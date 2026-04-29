@@ -1,0 +1,10 @@
+✅ Admin user seeded: konvictartzllc@gmail.com
+✅ Database initialized
+✅ Email initialized
+✅ AI Provider: OpenAI
+
+🚀 Konvict Artz - Dex AI Backend running on port 3101
+   Admin login: konvictartzllc@gmail.com
+   Health: http://localhost:3101/health
+   Provider status: AI=ok, Email=ok, RingCentral=network_error
+

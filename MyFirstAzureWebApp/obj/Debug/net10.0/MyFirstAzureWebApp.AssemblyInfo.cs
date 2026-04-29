@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MyFirstAzureWebApp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+74e9e69f685875bab2eb94349cd1740a8a842532")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6ebdc16391b9c47f361947570215ff59305be4e8")]
 [assembly: System.Reflection.AssemblyProductAttribute("MyFirstAzureWebApp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MyFirstAzureWebApp")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

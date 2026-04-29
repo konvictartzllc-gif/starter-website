@@ -5,7 +5,7 @@
     <string name="dex_ready_summary">Sign in to your Dex account, connect to your backend, and sync the assistant permissions from your phone.</string>
     <string name="server_title">Backend</string>
     <string name="server_hint">https://your-backend-url.com/api</string>
-    <string name="server_help">Use your real backend API base. Dex now defaults to the live Render API. For local testing, use http://10.0.2.2:3001/api in the emulator or http://YOUR_COMPUTER_IP:3001/api on a phone using the same Wi-Fi.</string>
+    <string name="server_help">Use your real backend API base. Dex now defaults to the live Render API. Hosted Dex backends should use https. For local testing, use http://10.0.2.2:3001/api in the emulator or http://YOUR_COMPUTER_IP:3001/api on a phone using the same Wi-Fi.</string>
     <string name="account_title">Dex account</string>
     <string name="name_optional">Name (for new account)</string>
     <string name="email">Email</string>

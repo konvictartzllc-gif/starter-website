@@ -517,6 +517,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val lower = trimmed.lowercase(Locale.US)
         return when {
             lower.startsWith("http://localhost") || lower.startsWith("http://127.0.0.1") -> DEFAULT_SERVER_URL
+            lower.startsWith("http://konvict-artz.onrender.com") -> trimmed.replaceFirst("http://", "https://")
+            lower.startsWith("http://www.konvict-artz.com") -> trimmed.replaceFirst("http://", "https://")
+            lower.startsWith("http://konvict-artz.com") -> trimmed.replaceFirst("http://", "https://")
             else -> trimmed
         }
     }

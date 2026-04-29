@@ -5,6 +5,7 @@ import { body, validationResult } from "express-validator";
 import { getDb } from "../db.js";
 import { getJwtSecret } from "../config.js";
 import { sendWelcomeEmail } from "../services/email.js";
+import { ensureAffiliateRecord } from "../services/affiliates.js";
 import { requireUser } from "../middleware/auth.js";
 import { generateOta } from "../middleware/security.js";
 
@@ -57,18 +58,6 @@ function sendAuthFailure(res, context, err, details = {}) {
   }
 
   return res.status(500).json({ error: "Server error" });
-}
-
-async function ensureAffiliateRecord(db, userId) {
-  const existing = await db.get("SELECT * FROM affiliates WHERE user_id = ?", [userId]);
-  if (existing) return existing;
-
-  const promoCode = `DEX${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-  await db.run(
-    "INSERT INTO affiliates (user_id, promo_code) VALUES (?, ?)",
-    [userId, promoCode]
-  );
-  return db.get("SELECT * FROM affiliates WHERE user_id = ?", [userId]);
 }
 
 async function consumeAffiliateInviteCode(db, inviteCode, email, userId) {
