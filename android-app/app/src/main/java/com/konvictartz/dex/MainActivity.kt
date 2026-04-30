@@ -124,6 +124,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var autoWakeStarted = false
     private var relationshipAliases: Map<String, String> = emptyMap()
     private var lastWakeListenStartedAt = 0L
+    private var pendingContactTarget: ContactMatch? = null
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -1274,6 +1275,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun processDexCommand(message: String) {
         if (handleTaskIntent(message)) return
+        detectContactOnlyIntent(message)?.let { contact ->
+            pendingContactTarget = contact
+            val reply = getString(R.string.contact_target_confirmed, contact.displayName)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return
+        }
         sendDexChat(message)
     }
 
@@ -1430,6 +1439,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val normalized = message.trim().lowercase(Locale.US)
         if (normalized.isBlank()) return false
 
+        consumePendingContactTarget(normalized)?.let { actionTaken ->
+            if (actionTaken) return true
+        }
+
         if (
             normalized.contains("what is on my calendar") ||
             normalized.contains("what's on my calendar") ||
@@ -1470,7 +1483,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return true
         }
 
+        buildQuickSmsDraft(message)?.let {
+            queuePendingAction(it)
+            return true
+        }
+
         buildEmailDraft(message)?.let {
+            queuePendingAction(it)
+            return true
+        }
+
+        buildQuickEmailDraft(message)?.let {
             queuePendingAction(it)
             return true
         }
@@ -1556,7 +1579,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun buildSmsDraft(message: String): PendingAction? {
         val match = Regex("^(?:text|sms|message)\\s+(.+?)\\s+(?:saying|that|message|tell)\\s+(.+)$", RegexOption.IGNORE_CASE)
             .find(message.trim()) ?: return null
-        val contactName = match.groupValues[1].trim()
+        val contactName = resolveContactAlias(match.groupValues[1].trim())
         val body = match.groupValues[2].trim()
         val contact = findPhoneContactByName(contactName) ?: run {
             val reply = getString(R.string.contact_not_found_phone, contactName)
@@ -1578,7 +1601,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun buildEmailDraft(message: String): PendingAction? {
         val match = Regex("^(?:email)\\s+(.+?)\\s+(?:about|saying|that|subject)\\s+(.+)$", RegexOption.IGNORE_CASE)
             .find(message.trim()) ?: return null
-        val contactName = match.groupValues[1].trim()
+        val contactName = resolveContactAlias(match.groupValues[1].trim())
         val body = match.groupValues[2].trim()
         val contact = findEmailContactByName(contactName) ?: run {
             val reply = getString(R.string.contact_not_found_email, contactName)
@@ -1595,6 +1618,37 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             targetValue = contact.value,
             subject = getString(R.string.default_email_subject),
             body = body,
+        )
+    }
+
+    private fun buildQuickSmsDraft(message: String): PendingAction? {
+        val match = Regex("^(?:text|sms|message)\\s+(.+)$", RegexOption.IGNORE_CASE)
+            .find(message.trim()) ?: return null
+        val contactName = resolveContactAlias(match.groupValues[1].trim())
+        val contact = findPhoneContactByName(contactName) ?: return null
+        return PendingAction(
+            kind = PendingActionKind.SMS_DRAFT,
+            summary = getString(R.string.sms_draft_summary, contact.displayName),
+            detail = getString(R.string.sms_draft_detail_blank, contact.displayName),
+            targetName = contact.displayName,
+            targetValue = contact.value,
+            body = "",
+        )
+    }
+
+    private fun buildQuickEmailDraft(message: String): PendingAction? {
+        val match = Regex("^(?:email)\\s+(.+)$", RegexOption.IGNORE_CASE)
+            .find(message.trim()) ?: return null
+        val contactName = resolveContactAlias(match.groupValues[1].trim())
+        val contact = findEmailContactByName(contactName) ?: return null
+        return PendingAction(
+            kind = PendingActionKind.EMAIL_DRAFT,
+            summary = getString(R.string.email_draft_summary, contact.displayName),
+            detail = getString(R.string.email_draft_detail_blank, contact.displayName),
+            targetName = contact.displayName,
+            targetValue = contact.value,
+            subject = getString(R.string.default_email_subject),
+            body = "",
         )
     }
 
@@ -1642,6 +1696,64 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             displayName = contact.displayName,
             phoneNumber = contact.value,
         )
+    }
+
+    private fun detectContactOnlyIntent(message: String): ContactMatch? {
+        val resolvedName = resolveContactAlias(message.trim())
+        if (resolvedName.isBlank()) return null
+        return findExactPhoneContactByName(resolvedName)
+            ?: findPhoneContactByName(resolvedName)?.takeIf {
+                it.displayName.equals(resolvedName, ignoreCase = true)
+            }
+    }
+
+    private fun consumePendingContactTarget(normalized: String): Boolean? {
+        val contact = pendingContactTarget ?: return null
+        return when {
+            normalized == "call" || normalized == "call them" || normalized == "call her" || normalized == "call him" -> {
+                pendingContactTarget = null
+                placeVoiceRequestedCall(DirectCallRequest(contact.displayName, contact.value))
+                true
+            }
+            normalized == "text" || normalized == "text them" || normalized == "message them" || normalized == "text her" || normalized == "text him" -> {
+                pendingContactTarget = null
+                queuePendingAction(
+                    PendingAction(
+                        kind = PendingActionKind.SMS_DRAFT,
+                        summary = getString(R.string.sms_draft_summary, contact.displayName),
+                        detail = getString(R.string.sms_draft_detail_blank, contact.displayName),
+                        targetName = contact.displayName,
+                        targetValue = contact.value,
+                        body = "",
+                    )
+                )
+                true
+            }
+            normalized == "email" || normalized == "email them" || normalized == "email her" || normalized == "email him" -> {
+                pendingContactTarget = null
+                val emailContact = findEmailContactByName(contact.displayName)
+                if (emailContact == null) {
+                    val reply = getString(R.string.contact_not_found_email, contact.displayName)
+                    binding.lastReplyValue.text = reply
+                    binding.conversationStatus.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                } else {
+                    queuePendingAction(
+                        PendingAction(
+                            kind = PendingActionKind.EMAIL_DRAFT,
+                            summary = getString(R.string.email_draft_summary, emailContact.displayName),
+                            detail = getString(R.string.email_draft_detail_blank, emailContact.displayName),
+                            targetName = emailContact.displayName,
+                            targetValue = emailContact.value,
+                            subject = getString(R.string.default_email_subject),
+                            body = "",
+                        )
+                    )
+                }
+                true
+            }
+            else -> false
+        }
     }
 
     private fun buildAppointmentDraft(message: String): PendingAction? {
@@ -2045,6 +2157,31 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             ),
             "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
             arrayOf("%$name%"),
+            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC"
+        )
+        cursor?.use {
+            if (it.moveToFirst()) {
+                return ContactMatch(
+                    displayName = it.getString(0),
+                    value = it.getString(1)
+                )
+            }
+        }
+        return null
+    }
+
+    private fun findExactPhoneContactByName(name: String): ContactMatch? {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return null
+        }
+        val cursor = contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                ContactsContract.CommonDataKinds.Phone.NUMBER
+            ),
+            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} = ? COLLATE NOCASE",
+            arrayOf(name),
             "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC"
         )
         cursor?.use {

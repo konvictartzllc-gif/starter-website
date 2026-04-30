@@ -78,8 +78,11 @@
     <string name="contact_save_opened">I opened a new contact draft for %1$s.</string>
     <string name="contact_not_found_phone">I could not find a phone contact for %1$s.</string>
     <string name="contact_not_found_email">I could not find an email contact for %1$s.</string>
+    <string name="contact_target_confirmed">I found %1$s in your contacts. Say call, text, or email.</string>
     <string name="try_again_with_contact">Try again with the exact saved contact name.</string>
     <string name="default_email_subject">Message from Dex</string>
+    <string name="sms_draft_detail_blank">I opened a message draft for %1$s so you can type or dictate the text.</string>
+    <string name="email_draft_detail_blank">I opened an email draft for %1$s so you can type or dictate the message.</string>
     <string name="sms_draft_opened">I opened the text draft for %1$s.</string>
     <string name="email_draft_opened">I opened the email draft for %1$s.</string>
     <string name="call_direct_started">Calling %1$s now.</string>
