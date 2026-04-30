@@ -145,7 +145,10 @@ export default function AdminPortal() {
     e.preventDefault();
     try {
       const data = await api.createAffiliateInvite({ email: inviteEmail, name: inviteName });
-      setMsg(`Affiliate invite ready. Code: ${data.invite.code}. Signup link: ${data.invite.registerLink}`);
+      const deliveryMessage = data.emailed
+        ? `The invite was emailed to ${inviteEmail || "the affiliate"}`
+        : "The invite was created, but it was not emailed. Copy the code or signup link below and send it manually.";
+      setMsg(`Affiliate invite ready. Code: ${data.invite.code}. Signup link: ${data.invite.registerLink}. ${deliveryMessage}`);
       setInviteEmail("");
       setInviteName("");
       loadAffiliateInvites();
@@ -398,7 +401,7 @@ export default function AdminPortal() {
           <div>
             <h2 className="text-lg font-bold mb-4">Affiliate Management</h2>
             <p className="text-sm text-gray-400 mb-4">
-              Invite an affiliate here. They will then use the normal register page with that same email to finish their account and get Dex access while promoting it.
+              Invite an affiliate here. If you enter an email, Dex will try to send the one-time code and signup link there. If email is not configured, you can still copy the generated code below and send it manually.
             </p>
             <form onSubmit={handleCreateAffiliateInvite} className="bg-gray-800 rounded-xl p-4 mb-6 flex gap-3 flex-wrap">
               <input

@@ -3,7 +3,7 @@ import { body, validationResult } from "express-validator";
 import { v4 as uuidv4 } from "uuid";
 import { requireAdmin } from "../middleware/auth.js";
 import { getDb } from "../db.js";
-import { sendPromoterNotification, sendPromoCode } from "../services/email.js";
+import { sendAffiliateInvite, sendPromoterNotification, sendPromoCode } from "../services/email.js";
 import { sendLowInventoryAlert } from "../services/ringcentral.js";
 import { ensureAffiliateRecord } from "../services/affiliates.js";
 
@@ -209,11 +209,14 @@ router.post("/affiliate-invites/create", requireAdmin, [
   );
 
   const invite = await db.get("SELECT * FROM affiliate_invite_codes WHERE code = ?", [code]);
+  const registerLink = getAffiliateInviteLink(code);
+  const emailed = email ? await sendAffiliateInvite(email, name, code, registerLink) : false;
   return res.json({
     success: true,
+    emailed,
     invite: {
       ...invite,
-      registerLink: getAffiliateInviteLink(code),
+      registerLink,
     },
   });
 });

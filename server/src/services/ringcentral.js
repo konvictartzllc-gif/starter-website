@@ -12,15 +12,14 @@ function getConfig() {
   return {
     clientId: process.env.RC_CLIENT_ID,
     clientSecret: process.env.RC_CLIENT_SECRET,
-    username: process.env.RC_USERNAME,
-    password: process.env.RC_PASSWORD,
+    jwt: process.env.RC_JWT,
     server: process.env.RC_SERVER || "https://platform.ringcentral.com",
     fromNumber: process.env.RC_PHONE_NUMBER || process.env.SUPPORT_PHONE || process.env.OWNER_PHONE,
   };
 }
 
 function hasRequiredConfig(config) {
-  return Boolean(config.clientId && config.clientSecret && config.username && config.password);
+  return Boolean(config.clientId && config.clientSecret && config.jwt);
 }
 
 async function fetchJson(url, options = {}) {
@@ -54,7 +53,7 @@ async function loginRingCentral(force = false) {
       configured: false,
       ready: false,
       reason: "missing_credentials",
-      detail: "Missing RC_CLIENT_ID, RC_CLIENT_SECRET, RC_USERNAME, or RC_PASSWORD.",
+      detail: "Missing RC_CLIENT_ID, RC_CLIENT_SECRET, or RC_JWT.",
     };
     return null;
   }
@@ -88,9 +87,8 @@ async function loginRingCentral(force = false) {
 
   const credentials = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
   const body = new URLSearchParams({
-    grant_type: "password",
-    username: config.username,
-    password: config.password,
+    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    assertion: config.jwt,
   });
 
   try {
@@ -120,7 +118,7 @@ async function loginRingCentral(force = false) {
     let reason = "login_failed";
     if (lower.includes("timeout") || lower.includes("network") || lower.includes("econn") || lower.includes("fetch failed")) {
       reason = "network_error";
-    } else if (lower.includes("unauthorized") || lower.includes("invalid") || lower.includes("grant")) {
+    } else if (lower.includes("unauthorized") || lower.includes("invalid") || lower.includes("grant") || lower.includes("jwt")) {
       reason = "auth_failed";
     } else if (lower.includes("forbidden") || lower.includes("scope")) {
       reason = "permission_denied";
