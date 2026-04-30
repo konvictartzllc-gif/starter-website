@@ -323,7 +323,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
                 override fun onResults(results: Bundle?) {
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                    val transcript = matches.joinToString(" ").lowercase(Locale.US)
+                    val transcript = matches.firstOrNull()?.trim().orEmpty().lowercase(Locale.US)
                     if (isListeningForCallCommand) {
                         isListeningForCallCommand = false
                         val action = parseCallVoiceAction(transcript)
@@ -526,7 +526,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val parsedUri = runCatching { URI(trimmed) }.getOrNull()
         val host = parsedUri?.host?.lowercase(Locale.US).orEmpty()
         val port = parsedUri?.port ?: -1
-        return when {
+        val normalized = when {
             lower.startsWith("http://localhost") || lower.startsWith("http://127.0.0.1") -> DEFAULT_SERVER_URL
             lower.startsWith("http://konvict-artz.onrender.com") -> trimmed.replaceFirst("http://", "https://")
             lower.startsWith("http://www.konvict-artz.com") -> trimmed.replaceFirst("http://", "https://")
@@ -534,6 +534,48 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             isPrivateLanHost(host) && port == 4000 -> trimmed.replace(":4000", ":3001")
             else -> trimmed
         }
+        return when {
+            normalized.equals("https://konvict-artz.onrender.com", ignoreCase = true) -> DEFAULT_SERVER_URL
+            normalized.equals("http://konvict-artz.onrender.com", ignoreCase = true) -> DEFAULT_SERVER_URL
+            normalized.equals("https://www.konvict-artz.com", ignoreCase = true) -> "https://www.konvict-artz.com/api"
+            normalized.equals("https://konvict-artz.com", ignoreCase = true) -> "https://konvict-artz.com/api"
+            normalized.startsWith("https://konvict-artz.onrender.com/", ignoreCase = true) &&
+                !normalized.contains("/api", ignoreCase = true) -> DEFAULT_SERVER_URL
+            normalized.startsWith("https://www.konvict-artz.com/", ignoreCase = true) &&
+                !normalized.contains("/api", ignoreCase = true) -> "https://www.konvict-artz.com/api"
+            normalized.startsWith("https://konvict-artz.com/", ignoreCase = true) &&
+                !normalized.contains("/api", ignoreCase = true) -> "https://konvict-artz.com/api"
+            else -> normalized
+        }
+    }
+
+    private fun backendUrlHint(): String = DEFAULT_SERVER_URL
+
+    private fun parseJsonObjectOrThrow(body: String, responseCode: Int): JSONObject {
+        if (body.isBlank()) return JSONObject()
+        val trimmed = body.trimStart()
+        if (trimmed.startsWith("<!DOCTYPE", ignoreCase = true) || trimmed.startsWith("<html", ignoreCase = true)) {
+            throw IOException("Dex expected the backend API but received a web page. Use ${backendUrlHint()}")
+        }
+        return runCatching { JSONObject(body) }.getOrElse { error ->
+            throw IOException(
+                "Dex expected JSON from the backend. Check that the backend URL ends with /api and uses https. (${backendUrlHint()})",
+                error
+            )
+        }
+    }
+
+    private fun parseErrorMessage(body: String, responseCode: Int): String {
+        if (body.isBlank()) return "Request failed with $responseCode"
+        val trimmed = body.trimStart()
+        if (trimmed.startsWith("<!DOCTYPE", ignoreCase = true) || trimmed.startsWith("<html", ignoreCase = true)) {
+            return "Dex expected the backend API but received a web page. Use ${backendUrlHint()}"
+        }
+        return runCatching { JSONObject(body) }.getOrNull()?.let { json ->
+            json.optString("message").ifBlank {
+                json.optString("error").ifBlank { "Request failed with $responseCode" }
+            }
+        } ?: "Dex expected JSON from the backend. Check that the backend URL ends with /api and uses https. (${backendUrlHint()})"
     }
 
     private fun login() {
@@ -860,7 +902,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
 
-        binding.lastHeardValue.text = transcript
+        binding.lastHeardValue.text = sanitizeWakeTranscriptForDisplay(normalized)
 
         if (normalized.contains("stop listening") || normalized.contains("go to sleep")) {
             stopWakeMode()
@@ -869,13 +911,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         if (!awaitingWakeCommand && !conversationActive) {
-            if (!normalized.contains(WAKE_WORD)) {
+            if (!containsWakeWord(normalized)) {
                 binding.conversationStatus.text = getString(R.string.wake_mode_waiting)
                 scheduleWakeListeningRestart(2500)
                 return
             }
 
-            val spokenCommand = normalized.replace(WAKE_WORD, "").trim()
+            val spokenCommand = stripWakeWord(normalized)
             conversationActive = true
             scheduleConversationTimeout()
             if (spokenCommand.isNotBlank()) {
@@ -895,14 +937,32 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         conversationActive = true
         scheduleConversationTimeout()
         awaitingWakeCommand = false
-        val cleanedTranscript =
-            if (normalized.contains(WAKE_WORD)) normalized.replace(WAKE_WORD, "").trim() else normalized
+        val cleanedTranscript = stripWakeWord(normalized)
         if (cleanedTranscript.isBlank()) {
             binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
             scheduleWakeListeningRestart(2500)
             return
         }
         processDexCommand(cleanedTranscript)
+    }
+
+    private fun containsWakeWord(transcript: String): Boolean =
+        WAKE_WORD_VARIANTS.any { transcript.contains(it) }
+
+    private fun stripWakeWord(transcript: String): String {
+        var cleaned = transcript
+        WAKE_WORD_VARIANTS.forEach { variant ->
+            cleaned = cleaned.replace(variant, " ")
+        }
+        return cleaned.replace("\\s+".toRegex(), " ").trim()
+    }
+
+    private fun sanitizeWakeTranscriptForDisplay(transcript: String): String {
+        val cleanedCommand = stripWakeWord(transcript)
+        if (containsWakeWord(transcript) && cleanedCommand.isBlank()) {
+            return getString(R.string.wake_mode_detected)
+        }
+        return cleanedCommand.ifBlank { transcript }
     }
 
     @Suppress("DEPRECATION")
@@ -2180,13 +2240,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
                 client.newCall(requestBuilder.build()).execute().use { response ->
                     val body = response.body?.string().orEmpty()
-                    val json = if (body.isNotBlank()) JSONObject(body) else JSONObject()
                     if (!response.isSuccessful) {
-                        throw IOException(json.optString("message").ifBlank {
-                            json.optString("error").ifBlank { "Request failed with ${response.code}" }
-                        })
+                        throw IOException(parseErrorMessage(body, response.code))
                     }
-                    json
+                    parseJsonObjectOrThrow(body, response.code)
                 }
             }
         }
@@ -2203,13 +2260,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
                 client.newCall(request).execute().use { response ->
                     val body = response.body?.string().orEmpty()
-                    val json = if (body.isNotBlank()) JSONObject(body) else JSONObject()
                     if (!response.isSuccessful) {
-                        throw IOException(json.optString("message").ifBlank {
-                            json.optString("error").ifBlank { "Request failed with ${response.code}" }
-                        })
+                        throw IOException(parseErrorMessage(body, response.code))
                     }
-                    json
+                    parseJsonObjectOrThrow(body, response.code)
                 }
             }
         }
@@ -2227,10 +2281,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 client.newCall(request).execute().use { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) {
-                        val json = if (body.isNotBlank()) JSONObject(body) else JSONObject()
-                        throw IOException(json.optString("message").ifBlank {
-                            json.optString("error").ifBlank { "Request failed with ${response.code}" }
-                        })
+                        throw IOException(parseErrorMessage(body, response.code))
                     }
                     if (body.isBlank()) JSONArray() else JSONArray(body)
                 }
@@ -2252,7 +2303,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_LEARNING_REMINDER_TITLE = "learning_reminder_title"
         const val KEY_LEARNING_REMINDER_TEXT = "learning_reminder_text"
         const val DEFAULT_SERVER_URL = "https://konvict-artz.onrender.com/api"
-        private const val WAKE_WORD = "hey dex"
+        private val WAKE_WORD_VARIANTS = listOf(
+            "hey dex",
+            "hey decks",
+            "hey deks",
+            "hey dix",
+            "hey dicks",
+            "hey dick's"
+        )
         private const val CONVERSATION_TIMEOUT_MS = 45_000L
         private const val MAX_CALL_ANSWER_RETRIES = 2
         private const val CALL_ANSWER_RETRY_DELAY_MS = 350L

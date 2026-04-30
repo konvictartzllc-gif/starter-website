@@ -58,6 +58,7 @@
     <string name="wake_mode_thinking">Dex is thinking.</string>
     <string name="wake_mode_replying">Dex is replying.</string>
     <string name="wake_mode_fallback_reply">I had trouble reaching the Dex chat service just now.</string>
+    <string name="wake_mode_detected">Wake phrase detected.</string>
     <string name="last_heard">Last thing Dex heard</string>
     <string name="last_reply">Last reply from Dex</string>
     <string name="voice_dash">-</string>

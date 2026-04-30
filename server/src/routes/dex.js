@@ -1472,7 +1472,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                         return res.json({ reply, appointmentIntent, automationPerformed });
               } catch (err) {
                     console.error("OpenAI error:", err.message);
-                    const fallback = "Hey, I'm having a little trouble connecting right now. Give me a sec and try again - I'll be right here!";
+                    const fallback = "Dex chat is temporarily unavailable. Please try again in a moment.";
                     return res.json({ reply: fallback });
               }
 });
