@@ -152,6 +152,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingContactAction: PendingContactAction? = null
     private var pendingSmsRecipient: ContactMatch? = null
     private var pendingSmsBodyDraft: String? = null
+    private var pendingIncomingSmsSender: String? = null
+    private var pendingIncomingSmsValue: String? = null
+    private var pendingIncomingSmsBody: String? = null
     private var currentThemePreset: String = THEME_STUDIO
     private var currentAccentColor: String = DEFAULT_ACCENT_COLOR
     private var currentBackgroundColor: String = DEFAULT_BACKGROUND_COLOR
@@ -634,6 +637,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentPanelColor = prefs.getString(KEY_PANEL_COLOR, DEFAULT_PANEL_COLOR).orEmpty().ifBlank { DEFAULT_PANEL_COLOR }
         binding.emailInput.setText(prefs.getString(KEY_EMAIL, ""))
         binding.affiliateInviteInput.setText(prefs.getString(KEY_AFFILIATE_INVITE_CODE, ""))
+        pendingIncomingSmsSender = prefs.getString(KEY_PENDING_INCOMING_SMS_SENDER, null)
+        pendingIncomingSmsValue = prefs.getString(KEY_PENDING_INCOMING_SMS_VALUE, null)
+        pendingIncomingSmsBody = prefs.getString(KEY_PENDING_INCOMING_SMS_BODY, null)
         binding.homeTitleInput.setText(prefs.getString(KEY_HOME_TITLE, ""))
         binding.homeSubtitleInput.setText(prefs.getString(KEY_HOME_SUBTITLE, ""))
         currentBackgroundImageUri = prefs.getString(KEY_HOME_BACKGROUND_URI, null)
@@ -1719,6 +1725,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean(KEY_PHONE_BACKEND_ENABLED, phoneBackendEnabled)
+                    .putBoolean(KEY_NOTIFICATIONS_ENABLED, binding.notificationsPermissionSwitch.isChecked)
                     .apply()
                 binding.permissionsMessage.text =
                     when (key) {
@@ -1738,6 +1745,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.phonePermissionSwitch.isChecked = permissions["phone"] == true
         binding.calendarPermissionSwitch.isChecked = permissions["calendar"] == true
         binding.notificationsPermissionSwitch.isChecked = permissions["notifications"] == true
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_NOTIFICATIONS_ENABLED, permissions["notifications"] == true)
+            .apply()
     }
 
     private fun requestAndroidPermissions() {
@@ -1752,6 +1763,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     Manifest.permission.ANSWER_PHONE_CALLS,
                     Manifest.permission.CALL_PHONE,
                     Manifest.permission.SEND_SMS,
+                    Manifest.permission.RECEIVE_SMS,
                     Manifest.permission.RECORD_AUDIO
                 )
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -1776,6 +1788,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.CALL_PHONE,
+            Manifest.permission.RECEIVE_SMS,
             Manifest.permission.RECORD_AUDIO
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -2412,6 +2425,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val normalized = message.trim().lowercase(Locale.US)
         if (normalized.isBlank()) return false
 
+        consumePendingIncomingSms(normalized)?.let { actionTaken ->
+            if (actionTaken) return true
+        }
+
         handlePendingActionVoiceCommand(normalized)?.let { actionTaken ->
             if (actionTaken) return true
         }
@@ -2506,6 +2523,86 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         return false
+    }
+
+    private fun consumePendingIncomingSms(normalized: String): Boolean? {
+        val sender = pendingIncomingSmsSender
+            ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_INCOMING_SMS_SENDER, null)
+        val senderValue = pendingIncomingSmsValue
+            ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_INCOMING_SMS_VALUE, null)
+        val body = pendingIncomingSmsBody
+            ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_INCOMING_SMS_BODY, null)
+        if (sender.isNullOrBlank() || body.isNullOrBlank()) return null
+
+        return when {
+            normalized == "read it" ||
+                normalized == "read the text" ||
+                normalized == "read the message" ||
+                normalized == "yes read it" ||
+                normalized == "yes read the text" -> {
+                val reply = getString(R.string.incoming_sms_readback, sender, body)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                true
+            }
+            normalized == "read it again" ||
+                normalized == "read that again" ||
+                normalized == "say it again" -> {
+                val reply = getString(R.string.incoming_sms_readback_again, sender, body)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                true
+            }
+            normalized == "reply to it" ||
+                normalized == "reply to that" ||
+                normalized == "text them back" ||
+                normalized == "reply back" ||
+                normalized == "answer it" -> {
+                val number = senderValue?.trim().orEmpty()
+                if (number.isBlank()) {
+                    val reply = getString(R.string.contact_not_found_phone, sender)
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    false
+                } else {
+                    pendingSmsRecipient = ContactMatch(sender, number)
+                    pendingSmsBodyDraft = null
+                    val reply = getString(R.string.incoming_sms_reply_prompt, sender)
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    true
+                }
+            }
+            normalized == "ignore it" ||
+                normalized == "ignore the text" ||
+                normalized == "ignore the message" ||
+                normalized == "no" ||
+                normalized == "cancel" -> {
+                val reply = getString(R.string.incoming_sms_ignored, sender)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                clearPendingIncomingSms()
+                true
+            }
+            else -> null
+        }
+    }
+
+    private fun clearPendingIncomingSms() {
+        pendingIncomingSmsSender = null
+        pendingIncomingSmsValue = null
+        pendingIncomingSmsBody = null
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_PENDING_INCOMING_SMS_SENDER)
+            .remove(KEY_PENDING_INCOMING_SMS_VALUE)
+            .remove(KEY_PENDING_INCOMING_SMS_BODY)
+            .apply()
     }
 
     private fun buildDashboardSectionIntent(message: String): Triple<String, String, String>? {
@@ -3706,7 +3803,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_BACKGROUND_SERVICE_ENABLED = "background_service_enabled"
         const val KEY_AUTO_START_ASSISTANT = "auto_start_assistant"
         const val KEY_PHONE_BACKEND_ENABLED = "phone_backend_enabled"
+        const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
         const val KEY_APP_IN_FOREGROUND = "app_in_foreground"
+        const val KEY_PENDING_INCOMING_SMS_SENDER = "pending_incoming_sms_sender"
+        const val KEY_PENDING_INCOMING_SMS_VALUE = "pending_incoming_sms_value"
+        const val KEY_PENDING_INCOMING_SMS_BODY = "pending_incoming_sms_body"
         const val KEY_LEARNING_REMINDER_ENABLED = "learning_reminder_enabled"
         const val KEY_LEARNING_REMINDER_TIME = "learning_reminder_time"
         const val KEY_LEARNING_REMINDER_TITLE = "learning_reminder_title"
