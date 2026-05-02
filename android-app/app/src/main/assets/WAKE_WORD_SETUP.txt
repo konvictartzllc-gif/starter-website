@@ -1,0 +1,11 @@
+Place your Vosk model folder in this assets directory.
+
+Example folder name:
+model-en-us
+
+What Dex needs for the offline wake engine:
+1. A Vosk Android model folder inside app/src/main/assets
+2. The matching folder name entered in Dex under "Set up wake word"
+3. The wake phrase you want Dex to listen for, like "hey dex"
+
+Until those are added, Dex falls back to the basic wake-mode path.

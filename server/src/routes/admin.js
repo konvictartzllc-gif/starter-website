@@ -210,10 +210,16 @@ router.post("/affiliate-invites/create", requireAdmin, [
 
   const invite = await db.get("SELECT * FROM affiliate_invite_codes WHERE code = ?", [code]);
   const registerLink = getAffiliateInviteLink(code);
-  const emailed = email ? await sendAffiliateInvite(email, name, code, registerLink) : false;
+  const emailQueued = Boolean(email);
+  if (emailQueued) {
+    Promise.resolve(sendAffiliateInvite(email, name, code, registerLink)).catch((error) => {
+      console.error("Affiliate invite email error:", error?.message || error);
+    });
+  }
   return res.json({
     success: true,
-    emailed,
+    emailed: false,
+    emailQueued,
     invite: {
       ...invite,
       registerLink,

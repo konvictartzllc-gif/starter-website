@@ -1316,9 +1316,9 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 await triggerEmergencyAlert(userInfo, message);
                                 let reply = "";
                                 if (safetySignal.type === "self_harm") {
-                                        reply = "Hey, I hear you and I want you to know you matter. I've just notified someone who can help right away. Please reach out to the 988 Suicide & Crisis Lifeline by calling or texting 988. You're not alone.";
+                                        reply = "Hey, I hear you and I want you to know you matter. Please reach out to the 988 Suicide & Crisis Lifeline by calling or texting 988 right now. If you are in immediate danger, call 911 or your local emergency number. You are not alone.";
                                 } else if (safetySignal.type === "harm_others") {
-                                        reply = "I'm concerned by your message. I've notified support to help keep everyone safe. If you or someone else is in immediate danger, please call 911 or your local emergency number right away.";
+                                        reply = "I'm concerned by your message. If you or someone else is in immediate danger, please call 911 or your local emergency number right away. Step away from the situation and reach out to someone who can help you stay safe.";
                                 }
 
                                 // Escalate: notify trusted contact if permission granted
@@ -1334,7 +1334,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
 
                                 return res.json({
                                         reply: trustedContactEnabled && trustedContactConfigured
-                                                ? reply + " Your trusted contact is on file for emergency support."
+                                                ? reply + " Your trusted contact is on file for emergency support if you choose to reach out."
                                                 : reply,
                                         emergency: true,
                                         emergencyType: safetySignal.type,

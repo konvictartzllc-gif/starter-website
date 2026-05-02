@@ -393,8 +393,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
 
         runCatching {
-            @Suppress("DEPRECATION")
-            val smsManager = SmsManager.getDefault()
+            val smsManager = resolveSmsManager()
             smsManager.sendTextMessage(senderValue, null, replyText, null, null)
         }.onSuccess {
             clearPendingIncomingSms()
@@ -420,10 +419,15 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun showIncomingCallNotification(caller: String) {
+        val fullScreenIntent = Intent(this, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_ASSISTANT_SURFACE, MainActivity.ASSISTANT_SURFACE_CALL)
+            putExtra(MainActivity.EXTRA_ASSISTANT_CALLER, caller)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
         val openAppIntent = PendingIntent.getActivity(
             this,
             100,
-            Intent(this, MainActivity::class.java),
+            fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val answerIntent = PendingIntent.getService(
@@ -447,6 +451,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setAutoCancel(true)
             .setContentIntent(openAppIntent)
+            .setFullScreenIntent(openAppIntent, true)
             .addAction(0, getString(R.string.answer_call), answerIntent)
             .addAction(0, getString(R.string.decline_call), declineIntent)
             .build()
@@ -572,6 +577,15 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             return
         }
         speakNow(text)
+    }
+
+    private fun resolveSmsManager(): SmsManager {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getSystemService(SmsManager::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            SmsManager.getDefault()
+        }
     }
 
     private fun speakNow(text: String) {

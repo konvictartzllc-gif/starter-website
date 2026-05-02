@@ -147,7 +147,9 @@ export default function AdminPortal() {
       const data = await api.createAffiliateInvite({ email: inviteEmail, name: inviteName });
       const deliveryMessage = data.emailed
         ? `The invite was emailed to ${inviteEmail || "the affiliate"}`
-        : "The invite was created, but it was not emailed. Copy the code or signup link below and send it manually.";
+        : data.emailQueued
+          ? `The invite was created and the email is on its way to ${inviteEmail || "the affiliate"}.`
+          : "The invite was created, but it was not emailed. Copy the code or signup link below and send it manually.";
       setMsg(`Affiliate invite ready. Code: ${data.invite.code}. Signup link: ${data.invite.registerLink}. ${deliveryMessage}`);
       setInviteEmail("");
       setInviteName("");
