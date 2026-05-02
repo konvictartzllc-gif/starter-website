@@ -63,6 +63,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         when (intent?.action) {
             ACTION_ANNOUNCE_SMS -> handleIncomingSms(intent)
             ACTION_ANNOUNCE_NOTIFICATION -> handleIncomingNotification(intent)
+            ACTION_SAFETY_CHECK_IN -> handleSafetyCheckIn(intent)
             ACTION_CALL_ANSWER -> handleCallAnswerAction()
             ACTION_CALL_DECLINE -> handleCallDeclineAction()
             ACTION_SMS_READ -> handleSmsReadAction()
@@ -295,7 +296,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             .apply()
 
         showIncomingSmsNotification(sender, smsBody)
-        speakShortStatus(getString(R.string.incoming_sms_prompt, sender))
+        mainHandler.postDelayed({
+            speakShortStatus(getString(R.string.incoming_sms_prompt, sender))
+        }, 700L)
     }
 
     private fun handleIncomingNotification(intent: Intent) {
@@ -318,6 +321,16 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
         showIncomingNotificationPrompt(appName, body)
         speakShortStatus(getString(R.string.notification_prompt, appName))
+    }
+
+    private fun handleSafetyCheckIn(intent: Intent) {
+        val title = intent.getStringExtra(DexSafetyCheckInScheduler.EXTRA_TITLE)
+            ?: getString(R.string.safety_check_in_title)
+        val text = intent.getStringExtra(DexSafetyCheckInScheduler.EXTRA_TEXT)
+            ?: getString(R.string.safety_check_in_text)
+        mainHandler.postDelayed({
+            speakShortStatus("$title. $text")
+        }, 700L)
     }
 
     @SuppressLint("MissingPermission")
@@ -634,6 +647,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         private const val NOTIFICATION_PROMPT_ID = 4110
         const val ACTION_ANNOUNCE_SMS = "com.konvictartz.dex.action.ANNOUNCE_SMS"
         const val ACTION_ANNOUNCE_NOTIFICATION = "com.konvictartz.dex.action.ANNOUNCE_NOTIFICATION"
+        const val ACTION_SAFETY_CHECK_IN = "com.konvictartz.dex.action.SAFETY_CHECK_IN"
         const val ACTION_CALL_ANSWER = "com.konvictartz.dex.action.CALL_ANSWER"
         const val ACTION_CALL_DECLINE = "com.konvictartz.dex.action.CALL_DECLINE"
         const val ACTION_SMS_READ = "com.konvictartz.dex.action.SMS_READ"

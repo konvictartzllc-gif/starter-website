@@ -12,7 +12,8 @@ import java.util.Locale
 
 class DexWakeWordEngine(
     private val context: Context,
-    private val onWakeWordDetected: () -> Unit
+    private val onWakeWordDetected: () -> Unit,
+    private val onWakeWordError: ((String) -> Unit)? = null
 ) : RecognitionListener {
 
     private val prefs by lazy { context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE) }
@@ -35,6 +36,10 @@ class DexWakeWordEngine(
     fun start(): Boolean {
         if (running || loading) return true
         if (!isConfigured()) return false
+        if (!hasPackagedModel()) {
+            onWakeWordError?.invoke("Dex could not find the offline wake model in the app package.")
+            return false
+        }
 
         val existingModel = model
         return if (existingModel != null) {
@@ -48,15 +53,25 @@ class DexWakeWordEngine(
                 { unpackedModel ->
                     loading = false
                     model = unpackedModel
-                    startRecognition(unpackedModel)
+                    if (!startRecognition(unpackedModel)) {
+                        onWakeWordError?.invoke("Dex could not start the offline wake engine.")
+                    }
                 },
-                { _ ->
+                { error ->
                     loading = false
                     running = false
+                    onWakeWordError?.invoke(error?.message ?: "Dex could not load the offline wake model.")
                 }
             )
             true
         }
+    }
+
+    private fun hasPackagedModel(): Boolean {
+        return runCatching {
+            val children = context.assets.list(modelAssetName()).orEmpty()
+            children.isNotEmpty()
+        }.getOrDefault(false)
     }
 
     fun stop() {
@@ -80,19 +95,53 @@ class DexWakeWordEngine(
             activeSpeechService.startListening(this)
             running = true
             true
+        }.onFailure {
+            running = false
+            onWakeWordError?.invoke(it.message ?: "Dex could not start the offline wake engine.")
         }.getOrDefault(false)
     }
 
+    private fun normalizedWakePhrase(): String = normalizeSpeechFragment(wakePhrase())
+
+    private fun normalizeSpeechFragment(value: String): String {
+        return value
+            .lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun wakeVariants(): Set<String> {
+        val phrase = normalizedWakePhrase()
+        if (phrase.isBlank()) return emptySet()
+        val tokens = phrase.split(" ").filter { it.isNotBlank() }
+        if (tokens.size < 2) return setOf(phrase)
+        if (tokens.last() != "dex") return setOf(phrase)
+        val prefix = tokens.dropLast(1).joinToString(" ")
+        val variants = listOf("dex", "decks", "deks", "decs", "dix", "dicks")
+        return variants.map { "$prefix $it".trim() }.toSet()
+    }
+
+    private fun matchesNormalizedText(candidate: String): Boolean {
+        val normalizedCandidate = normalizeSpeechFragment(candidate)
+        if (normalizedCandidate.isBlank()) return false
+        val phrase = normalizedWakePhrase()
+        if (phrase.isBlank()) return false
+        if (normalizedCandidate == phrase) return true
+        if (normalizedCandidate.contains(phrase)) return true
+        return wakeVariants().any { variant ->
+            normalizedCandidate == variant || normalizedCandidate.contains(variant)
+        }
+    }
+
     private fun matchesWakePhrase(payload: String?): Boolean {
-        val phrase = wakePhrase()
-        if (payload.isNullOrBlank() || phrase.isBlank()) return false
-        val normalized = payload.trim().lowercase(Locale.US)
-        if (normalized == phrase) return true
+        if (payload.isNullOrBlank()) return false
+        if (matchesNormalizedText(payload)) return true
         return runCatching {
             val json = JSONObject(payload)
-            val partial = json.optString("partial").trim().lowercase(Locale.US)
-            val text = json.optString("text").trim().lowercase(Locale.US)
-            partial == phrase || text == phrase
+            val partial = json.optString("partial")
+            val text = json.optString("text")
+            matchesNormalizedText(partial) || matchesNormalizedText(text)
         }.getOrDefault(false)
     }
 
@@ -116,6 +165,7 @@ class DexWakeWordEngine(
 
     override fun onError(e: Exception?) {
         running = false
+        onWakeWordError?.invoke(e?.message ?: "Dex lost the offline wake engine.")
     }
 
     override fun onTimeout() = Unit

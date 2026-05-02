@@ -149,6 +149,8 @@ export default function AdminPortal() {
         ? `The invite was emailed to ${inviteEmail || "the affiliate"}`
         : data.emailQueued
           ? `The invite was created and the email is on its way to ${inviteEmail || "the affiliate"}.`
+          : data.emailError
+            ? `${data.emailError} Copy the code or signup link below and send it manually.`
           : "The invite was created, but it was not emailed. Copy the code or signup link below and send it manually.";
       setMsg(`Affiliate invite ready. Code: ${data.invite.code}. Signup link: ${data.invite.registerLink}. ${deliveryMessage}`);
       setInviteEmail("");

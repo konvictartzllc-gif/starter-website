@@ -1145,13 +1145,34 @@ router.post("/learning/quiz", requireUser, async (req, res) => {
         }
 
         await ensureMemoryTable(db);
+        await ensureLearningTables(db);
         const preferences = await loadPreferenceMap(db, req.user.id, [
                 "learning_target_language",
                 "learning_level",
                 "learning_focus",
                 "learning_style",
         ]);
-        const learning = getLearningDefaults(preferences, req.body || {});
+        let learning = getLearningDefaults(preferences, req.body || {});
+        const latestLesson = await db.get(
+                `SELECT title, content, topic, language, level
+                   FROM learning_lessons
+                  WHERE user_id = ?
+                    AND lesson_type = 'daily'
+                  ORDER BY created_at DESC
+                  LIMIT 1`,
+                [req.user.id]
+        );
+
+        let lessonContext = "";
+        if (latestLesson) {
+                learning = {
+                        ...learning,
+                        topic: req.body?.topic || latestLesson.topic || learning.topic,
+                        language: latestLesson.language || learning.language,
+                        level: latestLesson.level || learning.level,
+                };
+                lessonContext = latestLesson.content || "";
+        }
 
         try {
                 const openai = getOpenAI();
@@ -1164,9 +1185,14 @@ router.post("/learning/quiz", requireUser, async (req, res) => {
                                 },
                                 {
                                         role: "user",
-                                        content:
-                                                `Create a 5-question ${learning.language} quiz for a ${learning.level} learner focused on ${learning.focus}. Topic: ${learning.topic}. ` +
-                                                `Return JSON with this shape: {"title":"...","topic":"...","language":"...","questions":[{"question":"...","choices":["...","...","...","..."],"answer":"...","explanation":"..."}]}`,
+                                        content: lessonContext
+                                                ? `Create a 5-question ${learning.language} quiz for a ${learning.level} learner based only on this lesson content. ` +
+                                                  `Focus: ${learning.focus}. Topic: ${learning.topic}. ` +
+                                                  `Lesson title: ${latestLesson?.title || learning.topic}. ` +
+                                                  `Lesson content:\n${lessonContext}\n\n` +
+                                                  `Return JSON with this shape: {"title":"...","topic":"...","language":"...","questions":[{"question":"...","choices":["...","...","...","..."],"answer":"...","explanation":"..."}]}`
+                                                : `Create a 5-question ${learning.language} quiz for a ${learning.level} learner focused on ${learning.focus}. Topic: ${learning.topic}. ` +
+                                                  `Return JSON with this shape: {"title":"...","topic":"...","language":"...","questions":[{"question":"...","choices":["...","...","...","..."],"answer":"...","explanation":"..."}]}`,
                                 },
                         ],
                         max_tokens: 900,

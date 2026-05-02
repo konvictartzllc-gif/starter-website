@@ -275,9 +275,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         })
         setupSpeechRecognizer()
-        wakeWordEngine = DexWakeWordEngine(this) {
-            runOnUiThread { handleWakeWordEngineDetection() }
-        }
+        wakeWordEngine = DexWakeWordEngine(
+            this,
+            onWakeWordDetected = {
+                runOnUiThread { handleWakeWordEngineDetection() }
+            },
+            onWakeWordError = { message ->
+                runOnUiThread { handleWakeWordEngineFailure(message) }
+            }
+        )
 
         loadStoredState()
         ensureDefaultWakeWordSetup()
@@ -1125,12 +1131,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     binding.learningLessonPreview.text =
                         getString(R.string.learning_lesson_preview_title, lesson.optString("language").ifBlank { "Language" }, title) +
                             "\n\n" + body
-                    val spokenBody = body.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
-                    val spokenReply = if (spokenBody.isBlank()) {
-                        getString(R.string.learning_lesson_spoken_title_only, title)
-                    } else {
-                        getString(R.string.learning_lesson_spoken_intro, title, spokenBody.take(260))
-                    }
+                    val spokenReply = buildSpokenLesson(title, body)
                     binding.conversationStatus.text = spokenReply
                     binding.lastReplyValue.text = spokenReply
                     speakDex(spokenReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
@@ -1172,12 +1173,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     }
                     binding.learningQuizPreview.text = lines.joinToString("\n")
                     val quizTitle = quiz.optString("title").ifBlank { "Quiz" }
-                    val firstQuestion = questions?.optJSONObject(0)?.optString("question").orEmpty()
-                    val spokenReply = if (firstQuestion.isBlank()) {
-                        getString(R.string.learning_quiz_spoken_title_only, quizTitle)
-                    } else {
-                        getString(R.string.learning_quiz_spoken_intro, quizTitle, firstQuestion)
-                    }
+                    val spokenReply = buildSpokenQuiz(quizTitle, questions)
                     binding.conversationStatus.text = spokenReply
                     binding.lastReplyValue.text = spokenReply
                     speakDex(spokenReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
@@ -1185,6 +1181,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }.onFailure {
                 binding.learningQuizPreview.text = getString(R.string.learning_quiz_failed)
             }
+        }
+    }
+
+    private fun buildSpokenLesson(title: String, body: String): String {
+        val cleaned = body
+            .replace("**", "")
+            .replace(Regex("[“”]"), "\"")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        if (cleaned.isBlank()) {
+            return getString(R.string.learning_lesson_spoken_title_only, title)
+        }
+        val intro = "Today's lesson is $title."
+        val bodySnippet = cleaned.take(700)
+        return "$intro $bodySnippet"
+    }
+
+    private fun buildSpokenQuiz(title: String, questions: JSONArray?): String {
+        val firstQuestion = questions?.optJSONObject(0)?.optString("question").orEmpty()
+        val secondQuestion = questions?.optJSONObject(1)?.optString("question").orEmpty()
+        return when {
+            firstQuestion.isBlank() -> getString(R.string.learning_quiz_spoken_title_only, title)
+            secondQuestion.isBlank() -> "I built a quiz based on your lesson. $title. First question: $firstQuestion"
+            else -> "I built a quiz based on your lesson. $title. First question: $firstQuestion Second question: $secondQuestion"
         }
     }
 
@@ -2685,6 +2705,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             R.string.voice_speaking,
             resumeWakeModeAfterSpeech = false
         )
+    }
+
+    private fun handleWakeWordEngineFailure(message: String?) {
+        wakeWordEngineActive = false
+        if (wakeModeEnabled) {
+            binding.conversationStatus.text = message?.takeIf { it.isNotBlank() }
+                ?: getString(R.string.wake_engine_start_failed)
+            scheduleWakeListeningRestart(1200)
+        } else {
+            refreshVoiceStatus()
+        }
     }
 
     private fun handleAssistantEntryIntent(intent: Intent?) {

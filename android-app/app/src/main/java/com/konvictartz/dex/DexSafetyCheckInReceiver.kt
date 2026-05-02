@@ -12,5 +12,11 @@ class DexSafetyCheckInReceiver : BroadcastReceiver() {
             ?: context.getString(R.string.safety_check_in_text)
 
         DexSafetyCheckInScheduler.showCheckInNotification(context, title, text)
+        val serviceIntent = Intent(context, DexForegroundService::class.java).apply {
+            action = DexForegroundService.ACTION_SAFETY_CHECK_IN
+            putExtra(DexSafetyCheckInScheduler.EXTRA_TITLE, title)
+            putExtra(DexSafetyCheckInScheduler.EXTRA_TEXT, text)
+        }
+        androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent)
     }
 }
