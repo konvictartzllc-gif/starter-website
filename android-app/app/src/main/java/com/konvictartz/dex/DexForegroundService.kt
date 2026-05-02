@@ -192,11 +192,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleCallStateChanged(state: Int, phoneNumber: String?) {
         val rawNumber = phoneNumber?.trim().orEmpty()
-        val contactName = rawNumber.takeIf { it.isNotBlank() }?.let { lookupContactName(it) }
         val resolvedCaller = resolveCallerLabel(phoneNumber)
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-        val autoAnswerKnownContacts = prefs.getBoolean(MainActivity.KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
-        val autoAnswerAnyNonSpam = prefs.getBoolean(MainActivity.KEY_AUTO_ANSWER_ANY_NON_SPAM, false)
         val autoDeclineSpam = prefs.getBoolean(MainActivity.KEY_AUTO_DECLINE_SPAM, true)
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
@@ -206,16 +203,6 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     postCallEvent("declined", resolvedCaller)
                     declineRingingCall()
                     speakShortStatus(getString(R.string.call_spam_blocked))
-                } else if (autoAnswerKnownContacts && !contactName.isNullOrBlank()) {
-                    postCallEvent("incoming", resolvedCaller)
-                    answerRingingCall()
-                    currentCallWasAnswered = true
-                    speakShortStatus(getString(R.string.call_auto_answered_known_contact, resolvedCaller))
-                } else if (autoAnswerAnyNonSpam) {
-                    postCallEvent("incoming", resolvedCaller)
-                    answerRingingCall()
-                    currentCallWasAnswered = true
-                    speakShortStatus(getString(R.string.call_answered))
                 } else {
                     postCallEvent("incoming", resolvedCaller)
                     showIncomingCallNotification(resolvedCaller)
