@@ -62,11 +62,14 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         manager.notify(NOTIFICATION_ID, buildNotification())
         when (intent?.action) {
             ACTION_ANNOUNCE_SMS -> handleIncomingSms(intent)
+            ACTION_ANNOUNCE_NOTIFICATION -> handleIncomingNotification(intent)
             ACTION_CALL_ANSWER -> handleCallAnswerAction()
             ACTION_CALL_DECLINE -> handleCallDeclineAction()
             ACTION_SMS_READ -> handleSmsReadAction()
             ACTION_SMS_IGNORE -> handleSmsIgnoreAction()
             ACTION_SMS_REPLY -> handleSmsReplyAction(intent)
+            ACTION_NOTIFICATION_READ -> handleNotificationReadAction()
+            ACTION_NOTIFICATION_IGNORE -> handleNotificationIgnoreAction()
         }
         startCallMonitoringIfReady()
         return START_STICKY
@@ -295,6 +298,28 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         speakShortStatus(getString(R.string.incoming_sms_prompt, sender))
     }
 
+    private fun handleIncomingNotification(intent: Intent) {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(MainActivity.KEY_APP_IN_FOREGROUND, false)) return
+        val hasToken = !prefs.getString(MainActivity.KEY_TOKEN, null).isNullOrBlank()
+        val notificationsEnabled = prefs.getBoolean(MainActivity.KEY_NOTIFICATIONS_ENABLED, false)
+        if (!hasToken || !notificationsEnabled) return
+
+        val appName = intent.getStringExtra(EXTRA_NOTIFICATION_APP).orEmpty().trim()
+        val title = intent.getStringExtra(EXTRA_NOTIFICATION_TITLE).orEmpty().trim()
+        val body = intent.getStringExtra(EXTRA_NOTIFICATION_TEXT).orEmpty().trim()
+        if (appName.isBlank() || body.isBlank()) return
+
+        prefs.edit()
+            .putString(MainActivity.KEY_PENDING_NOTIFICATION_APP, appName)
+            .putString(MainActivity.KEY_PENDING_NOTIFICATION_TITLE, title)
+            .putString(MainActivity.KEY_PENDING_NOTIFICATION_TEXT, body)
+            .apply()
+
+        showIncomingNotificationPrompt(appName, body)
+        speakShortStatus(getString(R.string.notification_prompt, appName))
+    }
+
     @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     private fun answerRingingCall() {
@@ -378,6 +403,20 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }.onFailure {
             speakShortStatus(getString(R.string.sms_send_failed, sender))
         }
+    }
+
+    private fun handleNotificationReadAction() {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val appName = prefs.getString(MainActivity.KEY_PENDING_NOTIFICATION_APP, null)
+        val body = prefs.getString(MainActivity.KEY_PENDING_NOTIFICATION_TEXT, null)
+        if (!appName.isNullOrBlank() && !body.isNullOrBlank()) {
+            speakShortStatus(getString(R.string.notification_readback, appName, body))
+        }
+    }
+
+    private fun handleNotificationIgnoreAction() {
+        clearPendingNotification()
+        dismissNotification(NOTIFICATION_PROMPT_ID)
     }
 
     private fun showIncomingCallNotification(caller: String) {
@@ -467,12 +506,58 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         manager.notify(SMS_NOTIFICATION_ID, notification)
     }
 
+    private fun showIncomingNotificationPrompt(appName: String, body: String) {
+        val openAppIntent = PendingIntent.getActivity(
+            this,
+            300,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val readIntent = PendingIntent.getService(
+            this,
+            301,
+            Intent(this, DexForegroundService::class.java).apply { action = ACTION_NOTIFICATION_READ },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val ignoreIntent = PendingIntent.getService(
+            this,
+            302,
+            Intent(this, DexForegroundService::class.java).apply { action = ACTION_NOTIFICATION_IGNORE },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, ACTION_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(getString(R.string.notification_prompt_title, appName))
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent)
+            .addAction(0, getString(R.string.notification_read_action), readIntent)
+            .addAction(0, getString(R.string.notification_ignore_action), ignoreIntent)
+            .build()
+
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_PROMPT_ID, notification)
+    }
+
     private fun clearPendingIncomingSms() {
         getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER)
             .remove(MainActivity.KEY_PENDING_INCOMING_SMS_VALUE)
             .remove(MainActivity.KEY_PENDING_INCOMING_SMS_BODY)
+            .apply()
+    }
+
+    private fun clearPendingNotification() {
+        getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(MainActivity.KEY_PENDING_NOTIFICATION_APP)
+            .remove(MainActivity.KEY_PENDING_NOTIFICATION_TITLE)
+            .remove(MainActivity.KEY_PENDING_NOTIFICATION_TEXT)
             .apply()
     }
 
@@ -532,14 +617,21 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         private const val NOTIFICATION_ID = 4107
         private const val CALL_NOTIFICATION_ID = 4108
         private const val SMS_NOTIFICATION_ID = 4109
+        private const val NOTIFICATION_PROMPT_ID = 4110
         const val ACTION_ANNOUNCE_SMS = "com.konvictartz.dex.action.ANNOUNCE_SMS"
+        const val ACTION_ANNOUNCE_NOTIFICATION = "com.konvictartz.dex.action.ANNOUNCE_NOTIFICATION"
         const val ACTION_CALL_ANSWER = "com.konvictartz.dex.action.CALL_ANSWER"
         const val ACTION_CALL_DECLINE = "com.konvictartz.dex.action.CALL_DECLINE"
         const val ACTION_SMS_READ = "com.konvictartz.dex.action.SMS_READ"
         const val ACTION_SMS_IGNORE = "com.konvictartz.dex.action.SMS_IGNORE"
         const val ACTION_SMS_REPLY = "com.konvictartz.dex.action.SMS_REPLY"
+        const val ACTION_NOTIFICATION_READ = "com.konvictartz.dex.action.NOTIFICATION_READ"
+        const val ACTION_NOTIFICATION_IGNORE = "com.konvictartz.dex.action.NOTIFICATION_IGNORE"
         const val EXTRA_SMS_SENDER = "extra_sms_sender"
         const val EXTRA_SMS_BODY = "extra_sms_body"
+        const val EXTRA_NOTIFICATION_APP = "extra_notification_app"
+        const val EXTRA_NOTIFICATION_TITLE = "extra_notification_title"
+        const val EXTRA_NOTIFICATION_TEXT = "extra_notification_text"
         const val KEY_REMOTE_REPLY_TEXT = "dex_remote_reply_text"
     }
 }

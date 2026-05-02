@@ -17,6 +17,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.provider.ContactsContract
 import android.provider.ContactsContract.Intents.Insert
+import android.provider.MediaStore
 import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -155,6 +156,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingIncomingSmsSender: String? = null
     private var pendingIncomingSmsValue: String? = null
     private var pendingIncomingSmsBody: String? = null
+    private var pendingNotificationApp: String? = null
+    private var pendingNotificationTitle: String? = null
+    private var pendingNotificationText: String? = null
     private var currentThemePreset: String = THEME_STUDIO
     private var currentAccentColor: String = DEFAULT_ACCENT_COLOR
     private var currentBackgroundColor: String = DEFAULT_BACKGROUND_COLOR
@@ -263,6 +267,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             fetchCurrentUserProfile()
             fetchPermissions()
             fetchLearningReminderPreferences()
+            fetchSafetyPreferences()
             fetchRelationshipAliases()
         }
     }
@@ -275,6 +280,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         autoStartWakeModeIfReady()
         if (!authToken.isNullOrBlank()) {
             fetchLearningReminderPreferences()
+            fetchSafetyPreferences()
             fetchRelationshipAliases()
         }
     }
@@ -454,6 +460,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.requestAndroidPermissionsButton.setOnClickListener {
             requestAndroidPermissions()
         }
+        binding.openAppSettingsButton.setOnClickListener {
+            openAppSettings()
+        }
+        binding.openBatterySettingsButton.setOnClickListener {
+            openBatterySettings()
+        }
+        binding.openNotificationSettingsButton.setOnClickListener {
+            openNotificationSettings()
+        }
+        binding.openNotificationAccessButton.setOnClickListener {
+            openNotificationAccessSettings()
+        }
 
         binding.testVoiceButton.setOnClickListener {
             speakDex(getString(R.string.voice_test_phrase))
@@ -526,6 +544,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         binding.saveLearningProfileButton.setOnClickListener {
             saveLearningProfile()
+        }
+
+        binding.saveSafetyProfileButton.setOnClickListener {
+            saveSafetyProfile()
+        }
+        binding.testSafetyCheckInButton.setOnClickListener {
+            testSafetyCheckIn()
+        }
+        binding.previewEmergencyPlanButton.setOnClickListener {
+            previewEmergencyPlan()
         }
 
         binding.getDailyLessonButton.setOnClickListener {
@@ -673,6 +701,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingIncomingSmsSender = prefs.getString(KEY_PENDING_INCOMING_SMS_SENDER, null)
         pendingIncomingSmsValue = prefs.getString(KEY_PENDING_INCOMING_SMS_VALUE, null)
         pendingIncomingSmsBody = prefs.getString(KEY_PENDING_INCOMING_SMS_BODY, null)
+        pendingNotificationApp = prefs.getString(KEY_PENDING_NOTIFICATION_APP, null)
+        pendingNotificationTitle = prefs.getString(KEY_PENDING_NOTIFICATION_TITLE, null)
+        pendingNotificationText = prefs.getString(KEY_PENDING_NOTIFICATION_TEXT, null)
         binding.homeTitleInput.setText(prefs.getString(KEY_HOME_TITLE, ""))
         binding.homeSubtitleInput.setText(prefs.getString(KEY_HOME_SUBTITLE, ""))
         currentBackgroundImageUri = prefs.getString(KEY_HOME_BACKGROUND_URI, null)
@@ -720,6 +751,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         refreshLoggedInState()
         fetchCurrentUserProfile()
         fetchPermissions()
+        fetchLearningReminderPreferences()
+        fetchSafetyPreferences()
+        fetchRelationshipAliases()
         maintainBackgroundService()
     }
 
@@ -729,6 +763,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentUserName = ""
         currentAccessType = ""
         phoneBackendEnabled = false
+        pendingAction = null
+        pendingContactTarget = null
+        pendingContactAction = null
+        pendingSmsRecipient = null
+        pendingSmsBodyDraft = null
+        pendingIncomingSmsSender = null
+        pendingIncomingSmsValue = null
+        pendingIncomingSmsBody = null
+        pendingNotificationApp = null
+        pendingNotificationTitle = null
+        pendingNotificationText = null
+        conversationActive = false
+        awaitingWakeCommand = false
+        mainHandler.removeCallbacks(resetWakeWindowRunnable)
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_TOKEN)
@@ -740,11 +788,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putBoolean(KEY_BACKGROUND_SERVICE_ENABLED, false)
             .putBoolean(KEY_AUTO_START_ASSISTANT, false)
             .putBoolean(KEY_PHONE_BACKEND_ENABLED, false)
-            .putBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
-            .putBoolean(KEY_AUTO_ANSWER_ANY_NON_SPAM, false)
-            .putBoolean(KEY_AUTO_DECLINE_SPAM, true)
-            .commit()
+              .putBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
+              .putBoolean(KEY_AUTO_ANSWER_ANY_NON_SPAM, false)
+              .putBoolean(KEY_AUTO_DECLINE_SPAM, true)
+              .commit()
+        clearPendingNotification()
         binding.authMessage.text = getString(R.string.logged_out_message)
+        binding.lastHeardValue.text = getString(R.string.voice_dash)
+        binding.lastReplyValue.text = getString(R.string.voice_dash)
+        binding.conversationStatus.text = getString(R.string.wake_mode_off)
+        binding.safetyProfileMessage.text = ""
+        binding.learningLessonPreview.text = ""
+        binding.learningQuizPreview.text = ""
+        updatePendingActionUi()
         DexLearningReminderScheduler.cancelReminder(this)
         stopDexBackgroundService()
         refreshLoggedInState()
@@ -758,6 +814,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.userDashboardCard.visibility =
             if (loggedIn && (currentUserRole == "user" || currentUserRole == "affiliate" || currentUserRole == "admin")) View.VISIBLE else View.GONE
         binding.learningCenterCard.visibility =
+            if (loggedIn && (currentUserRole == "user" || currentUserRole == "affiliate" || currentUserRole == "admin")) View.VISIBLE else View.GONE
+        binding.safetyProfileCard.visibility =
             if (loggedIn && (currentUserRole == "user" || currentUserRole == "affiliate" || currentUserRole == "admin")) View.VISIBLE else View.GONE
         binding.lifeSectionsCard.visibility =
             if (loggedIn && (currentUserRole == "user" || currentUserRole == "affiliate" || currentUserRole == "admin")) View.VISIBLE else View.GONE
@@ -780,6 +838,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.autoAnswerAnyCallerSwitch.isEnabled = loggedIn
         binding.autoDeclineSpamSwitch.isEnabled = loggedIn
         binding.authMessage.text = if (loggedIn) getString(R.string.connected_as, binding.emailInput.text?.toString().orEmpty()) else getString(R.string.logged_out_message)
+        if (loggedIn) {
+            binding.statusTitle.text = getString(R.string.dex_home_title)
+            binding.statusSummary.text = getString(R.string.dex_home_summary)
+        } else {
+            binding.statusTitle.text = getString(R.string.dex_ready_title)
+            binding.statusSummary.text = getString(R.string.dex_ready_summary)
+        }
         updateDashboardHeader()
         if (!loggedIn) {
             applyPermissions(emptyMap())
@@ -938,6 +1003,70 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 fetchDashboardData()
             }
         }
+    }
+
+    private fun saveSafetyProfile() {
+        val token = authToken ?: return
+        val serverUrl = currentServerUrl()
+        val updates = listOf(
+            "emergency_contact" to binding.safetyContactInput.text?.toString()?.trim().orEmpty(),
+            "comfort_style" to binding.safetyComfortInput.text?.toString()?.trim().orEmpty(),
+            "grounding_preference" to binding.safetyGroundingInput.text?.toString()?.trim().orEmpty(),
+            "emergency_contact_permission" to if (binding.safetyNotifyTrustedContactSwitch.isChecked) "1" else "0",
+            "safety_follow_up_opt_in" to if (binding.safetyFollowUpSwitch.isChecked) "1" else "0",
+        )
+        lifecycleScope.launch {
+            var failed = false
+            updates.forEach { (key, value) ->
+                val result = postJson(
+                    "$serverUrl/dex/preferences",
+                    JSONObject().apply {
+                        put("key", key)
+                        put("value", value)
+                    },
+                    token
+                )
+                if (result.isFailure) failed = true
+            }
+            binding.safetyProfileMessage.text =
+                if (failed) getString(R.string.safety_profile_failed) else getString(R.string.safety_profile_saved)
+            if (!failed) fetchSafetyPreferences()
+        }
+    }
+
+    private fun testSafetyCheckIn() {
+        val reply = getString(R.string.safety_check_in_scheduled)
+        DexSafetyCheckInScheduler.scheduleOneTimeCheckIn(
+            context = this,
+            delayMinutes = 1,
+            title = getString(R.string.safety_check_in_title),
+            text = getString(R.string.safety_check_in_text)
+        )
+        binding.safetyProfileMessage.text = reply
+        binding.lastReplyValue.text = reply
+        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
+    }
+
+    private fun previewEmergencyPlan() {
+        val contact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
+        val contactAlerts = if (binding.safetyNotifyTrustedContactSwitch.isChecked) {
+            getString(R.string.safety_preview_enabled)
+        } else {
+            getString(R.string.safety_preview_disabled)
+        }
+        val followUps = if (binding.safetyFollowUpSwitch.isChecked) {
+            getString(R.string.safety_preview_enabled)
+        } else {
+            getString(R.string.safety_preview_disabled)
+        }
+        val reply = if (contact.isNotBlank()) {
+            getString(R.string.safety_emergency_preview_with_contact, contact, contactAlerts, followUps)
+        } else {
+            getString(R.string.safety_emergency_preview_without_contact, contactAlerts, followUps)
+        }
+        binding.safetyProfileMessage.text = reply
+        binding.lastReplyValue.text = reply
+        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
     }
 
     private fun requestDailyLesson() {
@@ -1431,6 +1560,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.dashboardCard,
                 binding.userDashboardCard,
                 binding.learningCenterCard,
+                binding.safetyProfileCard,
+                binding.lifeSectionsCard,
+                binding.billingCard,
                 binding.affiliateDashboardCard,
                 binding.adminDashboardCard,
                 binding.themeCard,
@@ -1559,7 +1691,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val email = binding.emailInput.text?.toString()?.trim().orEmpty()
         val password = binding.passwordInput.text?.toString().orEmpty()
         if (email.isBlank() || password.isBlank()) {
-            binding.authMessage.text = "Email and password are required."
+            binding.authMessage.text = getString(R.string.auth_email_password_required)
             return
         }
         runAuthRequest("/auth/login", JSONObject().apply {
@@ -1574,7 +1706,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val password = binding.passwordInput.text?.toString().orEmpty()
         val affiliateInviteCode = binding.affiliateInviteInput.text?.toString()?.trim().orEmpty()
         if (email.isBlank() || password.isBlank()) {
-            binding.authMessage.text = "Email and password are required."
+            binding.authMessage.text = getString(R.string.auth_email_password_required)
             return
         }
         runAuthRequest("/auth/register", JSONObject().apply {
@@ -1588,7 +1720,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun runAuthRequest(path: String, payload: JSONObject) {
         val serverUrl = currentServerUrl()
         if (serverUrl.isBlank()) {
-            binding.authMessage.text = "Add your backend API URL first."
+            binding.authMessage.text = getString(R.string.auth_backend_required)
             return
         }
         saveServerUrl(serverUrl)
@@ -1602,13 +1734,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 val email = user?.optString("email").orEmpty().ifBlank { binding.emailInput.text?.toString().orEmpty() }
                 currentTrialDaysLeft = if (user?.has("trialDaysLeft") == true) user.optInt("trialDaysLeft") else null
                 if (token.isBlank()) {
-                    binding.authMessage.text = "Dex did not return a login token."
+                    binding.authMessage.text = getString(R.string.auth_token_missing)
                     return@onSuccess
                 }
                 saveSession(token, email, user)
                 binding.authMessage.text = getString(R.string.connected_as, email)
             }.onFailure { error ->
-                binding.authMessage.text = error.message ?: "Dex sign-in failed."
+                binding.authMessage.text = error.message ?: getString(R.string.auth_sign_in_failed)
             }
         }
     }
@@ -1721,6 +1853,45 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun fetchSafetyPreferences() {
+        val token = authToken ?: return
+        val serverUrl = currentServerUrl()
+        lifecycleScope.launch {
+            val result = getJson("$serverUrl/dex/preferences", token)
+            result.onSuccess { response ->
+                val preferences = response.optJSONObject("preferences") ?: JSONObject()
+                val emergencyContact = preferences.optString("emergency_contact")
+                val comfortStyle = preferences.optString("comfort_style").ifBlank { "calm" }
+                val groundingPreference = preferences.optString("grounding_preference").ifBlank { "gentle" }
+                val contactPermission = preferences.optString("emergency_contact_permission") == "1"
+                val followUp = preferences.optString("safety_follow_up_opt_in") == "1"
+
+                binding.safetyContactInput.setText(emergencyContact)
+                binding.safetyComfortInput.setText(comfortStyle)
+                binding.safetyGroundingInput.setText(groundingPreference)
+                binding.safetyNotifyTrustedContactSwitch.isChecked = contactPermission
+                binding.safetyFollowUpSwitch.isChecked = followUp
+                binding.safetyProfileSummary.text =
+                    if (emergencyContact.isBlank()) {
+                        getString(R.string.safety_profile_default)
+                    } else {
+                        getString(
+                            R.string.safety_profile_loaded,
+                            comfortStyle.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() },
+                            groundingPreference.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() },
+                            emergencyContact
+                        )
+                    }
+                binding.safetyProfileMessage.text =
+                    if (contactPermission) getString(R.string.safety_notify_contact)
+                    else getString(R.string.safety_contact_none)
+            }.onFailure {
+                binding.safetyProfileSummary.text = getString(R.string.safety_profile_default)
+                binding.safetyProfileMessage.text = getString(R.string.safety_contact_none)
+            }
+        }
+    }
+
     private fun fetchRelationshipAliases() {
         val token = authToken ?: return
         val serverUrl = currentServerUrl()
@@ -1818,6 +1989,47 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 permissionLauncher.launch(permissions.toTypedArray())
             }
             .show()
+    }
+
+    private fun openAppSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
+        openSettingsIntent(intent)
+    }
+
+    private fun openBatterySettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+        } else {
+            Intent(Settings.ACTION_SETTINGS)
+        }
+        openSettingsIntent(intent)
+    }
+
+    private fun openNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+            }
+        }
+        openSettingsIntent(intent)
+    }
+
+    private fun openNotificationAccessSettings() {
+        openSettingsIntent(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+    }
+
+    private fun openSettingsIntent(intent: Intent) {
+        runCatching {
+            startActivity(intent)
+        }.onFailure {
+            binding.backgroundAccessMessage.text = getString(R.string.background_settings_open_failed)
+        }
     }
 
     private fun hasNotificationPermissionForReminder(): Boolean {
@@ -2402,6 +2614,142 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return false
     }
 
+    private data class AppLaunchTarget(
+        val label: String,
+        val packages: List<String> = emptyList(),
+        val actionIntent: Intent? = null,
+        val webUri: Uri? = null
+    )
+
+    private fun openKnownApp(target: AppLaunchTarget): Boolean {
+        val packageManager = packageManager
+        val launchIntent =
+            target.packages
+                .asSequence()
+                .mapNotNull { packageManager.getLaunchIntentForPackage(it) }
+                .firstOrNull()
+                ?.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                ?: target.actionIntent?.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                ?: target.webUri?.let { Intent(Intent.ACTION_VIEW, it).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+
+        return if (launchIntent != null) {
+            try {
+                startActivity(launchIntent)
+                val reply = getString(R.string.app_opened, target.label)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                true
+            } catch (_: Exception) {
+                val reply = getString(R.string.action_open_failed)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                true
+            }
+        } else {
+            val reply = getString(R.string.app_not_available, target.label)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            true
+        }
+    }
+
+    private fun handleAppLaunchIntent(message: String): Boolean {
+        val trimmed = message.trim()
+        val normalized = trimmed.lowercase(Locale.US)
+        val launchPattern =
+            Regex(
+                "^(?:open|launch|start|pull up|take me to|show me|bring up)\\s+(?:my\\s+)?(.+?)$",
+                RegexOption.IGNORE_CASE
+            )
+        val rawTarget =
+            launchPattern.find(trimmed)?.groupValues?.getOrNull(1)?.trim()
+                ?: return false
+        val target = rawTarget
+            .replace(Regex("^the\\s+", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s+app$", RegexOption.IGNORE_CASE), "")
+            .trim()
+            .lowercase(Locale.US)
+        if (target.isBlank()) return false
+
+        fun app(label: String, vararg packages: String) =
+            AppLaunchTarget(label = label, packages = packages.toList())
+
+        val knownTarget = when {
+            target.contains("gmail") || target == "email" || target == "mail" ->
+                app("Gmail", "com.google.android.gm")
+            target.contains("facebook messenger") || target == "messenger" ->
+                app("Messenger", "com.facebook.orca")
+            target.contains("facebook") ->
+                app("Facebook", "com.facebook.katana", "com.facebook.lite")
+            target.contains("instagram") ->
+                app("Instagram", "com.instagram.android")
+            target.contains("tiktok") ->
+                app("TikTok", "com.zhiliaoapp.musically")
+            target.contains("spotify") ->
+                app("Spotify", "com.spotify.music")
+            target.contains("youtube music") ->
+                app("YouTube Music", "com.google.android.apps.youtube.music")
+            target == "youtube" ->
+                app("YouTube", "com.google.android.youtube")
+            target.contains("maps") || target == "map" || target.contains("google maps") ->
+                app("Google Maps", "com.google.android.apps.maps")
+            target.contains("calendar") ->
+                app("Calendar", "com.google.android.calendar", "com.samsung.android.calendar")
+            target.contains("camera") ->
+                AppLaunchTarget(label = "Camera", actionIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
+            target.contains("calculator") || target == "calc" ->
+                app("Calculator", "com.google.android.calculator", "com.sec.android.app.popupcalculator")
+            target.contains("settings") ->
+                AppLaunchTarget(label = "Settings", actionIntent = Intent(Settings.ACTION_SETTINGS))
+            target.contains("chrome") ->
+                app("Chrome", "com.android.chrome")
+            target.contains("browser") ->
+                AppLaunchTarget(label = "Browser", actionIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")))
+            target.contains("photos") || target.contains("google photos") ->
+                app("Google Photos", "com.google.android.apps.photos")
+            target.contains("gallery") ->
+                app("Gallery", "com.sec.android.gallery3d")
+            target.contains("messages") || target == "message" || target == "texts" ->
+                app("Messages", "com.google.android.apps.messaging", "com.samsung.android.messaging")
+            target.contains("phone") || target.contains("dialer") ->
+                AppLaunchTarget(label = "Phone", actionIntent = Intent(Intent.ACTION_DIAL))
+            target.contains("contacts") ->
+                AppLaunchTarget(
+                    label = "Contacts",
+                    actionIntent = Intent(Intent.ACTION_VIEW).apply {
+                        type = ContactsContract.Contacts.CONTENT_TYPE
+                    }
+                )
+            target.contains("clock") || target.contains("alarm") ->
+                app("Clock", "com.google.android.deskclock", "com.sec.android.app.clockpackage")
+            target.contains("notes") || target.contains("samsung notes") ->
+                app("Notes", "com.samsung.android.app.notes")
+            else -> null
+        }
+
+        if (knownTarget != null) return openKnownApp(knownTarget)
+
+        if (
+            normalized.startsWith("open ") ||
+                normalized.startsWith("launch ") ||
+                normalized.startsWith("pull up ") ||
+                normalized.startsWith("take me to ")
+        ) {
+            val reply = getString(R.string.app_not_available, rawTarget.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString()
+            })
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return true
+        }
+
+        return false
+    }
+
     private fun handleSpeakerIntent(normalized: String): Boolean {
         val speakerRequest =
             normalized.contains("put it on speaker") ||
@@ -2479,6 +2827,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val normalized = message.trim().lowercase(Locale.US)
         if (normalized.isBlank()) return false
 
+        consumePendingNotification(normalized)?.let { actionTaken ->
+            if (actionTaken) return true
+        }
+
         consumePendingIncomingSms(normalized)?.let { actionTaken ->
             if (actionTaken) return true
         }
@@ -2500,9 +2852,31 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         if (
+            normalized.contains("read my notifications") ||
+                normalized.contains("read my notification") ||
+                normalized.contains("what notifications do i have") ||
+                normalized.contains("what notification do i have") ||
+                normalized.contains("read my alerts")
+        ) {
+            val app = pendingNotificationApp
+                ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_APP, null)
+            val text = pendingNotificationText
+                ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_TEXT, null)
+            val reply = if (!app.isNullOrBlank() && !text.isNullOrBlank()) {
+                getString(R.string.notification_readback, app, text)
+            } else {
+                getString(R.string.notification_none)
+            }
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return true
+        }
+
+        if (
             normalized.contains("what is on my calendar") ||
-            normalized.contains("what's on my calendar") ||
-            normalized.contains("what do i have today") ||
+                normalized.contains("what's on my calendar") ||
+                normalized.contains("what do i have today") ||
             normalized.contains("what do i have tomorrow") ||
             normalized.contains("my schedule today") ||
             normalized.contains("my schedule tomorrow")
@@ -2522,6 +2896,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         if (handleMediaIntent(message)) return true
+
+        if (handleAppLaunchIntent(message)) return true
 
         if (handleSpeakerIntent(normalized)) return true
 
@@ -2647,6 +3023,40 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun consumePendingNotification(normalized: String): Boolean? {
+        val app = pendingNotificationApp
+            ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_APP, null)
+        val text = pendingNotificationText
+            ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_TEXT, null)
+        if (app.isNullOrBlank() || text.isNullOrBlank()) return null
+
+        return when {
+            normalized == "read it" ||
+                normalized == "read the notification" ||
+                normalized == "read that notification" ||
+                normalized == "yes read it" -> {
+                val reply = getString(R.string.notification_readback, app, text)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                true
+            }
+            normalized == "ignore it" ||
+                normalized == "ignore the notification" ||
+                normalized == "ignore that" ||
+                normalized == "no" ||
+                normalized == "cancel" -> {
+                val reply = getString(R.string.notification_ignored)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                clearPendingNotification()
+                true
+            }
+            else -> null
+        }
+    }
+
     private fun clearPendingIncomingSms() {
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
@@ -2656,6 +3066,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .remove(KEY_PENDING_INCOMING_SMS_SENDER)
             .remove(KEY_PENDING_INCOMING_SMS_VALUE)
             .remove(KEY_PENDING_INCOMING_SMS_BODY)
+            .apply()
+    }
+
+    private fun clearPendingNotification() {
+        pendingNotificationApp = null
+        pendingNotificationTitle = null
+        pendingNotificationText = null
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_PENDING_NOTIFICATION_APP)
+            .remove(KEY_PENDING_NOTIFICATION_TITLE)
+            .remove(KEY_PENDING_NOTIFICATION_TEXT)
             .apply()
     }
 
@@ -2845,6 +3267,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val result = postJson("$serverUrl/dex/chat", JSONObject().apply { put("message", message) }, token)
             result.onSuccess { response ->
                 val reply = response.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
+                maybeScheduleSafetyCheckIn(response)
                 binding.lastReplyValue.text = reply
                 binding.conversationStatus.text = getString(R.string.wake_mode_replying)
                 conversationActive = true
@@ -2859,6 +3282,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 speakDex(fallback, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
             }
         }
+    }
+
+    private fun maybeScheduleSafetyCheckIn(response: JSONObject) {
+        if (!response.optBoolean("followUpSuggested", false)) return
+        val delayMinutes = response.optInt("followUpDelayMinutes", 15).coerceAtLeast(1)
+        val title = response.optString("followUpTitle").ifBlank { getString(R.string.safety_check_in_title) }
+        val text = response.optString("followUpMessage").ifBlank { getString(R.string.safety_check_in_text) }
+        DexSafetyCheckInScheduler.scheduleOneTimeCheckIn(
+            context = this,
+            delayMinutes = delayMinutes,
+            title = title,
+            text = text
+        )
     }
 
     private fun buildSmsDraft(message: String): PendingAction? {
@@ -3865,6 +4301,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_PENDING_INCOMING_SMS_SENDER = "pending_incoming_sms_sender"
         const val KEY_PENDING_INCOMING_SMS_VALUE = "pending_incoming_sms_value"
         const val KEY_PENDING_INCOMING_SMS_BODY = "pending_incoming_sms_body"
+        const val KEY_PENDING_NOTIFICATION_APP = "pending_notification_app"
+        const val KEY_PENDING_NOTIFICATION_TITLE = "pending_notification_title"
+        const val KEY_PENDING_NOTIFICATION_TEXT = "pending_notification_text"
         const val KEY_LEARNING_REMINDER_ENABLED = "learning_reminder_enabled"
         const val KEY_LEARNING_REMINDER_TIME = "learning_reminder_time"
         const val KEY_LEARNING_REMINDER_TITLE = "learning_reminder_title"

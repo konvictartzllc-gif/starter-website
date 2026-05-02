@@ -7,6 +7,9 @@ import { triggerEmergencyAlert, sendLowInventoryAlert, sendSms, makeCall } from 
 import { createEvent, listEvents } from "../services/calendar.js";
 import { verifyOta, spamFilter } from "../middleware/security.js";
 import { sendCustomEmail } from "../services/email.js";
+import { detectTone } from "../services/toneDetection.js";
+import { styleResponse } from "../services/responseStyler.js";
+import { buildSupportReply, detectSafetySignal } from "../services/safetySignals.js";
 const router = Router();
 
 const CHAT_MEMORY_RETENTION_DAYS = 3;
@@ -26,6 +29,9 @@ const FREE_SETTING_KEYS = new Set([
         "learning_subject",
         "daily_briefing_enabled",
         "daily_briefing_time",
+        "comfort_style",
+        "grounding_preference",
+        "safety_follow_up_opt_in",
 ]);
 
 async function ensureMemoryTable(db) {
@@ -1230,15 +1236,6 @@ function getOpenAI() {
     return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
-function detectEmergency(message) {
-        // Detect self-harm or harm to others
-        const selfHarm = /\b(suicide|kill myself|end it all|self[- ]?harm|hurt myself|don'?t want to live|want to die)\b/i;
-        const harmOthers = /\b(hurt|kill|attack|shoot|harm|injure) (someone|others|them|him|her|people|person|my (mom|dad|family|friend|boss|teacher))\b/i;
-        if (selfHarm.test(message)) return "self";
-        if (harmOthers.test(message)) return "others";
-        return null;
-}
-
 const DEX_SYSTEM_PROMPT = `You are Dex, a friendly and empathetic AI assistant for Konvict Artz. You help users with scheduling, questions, general support, and teaching. Be warm, concise, and helpful.
 
 When a user wants to learn something:
@@ -1303,38 +1300,59 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 });
                         }
 
-                        const emergencyType = detectEmergency(message);
-                        if (emergencyType) {
+                        const safetySignal = detectSafetySignal(message);
+                        if (safetySignal.level === "emergency") {
                                 const userInfo = `${user.name || "Unknown"} (${user.email})`;
                                 await triggerEmergencyAlert(userInfo, message);
                                 let reply = "";
-                                if (emergencyType === "self") {
+                                if (safetySignal.type === "self_harm") {
                                         reply = "Hey, I hear you and I want you to know you matter. I've just notified someone who can help right away. Please reach out to the 988 Suicide & Crisis Lifeline by calling or texting 988. You're not alone.";
-                                } else if (emergencyType === "others") {
+                                } else if (safetySignal.type === "harm_others") {
                                         reply = "I'm concerned by your message. I've notified support to help keep everyone safe. If you or someone else is in immediate danger, please call 911 or your local emergency number right away.";
                                 }
 
                                 // Escalate: notify trusted contact if permission granted
-                                let contactNotified = false;
+                                let trustedContactEnabled = false;
+                                let trustedContactConfigured = false;
                                 try {
                                         const memRows = await db.all("SELECT key, value FROM user_memory WHERE user_id = ?", [userId]);
                                         const memory = {};
                                         for (const row of memRows) memory[row.key] = row.value;
-                                        if (memory.emergency_contact_permission === "1" && memory.emergency_contact) {
-                                                // Simulate notification (future: send SMS/email/call)
-                                                // e.g., await sendSms(memory.emergency_contact, `Dex AI Emergency Alert for ${userInfo}: ${message}`);
-                                                contactNotified = true;
-                                        }
+                                        trustedContactEnabled = memory.emergency_contact_permission === "1";
+                                        trustedContactConfigured = Boolean(memory.emergency_contact);
                                 } catch {}
 
                                 return res.json({
-                                        reply: contactNotified
-                                                ? reply + " I've also notified your trusted emergency contact."
+                                        reply: trustedContactEnabled && trustedContactConfigured
+                                                ? reply + " Your trusted contact is on file for emergency support."
                                                 : reply,
                                         emergency: true,
-                                        emergencyType,
-                                        contactNotified,
+                                        emergencyType: safetySignal.type,
+                                        trustedContactEnabled,
+                                        trustedContactConfigured,
                                 });
+                        }
+
+                        if (safetySignal.level === "support" || safetySignal.level === "urgent_support") {
+                                const supportReply = buildSupportReply(safetySignal, learningPreferences);
+                                if (supportReply) {
+                                        const detectedTone = detectTone(message);
+                                        const styled = styleResponse(supportReply, detectedTone);
+                                        await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, styled.text]);
+                                        const followUpEnabled = learningPreferences.safety_follow_up_opt_in === "1";
+                                        const followUpDelayMinutes = safetySignal.level === "urgent_support" ? 10 : 20;
+                                        return res.json({
+                                                reply: styled.text,
+                                                support: true,
+                                                supportLevel: safetySignal.level,
+                                                supportType: safetySignal.type,
+                                                tone: styled.meta?.detectedTone || detectedTone || "neutral",
+                                                followUpSuggested: followUpEnabled,
+                                                followUpDelayMinutes,
+                                                followUpTitle: "Dex check-in",
+                                                followUpMessage: "Dex is checking in after a hard moment. If you want support, open Dex and tell me what you need right now.",
+                                        });
+                                }
                         }
 
               const history = await db.all(
@@ -1347,6 +1365,9 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                     "learning_focus",
                     "learning_style",
                     "conversation_tone",
+                    "comfort_style",
+                    "grounding_preference",
+                    "safety_follow_up_opt_in",
               ]);
               const learningContext = buildLearningContext(learningPreferences);
               await ensureRelationshipAliasesTable(db);

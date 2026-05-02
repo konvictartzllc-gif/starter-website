@@ -312,6 +312,55 @@ export default function Preferences() {
         </button>
       </div>
 
+      <div className="learning-section">
+        <h3>Emotions And Safety</h3>
+        <p>Tell Dex how you want support to feel when you are overwhelmed, sad, or in a hard moment. Emergency contact setup stays above.</p>
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: 12 }}>
+          <label>
+            <div>Comfort Style</div>
+            <select
+              value={preferences.comfort_style || ""}
+              onChange={(e) => setPreferences((prev) => ({ ...prev, comfort_style: e.target.value }))}
+            >
+              <option value="">Calm</option>
+              <option value="calm">Calm</option>
+              <option value="direct">Direct</option>
+              <option value="faith">Faith-centered</option>
+            </select>
+          </label>
+          <label>
+            <div>Grounding Preference</div>
+            <select
+              value={preferences.grounding_preference || ""}
+              onChange={(e) => setPreferences((prev) => ({ ...prev, grounding_preference: e.target.value }))}
+            >
+              <option value="">Gentle</option>
+              <option value="gentle">Gentle</option>
+              <option value="step_by_step">Step by step</option>
+            </select>
+          </label>
+        </div>
+        <label style={{ display: "block", marginBottom: 12 }}>
+          <input
+            type="checkbox"
+            checked={preferences.safety_follow_up_opt_in === "1"}
+            onChange={(e) => setPreferences((prev) => ({ ...prev, safety_follow_up_opt_in: e.target.checked ? "1" : "0" }))}
+          />
+          {" "}Let Dex keep checking in after a distress moment
+        </label>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={async () => {
+            await savePreference("comfort_style", preferences.comfort_style || "", "Safety preferences updated!");
+            await savePreference("grounding_preference", preferences.grounding_preference || "", "Safety preferences updated!");
+            await savePreference("safety_follow_up_opt_in", preferences.safety_follow_up_opt_in || "0", "Safety preferences updated!");
+          }}
+        >
+          {saving ? "Saving..." : "Save Safety Preferences"}
+        </button>
+      </div>
+
       <div className="voice-section">
         <h3>Dex Voice</h3>
         <p>Pick the voice Dex uses on this device. Voice names depend on your browser and phone.</p>
