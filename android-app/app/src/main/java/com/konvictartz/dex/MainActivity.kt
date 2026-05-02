@@ -280,6 +280,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         loadStoredState()
+        ensureDefaultWakeWordSetup()
         clearStaleBackgroundState()
         setupUi()
         updateAndroidPermissionStatus()
@@ -1677,6 +1678,23 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return normalizeServerUrl(rawValue)
     }
 
+    private fun ensureDefaultWakeWordSetup() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val currentModel = prefs.getString(KEY_VOSK_MODEL_ASSET, null).orEmpty().trim()
+        val currentPhrase = prefs.getString(KEY_VOSK_WAKE_PHRASE, null).orEmpty().trim()
+        val editor = prefs.edit()
+        var changed = false
+        if (currentModel.isBlank()) {
+            editor.putString(KEY_VOSK_MODEL_ASSET, DEFAULT_VOSK_MODEL_ASSET)
+            changed = true
+        }
+        if (currentPhrase.isBlank()) {
+            editor.putString(KEY_VOSK_WAKE_PHRASE, DEFAULT_VOSK_WAKE_PHRASE)
+            changed = true
+        }
+        if (changed) editor.apply()
+    }
+
     private fun isPrivateLanHost(host: String): Boolean {
         if (host.startsWith("192.168.") || host.startsWith("10.")) return true
         val match = Regex("^172\\.(\\d{1,2})\\.").find(host) ?: return false
@@ -2494,13 +2512,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun showWakeWordSetupDialog() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val currentModel = prefs.getString(KEY_VOSK_MODEL_ASSET, DEFAULT_VOSK_MODEL_ASSET).orEmpty()
+        val currentPhrase = prefs.getString(KEY_VOSK_WAKE_PHRASE, DEFAULT_VOSK_WAKE_PHRASE).orEmpty()
+
         val modelInput = EditText(this).apply {
             hint = getString(R.string.wake_engine_model_hint)
-            setText(prefs.getString(KEY_VOSK_MODEL_ASSET, "model-en-us").orEmpty())
+            setText(currentModel)
         }
         val phraseInput = EditText(this).apply {
             hint = getString(R.string.wake_engine_phrase_hint)
-            setText(prefs.getString(KEY_VOSK_WAKE_PHRASE, "hey dex").orEmpty())
+            setText(currentPhrase)
         }
 
         val container = LinearLayout(this).apply {
@@ -4520,6 +4541,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val EXTRA_ASSISTANT_SURFACE = "assistant_surface"
         const val EXTRA_ASSISTANT_CALLER = "assistant_caller"
         const val DEFAULT_SERVER_URL = "https://konvict-artz.onrender.com/api"
+        const val DEFAULT_VOSK_MODEL_ASSET = "model-en-us"
+        const val DEFAULT_VOSK_WAKE_PHRASE = "hey dex"
         const val ASSISTANT_SURFACE_CALL = "call"
         private const val DEFAULT_ACCENT_COLOR = "#69C6FF"
         private const val DEFAULT_BACKGROUND_COLOR = "#0F172A"
