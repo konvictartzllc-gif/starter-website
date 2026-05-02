@@ -46,6 +46,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var lastCaller = "Unknown caller"
     private var currentCallWasAnswered = false
     private var pendingSpeechText: String? = null
+    private var wakeWordEngine: DexWakeWordEngine? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     override fun onCreate() {
         super.onCreate()
@@ -54,7 +55,13 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
         telecomManager = getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
         textToSpeech = TextToSpeech(this, this)
+        wakeWordEngine = DexWakeWordEngine(
+            this,
+            onWakeWordDetected = { launchWakeAssistantSurface() },
+            onWakeWordError = { _ -> stopBackgroundWakeWordListening() }
+        )
         startCallMonitoringIfReady()
+        refreshWakeWordBackgroundState()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -73,11 +80,13 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ACTION_NOTIFICATION_IGNORE -> handleNotificationIgnoreAction()
         }
         startCallMonitoringIfReady()
+        refreshWakeWordBackgroundState()
         return START_STICKY
     }
 
     override fun onDestroy() {
         stopCallMonitoring()
+        stopBackgroundWakeWordListening()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         super.onDestroy()
@@ -165,6 +174,31 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)
     }
 
+    private fun shouldRunBackgroundWakeWord(): Boolean {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val hasToken = !prefs.getString(MainActivity.KEY_TOKEN, null).isNullOrBlank()
+        val appInForeground = prefs.getBoolean(MainActivity.KEY_APP_IN_FOREGROUND, false)
+        val modelAsset = prefs.getString(MainActivity.KEY_VOSK_MODEL_ASSET, MainActivity.DEFAULT_VOSK_MODEL_ASSET).orEmpty().trim()
+        val wakePhrase = prefs.getString(MainActivity.KEY_VOSK_WAKE_PHRASE, MainActivity.DEFAULT_VOSK_WAKE_PHRASE).orEmpty().trim()
+        return hasToken &&
+            !appInForeground &&
+            modelAsset.isNotBlank() &&
+            wakePhrase.isNotBlank() &&
+            hasPermission(Manifest.permission.RECORD_AUDIO)
+    }
+
+    private fun refreshWakeWordBackgroundState() {
+        if (shouldRunBackgroundWakeWord()) {
+            wakeWordEngine?.start()
+        } else {
+            stopBackgroundWakeWordListening()
+        }
+    }
+
+    private fun stopBackgroundWakeWordListening() {
+        wakeWordEngine?.stop()
+    }
+
     private fun hasPermission(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
@@ -234,6 +268,14 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             }
         }
         lastCallState = state
+    }
+
+    private fun launchWakeAssistantSurface() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_ASSISTANT_SURFACE, MainActivity.ASSISTANT_SURFACE_WAKE)
+        }
+        startActivity(intent)
     }
 
     private fun resolveCallerLabel(phoneNumber: String?): String {

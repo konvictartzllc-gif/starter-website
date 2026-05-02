@@ -111,6 +111,20 @@ private data class DashboardSection(
     val body: String,
 )
 
+private data class QuizQuestion(
+    val question: String,
+    val answer: String,
+    val explanation: String,
+)
+
+private data class QuizSession(
+    val quiz: JSONObject,
+    val title: String,
+    val questions: List<QuizQuestion>,
+    val answers: MutableList<String> = mutableListOf(),
+    var currentIndex: Int = 0,
+)
+
 private enum class PendingContactAction {
     CALL,
     TEXT,
@@ -177,6 +191,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentTrialDaysLeft: Int? = null
     private var hasBillingCustomer = false
     private val dashboardSections = mutableListOf<DashboardSection>()
+    private var pendingSpeechCompletion: (() -> Unit)? = null
+    private var finalSpeechUtteranceId: String? = null
+    private var activeQuizSession: QuizSession? = null
+    private var listeningForQuizAnswer = false
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -242,6 +260,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
             override fun onDone(utteranceId: String?) {
                 runOnUiThread {
+                    if (utteranceId != null && utteranceId == finalSpeechUtteranceId) {
+                        finalSpeechUtteranceId = null
+                        val callback = pendingSpeechCompletion
+                        pendingSpeechCompletion = null
+                        callback?.invoke()
+                    }
                     if (resumeCommandCaptureAfterWakePrompt && wakeModeEnabled) {
                         resumeCommandCaptureAfterWakePrompt = false
                         startWakeWordListening()
@@ -259,6 +283,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
             override fun onError(utteranceId: String?) {
                 runOnUiThread {
+                    if (utteranceId != null && utteranceId == finalSpeechUtteranceId) {
+                        finalSpeechUtteranceId = null
+                        val callback = pendingSpeechCompletion
+                        pendingSpeechCompletion = null
+                        callback?.invoke()
+                    }
                     if (resumeCommandCaptureAfterWakePrompt && wakeModeEnabled) {
                         resumeCommandCaptureAfterWakePrompt = false
                         startWakeWordListening()
@@ -411,6 +441,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     when {
                         isListeningForCallCommand -> binding.callMonitorStatus.text = getString(R.string.call_listening)
+                        listeningForQuizAnswer -> binding.learningQuizPreview.append("\n\nListening for your answer...")
                         wakeModeEnabled && (awaitingWakeCommand || conversationActive) ->
                             binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
                     }
@@ -431,6 +462,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             mainHandler.postDelayed({ startListeningForCallCommand() }, CALL_COMMAND_RETRY_DELAY_MS)
                         } else {
                             binding.callMonitorStatus.text = getString(R.string.call_voice_unavailable)
+                        }
+                    } else if (listeningForQuizAnswer) {
+                        listeningForQuizAnswer = false
+                        when (error) {
+                            SpeechRecognizer.ERROR_NO_MATCH,
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> repeatCurrentQuizQuestion()
+                            else -> {
+                                binding.learningQuizPreview.append("\n\nI missed that answer, so let's try that question again.")
+                                repeatCurrentQuizQuestion()
+                            }
                         }
                     } else if (wakeModeEnabled) {
                         handleWakeRecognitionError(error)
@@ -455,6 +496,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                                 binding.callMonitorStatus.text = getString(R.string.call_voice_unavailable)
                             }
                         }
+                    } else if (listeningForQuizAnswer) {
+                        listeningForQuizAnswer = false
+                        handleQuizAnswerTranscript(transcript)
                     } else if (wakeModeEnabled) {
                         handleWakeTranscript(transcript)
                     }
@@ -1131,10 +1175,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     binding.learningLessonPreview.text =
                         getString(R.string.learning_lesson_preview_title, lesson.optString("language").ifBlank { "Language" }, title) +
                             "\n\n" + body
-                    val spokenReply = buildSpokenLesson(title, body)
-                    binding.conversationStatus.text = spokenReply
-                    binding.lastReplyValue.text = spokenReply
-                    speakDex(spokenReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    val spokenSegments = buildSpokenLessonSegments(title, body)
+                    binding.conversationStatus.text = "Dex is teaching your lesson."
+                    binding.lastReplyValue.text = spokenSegments.firstOrNull().orEmpty()
+                    speakDexSequence(spokenSegments, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
                     fetchDashboardData()
                 }
             }.onFailure {
@@ -1172,11 +1216,37 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         lines += "${i + 1}. ${item.optString("question")}"
                     }
                     binding.learningQuizPreview.text = lines.joinToString("\n")
-                    val quizTitle = quiz.optString("title").ifBlank { "Quiz" }
-                    val spokenReply = buildSpokenQuiz(quizTitle, questions)
-                    binding.conversationStatus.text = spokenReply
-                    binding.lastReplyValue.text = spokenReply
-                    speakDex(spokenReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    val parsedQuestions =
+                        buildList {
+                            for (i in 0 until (questions?.length() ?: 0)) {
+                                val item = questions?.optJSONObject(i) ?: continue
+                                add(
+                                    QuizQuestion(
+                                        question = item.optString("question"),
+                                        answer = item.optString("answer"),
+                                        explanation = item.optString("explanation")
+                                    )
+                                )
+                            }
+                        }
+                    if (parsedQuestions.isEmpty()) {
+                        binding.learningQuizPreview.text = getString(R.string.learning_quiz_failed)
+                    } else {
+                        val quizTitle = quiz.optString("title").ifBlank { "Quiz" }
+                        activeQuizSession = QuizSession(quiz = quiz, title = quizTitle, questions = parsedQuestions)
+                        binding.conversationStatus.text = "Dex is giving your quiz."
+                        binding.lastReplyValue.text = "Quiz ready: $quizTitle"
+                        speakDexSequence(
+                            listOf(
+                                "I built a quiz based on your lesson. $quizTitle.",
+                                formatCurrentQuizQuestion(activeQuizSession!!)
+                            ),
+                            R.string.voice_speaking,
+                            resumeWakeModeAfterSpeech = false
+                        ) {
+                            startQuizAnswerListening()
+                        }
+                    }
                 }
             }.onFailure {
                 binding.learningQuizPreview.text = getString(R.string.learning_quiz_failed)
@@ -1205,6 +1275,125 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             firstQuestion.isBlank() -> getString(R.string.learning_quiz_spoken_title_only, title)
             secondQuestion.isBlank() -> "I built a quiz based on your lesson. $title. First question: $firstQuestion"
             else -> "I built a quiz based on your lesson. $title. First question: $firstQuestion Second question: $secondQuestion"
+        }
+    }
+
+    private fun buildSpokenLessonSegments(title: String, body: String): List<String> {
+        val cleaned = body
+            .replace("**", "")
+            .replace(Regex("[â€œâ€]"), "\"")
+            .trim()
+        if (cleaned.isBlank()) {
+            return listOf(getString(R.string.learning_lesson_spoken_title_only, title))
+        }
+        val sections =
+            cleaned
+                .split(Regex("\\n\\s*\\n"))
+                .map { it.replace(Regex("\\s+"), " ").trim() }
+                .filter { it.isNotBlank() }
+                .take(5)
+        return buildList {
+            add("Today's lesson is $title.")
+            addAll(sections)
+        }
+    }
+
+    private fun formatCurrentQuizQuestion(session: QuizSession): String {
+        val question = session.questions.getOrNull(session.currentIndex)?.question.orEmpty()
+        return "Question ${session.currentIndex + 1}. $question. Say your answer when you're ready."
+    }
+
+    private fun repeatCurrentQuizQuestion() {
+        val session = activeQuizSession ?: return
+        speakDexSequence(
+            listOf("Let's try that question again.", formatCurrentQuizQuestion(session)),
+            R.string.voice_speaking,
+            resumeWakeModeAfterSpeech = false
+        ) {
+            startQuizAnswerListening()
+        }
+    }
+
+    private fun startQuizAnswerListening() {
+        val recognizer = speechRecognizer ?: return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+        }
+        listeningForQuizAnswer = true
+        recognizer.cancel()
+        recognizer.startListening(intent)
+    }
+
+    private fun handleQuizAnswerTranscript(transcript: String) {
+        val session = activeQuizSession ?: return
+        val answer = transcript.trim()
+        if (answer.isBlank()) {
+            repeatCurrentQuizQuestion()
+            return
+        }
+        session.answers += answer
+        binding.learningQuizPreview.append("\nAnswer ${session.currentIndex + 1}: $answer")
+        session.currentIndex += 1
+        if (session.currentIndex >= session.questions.size) {
+            submitQuizSession(session)
+            return
+        }
+        speakDexSequence(
+            listOf("Got it.", formatCurrentQuizQuestion(session)),
+            R.string.voice_speaking,
+            resumeWakeModeAfterSpeech = false
+        ) {
+            startQuizAnswerListening()
+        }
+    }
+
+    private fun submitQuizSession(session: QuizSession) {
+        val token = authToken ?: return
+        val serverUrl = currentServerUrl()
+        lifecycleScope.launch {
+            val payload = JSONObject().apply {
+                put("quiz", session.quiz)
+                put("answers", JSONArray(session.answers))
+            }
+            val result = postJson("$serverUrl/dex/learning/quiz/submit", payload, token)
+            result.onSuccess { response ->
+                activeQuizSession = null
+                val score = response.optInt("score", 0)
+                val total = response.optInt("totalQuestions", session.questions.size)
+                val percentage = response.optInt("percentage", 0)
+                val results = response.optJSONArray("results")
+                val missed = results?.let {
+                    (0 until it.length())
+                        .mapNotNull { index -> it.optJSONObject(index) }
+                        .firstOrNull { item -> !item.optBoolean("correct", false) }
+                }
+                val summary = buildString {
+                    append("Quiz complete. You got $score out of $total correct. That's $percentage percent.")
+                    missed?.optString("explanation")?.takeIf { it.isNotBlank() }?.let {
+                        append(" Here's one thing to remember: $it")
+                    }
+                }
+                binding.learningQuizPreview.append("\n\n$summary")
+                binding.lastReplyValue.text = summary
+                binding.conversationStatus.text = summary
+                speakDex(summary, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                fetchDashboardData()
+            }.onFailure {
+                activeQuizSession = null
+                val reply = getString(R.string.learning_quiz_failed)
+                binding.learningQuizPreview.append("\n\n$reply")
+                binding.lastReplyValue.text = reply
+                binding.conversationStatus.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            }
         }
     }
 
@@ -2190,9 +2379,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun shouldRunBackgroundService(): Boolean {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val autoStartEnabled = prefs.getBoolean(KEY_AUTO_START_ASSISTANT, false)
         val hasToken = !authToken.isNullOrBlank()
         val notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, false)
+        val wakeReady =
+            hasToken &&
+                !prefs.getString(KEY_VOSK_MODEL_ASSET, DEFAULT_VOSK_MODEL_ASSET).isNullOrBlank() &&
+                !prefs.getString(KEY_VOSK_WAKE_PHRASE, DEFAULT_VOSK_WAKE_PHRASE).isNullOrBlank() &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val phoneReady =
             phoneBackendEnabled &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED &&
@@ -2201,7 +2394,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             notificationsEnabled &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED &&
                 hasNotificationPermissionForReminder()
-        return autoStartEnabled && hasToken && (phoneReady || smsReady)
+        return hasToken && (phoneReady || smsReady || wakeReady)
     }
 
     private fun setAppForegroundState(inForeground: Boolean) {
@@ -2518,6 +2711,41 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         refreshVoiceStatus()
     }
 
+    private fun speakDexSequence(
+        segments: List<String>,
+        activeStatusResId: Int = R.string.voice_speaking,
+        resumeWakeModeAfterSpeech: Boolean = false,
+        onComplete: (() -> Unit)? = null
+    ) {
+        val cleanedSegments = segments.map { it.trim() }.filter { it.isNotBlank() }
+        if (cleanedSegments.isEmpty()) {
+            onComplete?.invoke()
+            return
+        }
+        if (!ttsReady) {
+            speakDex(cleanedSegments.joinToString(" "), activeStatusResId, resumeWakeModeAfterSpeech)
+            onComplete?.invoke()
+            return
+        }
+        this.resumeWakeListeningAfterSpeech = resumeWakeModeAfterSpeech
+        pendingSpeechCompletion = onComplete
+        mainHandler.removeCallbacks(restartWakeListeningRunnable)
+        textToSpeech?.stop()
+        finalSpeechUtteranceId = "dex_voice_final_${System.currentTimeMillis()}"
+        cleanedSegments.forEachIndexed { index, segment ->
+            val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            val utteranceId =
+                if (index == cleanedSegments.lastIndex) finalSpeechUtteranceId
+                else "dex_voice_part_${System.currentTimeMillis()}_$index"
+            textToSpeech?.speak(segment, queueMode, null, utteranceId)
+            if (index < cleanedSegments.lastIndex) {
+                textToSpeech?.playSilentUtterance(450L, TextToSpeech.QUEUE_ADD, null)
+            }
+        }
+        ttsStatusMessage = getString(activeStatusResId)
+        refreshVoiceStatus()
+    }
+
     private fun openVoiceSetup() {
         val voiceSetupIntent = Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)
         val fallbackIntent = Intent(Settings.ACTION_SETTINGS)
@@ -2725,6 +2953,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         enableAssistantLockscreenMode()
 
         when (surface) {
+            ASSISTANT_SURFACE_WAKE -> {
+                if (!wakeModeEnabled) {
+                    startWakeMode(automatic = true)
+                }
+                handleWakeWordEngineDetection()
+            }
             ASSISTANT_SURFACE_CALL -> {
                 val caller = intent?.getStringExtra(EXTRA_ASSISTANT_CALLER).orEmpty().ifBlank {
                     getString(R.string.unknown_number_label)
@@ -4574,6 +4808,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val DEFAULT_SERVER_URL = "https://konvict-artz.onrender.com/api"
         const val DEFAULT_VOSK_MODEL_ASSET = "model-en-us"
         const val DEFAULT_VOSK_WAKE_PHRASE = "hey dex"
+        const val ASSISTANT_SURFACE_WAKE = "wake"
         const val ASSISTANT_SURFACE_CALL = "call"
         private const val DEFAULT_ACCENT_COLOR = "#69C6FF"
         private const val DEFAULT_BACKGROUND_COLOR = "#0F172A"

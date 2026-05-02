@@ -1220,9 +1220,20 @@ router.post("/learning/quiz/submit", requireUser, async (req, res) => {
                 return res.status(400).json({ error: "invalid_quiz_submission", message: "Quiz and answers are required." });
         }
 
+        const normalizeQuizAnswer = (value) =>
+                String(value ?? "")
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[^\p{L}\p{N}\s]/gu, "")
+                        .replace(/\s+/g, " ");
+
         const results = quiz.questions.map((question, index) => {
                 const userAnswer = answers[index] ?? null;
-                const correct = userAnswer === question.answer;
+                const normalizedAnswer = normalizeQuizAnswer(userAnswer);
+                const normalizedCorrect = normalizeQuizAnswer(question.answer);
+                const correct =
+                        normalizedAnswer === normalizedCorrect ||
+                        normalizedAnswer === normalizeQuizAnswer(String(question.correctOption ?? ""));
                 return {
                         question: question.question,
                         userAnswer,
@@ -1339,7 +1350,9 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                         const safetySignal = detectSafetySignal(message);
                         if (safetySignal.level === "emergency") {
                                 const userInfo = `${user.name || "Unknown"} (${user.email})`;
-                                await triggerEmergencyAlert(userInfo, message);
+                                Promise.resolve(triggerEmergencyAlert(userInfo, message)).catch((error) => {
+                                        console.error("Emergency alert error:", error?.message || error);
+                                });
                                 let reply = "";
                                 if (safetySignal.type === "self_harm") {
                                         reply = "Hey, I hear you and I want you to know you matter. Please reach out to the 988 Suicide & Crisis Lifeline by calling or texting 988 right now. If you are in immediate danger, call 911 or your local emergency number. You are not alone.";

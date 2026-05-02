@@ -214,13 +214,21 @@ router.post("/affiliate-invites/create", requireAdmin, [
   let emailQueued = false;
   let emailError = null;
   if (email) {
+    const emailPromise = Promise.resolve(sendAffiliateInvite(email, name, code, registerLink));
     try {
-      emailed = await Promise.race([
-        sendAffiliateInvite(email, name, code, registerLink),
-        new Promise((resolve) => setTimeout(() => resolve(false), 12000)),
+      const deliveryState = await Promise.race([
+        emailPromise.then((sent) => (sent ? "sent" : "failed")),
+        new Promise((resolve) => setTimeout(() => resolve("queued"), 2500)),
       ]);
-      if (!emailed) {
+      if (deliveryState === "sent") {
+        emailed = true;
+      } else if (deliveryState === "failed") {
         emailError = "Dex could not confirm delivery of the invite email.";
+      } else {
+        emailQueued = true;
+        emailPromise.catch((error) => {
+          console.error("Affiliate invite email error:", error?.message || error);
+        });
       }
     } catch (error) {
       emailError = error?.message || "Dex could not send the invite email.";
