@@ -191,9 +191,13 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun handleCallStateChanged(state: Int, phoneNumber: String?) {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(MainActivity.KEY_APP_IN_FOREGROUND, false)) {
+            lastCallState = state
+            return
+        }
         val rawNumber = phoneNumber?.trim().orEmpty()
         val resolvedCaller = resolveCallerLabel(phoneNumber)
-        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val autoDeclineSpam = prefs.getBoolean(MainActivity.KEY_AUTO_DECLINE_SPAM, true)
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
@@ -271,6 +275,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleIncomingSms(intent: Intent) {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(MainActivity.KEY_APP_IN_FOREGROUND, false)) return
         val hasToken = !prefs.getString(MainActivity.KEY_TOKEN, null).isNullOrBlank()
         val notificationsEnabled = prefs.getBoolean(MainActivity.KEY_NOTIFICATIONS_ENABLED, false)
         if (!hasToken || !notificationsEnabled) return

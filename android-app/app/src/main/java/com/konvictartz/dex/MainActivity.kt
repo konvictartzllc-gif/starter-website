@@ -282,11 +282,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     override fun onStart() {
         super.onStart()
         setAppForegroundState(true)
+        refreshCallMonitorState()
         maintainBackgroundService()
     }
 
     override fun onStop() {
         setAppForegroundState(false)
+        stopCallMonitoring()
+        stopListeningForCallCommand()
+        updateCallActionVisibility(false)
         maintainBackgroundService()
         super.onStop()
     }
