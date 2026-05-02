@@ -499,6 +499,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 .apply()
             maintainBackgroundService()
         }
+        binding.autoAnswerAnyCallerSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (!binding.autoAnswerAnyCallerSwitch.isPressed) return@setOnCheckedChangeListener
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_AUTO_ANSWER_ANY_NON_SPAM, isChecked)
+                .apply()
+            maintainBackgroundService()
+        }
         binding.autoDeclineSpamSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (!binding.autoDeclineSpamSwitch.isPressed) return@setOnCheckedChangeListener
             getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -651,9 +659,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentAccentColor = prefs.getString(KEY_ACCENT_COLOR, DEFAULT_ACCENT_COLOR).orEmpty().ifBlank { DEFAULT_ACCENT_COLOR }
         currentBackgroundColor = prefs.getString(KEY_BACKGROUND_COLOR, DEFAULT_BACKGROUND_COLOR).orEmpty().ifBlank { DEFAULT_BACKGROUND_COLOR }
         currentPanelColor = prefs.getString(KEY_PANEL_COLOR, DEFAULT_PANEL_COLOR).orEmpty().ifBlank { DEFAULT_PANEL_COLOR }
+        phoneBackendEnabled = prefs.getBoolean(KEY_PHONE_BACKEND_ENABLED, false)
         binding.emailInput.setText(prefs.getString(KEY_EMAIL, ""))
         binding.affiliateInviteInput.setText(prefs.getString(KEY_AFFILIATE_INVITE_CODE, ""))
+        binding.notificationsPermissionSwitch.isChecked = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, false)
         binding.autoAnswerKnownContactsSwitch.isChecked = prefs.getBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
+        binding.autoAnswerAnyCallerSwitch.isChecked = prefs.getBoolean(KEY_AUTO_ANSWER_ANY_NON_SPAM, false)
         binding.autoDeclineSpamSwitch.isChecked = prefs.getBoolean(KEY_AUTO_DECLINE_SPAM, true)
         pendingIncomingSmsSender = prefs.getString(KEY_PENDING_INCOMING_SMS_SENDER, null)
         pendingIncomingSmsValue = prefs.getString(KEY_PENDING_INCOMING_SMS_VALUE, null)
@@ -726,6 +737,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putBoolean(KEY_AUTO_START_ASSISTANT, false)
             .putBoolean(KEY_PHONE_BACKEND_ENABLED, false)
             .putBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
+            .putBoolean(KEY_AUTO_ANSWER_ANY_NON_SPAM, false)
             .putBoolean(KEY_AUTO_DECLINE_SPAM, true)
             .commit()
         binding.authMessage.text = getString(R.string.logged_out_message)
@@ -761,6 +773,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.calendarPermissionSwitch.isEnabled = loggedIn
         binding.notificationsPermissionSwitch.isEnabled = loggedIn
         binding.autoAnswerKnownContactsSwitch.isEnabled = loggedIn
+        binding.autoAnswerAnyCallerSwitch.isEnabled = loggedIn
         binding.autoDeclineSpamSwitch.isEnabled = loggedIn
         binding.authMessage.text = if (loggedIn) getString(R.string.connected_as, binding.emailInput.text?.toString().orEmpty()) else getString(R.string.logged_out_message)
         updateDashboardHeader()
@@ -1730,6 +1743,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun updatePermissions(key: String, enabled: Boolean) {
         val token = authToken ?: return
         val serverUrl = currentServerUrl()
+        phoneBackendEnabled = binding.phonePermissionSwitch.isChecked
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_PHONE_BACKEND_ENABLED, phoneBackendEnabled)
+            .putBoolean(KEY_NOTIFICATIONS_ENABLED, binding.notificationsPermissionSwitch.isChecked)
+            .apply()
+        refreshCallMonitorState()
         val payload = JSONObject().apply {
             put("permissions", JSONObject().apply {
                 put("phone", binding.phonePermissionSwitch.isChecked)
@@ -1755,20 +1775,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         "calendar" -> getString(if (enabled) R.string.calendar_enabled else R.string.calendar_disabled)
                         else -> getString(if (enabled) R.string.notifications_enabled else R.string.notifications_disabled)
                     }
-                refreshCallMonitorState()
             }.onFailure { error ->
                 binding.permissionsMessage.text = error.message ?: getString(R.string.permissions_save_failed)
-                fetchPermissions()
             }
         }
     }
 
     private fun applyPermissions(permissions: Map<String, Boolean>) {
-        binding.phonePermissionSwitch.isChecked = permissions["phone"] == true
+        phoneBackendEnabled = permissions["phone"] == true
+        binding.phonePermissionSwitch.isChecked = phoneBackendEnabled
         binding.calendarPermissionSwitch.isChecked = permissions["calendar"] == true
         binding.notificationsPermissionSwitch.isChecked = permissions["notifications"] == true
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
+            .putBoolean(KEY_PHONE_BACKEND_ENABLED, phoneBackendEnabled)
             .putBoolean(KEY_NOTIFICATIONS_ENABLED, permissions["notifications"] == true)
             .apply()
     }
@@ -3835,6 +3855,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_PHONE_BACKEND_ENABLED = "phone_backend_enabled"
         const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
         const val KEY_AUTO_ANSWER_KNOWN_CONTACTS = "auto_answer_known_contacts"
+        const val KEY_AUTO_ANSWER_ANY_NON_SPAM = "auto_answer_any_non_spam"
         const val KEY_AUTO_DECLINE_SPAM = "auto_decline_spam"
         const val KEY_APP_IN_FOREGROUND = "app_in_foreground"
         const val KEY_PENDING_INCOMING_SMS_SENDER = "pending_incoming_sms_sender"

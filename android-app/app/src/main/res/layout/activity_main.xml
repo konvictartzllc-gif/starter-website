@@ -1523,6 +1523,13 @@
                     android:text="@string/auto_answer_known_contacts" />
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/autoAnswerAnyCallerSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/auto_answer_any_non_spam_calls" />
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/autoDeclineSpamSwitch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

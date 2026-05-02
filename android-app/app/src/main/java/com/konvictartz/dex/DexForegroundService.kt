@@ -45,6 +45,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var lastCallState = TelephonyManager.CALL_STATE_IDLE
     private var lastCaller = "Unknown caller"
     private var currentCallWasAnswered = false
+    private var pendingSpeechText: String? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     override fun onCreate() {
         super.onCreate()
@@ -89,6 +90,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         ttsReady = languageResult != TextToSpeech.LANG_MISSING_DATA &&
             languageResult != TextToSpeech.LANG_NOT_SUPPORTED &&
             languageResult != TextToSpeech.ERROR
+        if (ttsReady) {
+            pendingSpeechText?.let { queued ->
+                pendingSpeechText = null
+                speakNow(queued)
+            }
+        }
     }
 
     private fun buildNotification(): Notification {
@@ -189,6 +196,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val resolvedCaller = resolveCallerLabel(phoneNumber)
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val autoAnswerKnownContacts = prefs.getBoolean(MainActivity.KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
+        val autoAnswerAnyNonSpam = prefs.getBoolean(MainActivity.KEY_AUTO_ANSWER_ANY_NON_SPAM, false)
         val autoDeclineSpam = prefs.getBoolean(MainActivity.KEY_AUTO_DECLINE_SPAM, true)
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
@@ -203,6 +211,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     answerRingingCall()
                     currentCallWasAnswered = true
                     speakShortStatus(getString(R.string.call_auto_answered_known_contact, resolvedCaller))
+                } else if (autoAnswerAnyNonSpam) {
+                    postCallEvent("incoming", resolvedCaller)
+                    answerRingingCall()
+                    currentCallWasAnswered = true
+                    speakShortStatus(getString(R.string.call_answered))
                 } else {
                     postCallEvent("incoming", resolvedCaller)
                     showIncomingCallNotification(resolvedCaller)
@@ -266,13 +279,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun speakIncomingCallPrompt(caller: String) {
-        if (!ttsReady) return
-        textToSpeech?.speak(
-            getString(R.string.call_background_prompt_template, caller),
-            TextToSpeech.QUEUE_FLUSH,
-            null,
-            "dex_bg_call_${System.currentTimeMillis()}"
-        )
+        speakShortStatus(getString(R.string.call_background_prompt_template, caller))
     }
 
     private fun handleIncomingSms(intent: Intent) {
@@ -293,13 +300,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             .apply()
 
         showIncomingSmsNotification(sender, smsBody)
-        if (!ttsReady) return
-        textToSpeech?.speak(
-            getString(R.string.incoming_sms_prompt, sender),
-            TextToSpeech.QUEUE_FLUSH,
-            null,
-            "dex_bg_sms_${System.currentTimeMillis()}"
-        )
+        speakShortStatus(getString(R.string.incoming_sms_prompt, sender))
     }
 
     @SuppressLint("MissingPermission")
@@ -489,7 +490,14 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun speakShortStatus(text: String) {
-        if (!ttsReady) return
+        if (!ttsReady) {
+            pendingSpeechText = text
+            return
+        }
+        speakNow(text)
+    }
+
+    private fun speakNow(text: String) {
         textToSpeech?.speak(
             text,
             TextToSpeech.QUEUE_FLUSH,

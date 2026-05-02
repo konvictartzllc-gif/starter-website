@@ -243,6 +243,7 @@
     <string name="call_monitor_waiting">Call monitoring is waiting for login, backend phone permission, and Android runtime access.</string>
     <string name="call_monitor_active">Dex call monitoring is active and ready to help with allowed calls on this device.</string>
     <string name="auto_answer_known_contacts">Auto-answer saved contacts outside the app</string>
+    <string name="auto_answer_any_non_spam_calls">Auto-answer any non-spam caller outside the app</string>
     <string name="auto_decline_spam_calls">Auto-decline likely spam calls</string>
     <string name="private_number_label">Private number</string>
     <string name="unknown_number_label">Unknown number</string>
