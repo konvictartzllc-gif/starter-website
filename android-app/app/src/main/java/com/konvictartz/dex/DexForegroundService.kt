@@ -184,14 +184,25 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun handleCallStateChanged(state: Int, phoneNumber: String?) {
+        val rawNumber = phoneNumber?.trim().orEmpty()
+        val contactName = rawNumber.takeIf { it.isNotBlank() }?.let { lookupContactName(it) }
         val resolvedCaller = resolveCallerLabel(phoneNumber)
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val autoAnswerKnownContacts = prefs.getBoolean(MainActivity.KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
+        val autoDeclineSpam = prefs.getBoolean(MainActivity.KEY_AUTO_DECLINE_SPAM, true)
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
                 currentCallWasAnswered = false
                 lastCaller = resolvedCaller
-                if (isLikelySpamCaller(resolvedCaller, phoneNumber)) {
+                if (autoDeclineSpam && isLikelySpamCaller(resolvedCaller, phoneNumber)) {
                     postCallEvent("declined", resolvedCaller)
                     declineRingingCall()
+                    speakShortStatus(getString(R.string.call_spam_blocked))
+                } else if (autoAnswerKnownContacts && !contactName.isNullOrBlank()) {
+                    postCallEvent("incoming", resolvedCaller)
+                    answerRingingCall()
+                    currentCallWasAnswered = true
+                    speakShortStatus(getString(R.string.call_auto_answered_known_contact, resolvedCaller))
                 } else {
                     postCallEvent("incoming", resolvedCaller)
                     showIncomingCallNotification(resolvedCaller)
@@ -220,7 +231,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun resolveCallerLabel(phoneNumber: String?): String {
         val rawNumber = phoneNumber?.trim().orEmpty()
         if (rawNumber.isBlank()) {
-            return lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" } ?: "Unknown caller"
+            return lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" } ?: getString(R.string.private_number_label)
         }
         val contactName = lookupContactName(rawNumber)
         return contactName ?: rawNumber
@@ -251,7 +262,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
         val rawNumber = phoneNumber?.trim().orEmpty()
         if (rawNumber.isBlank()) return false
-        return rawNumber.startsWith("000") || rawNumber == "Unknown caller"
+        return rawNumber.startsWith("000")
     }
 
     private fun speakIncomingCallPrompt(caller: String) {

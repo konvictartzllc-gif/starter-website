@@ -242,6 +242,12 @@
     <string name="call_monitor_summary">When phone access is enabled and Android permissions are granted, Dex can monitor calls, block likely spam, and help you handle calls while the app and background service are running.</string>
     <string name="call_monitor_waiting">Call monitoring is waiting for login, backend phone permission, and Android runtime access.</string>
     <string name="call_monitor_active">Dex call monitoring is active and ready to help with allowed calls on this device.</string>
+    <string name="auto_answer_known_contacts">Auto-answer saved contacts outside the app</string>
+    <string name="auto_decline_spam_calls">Auto-decline likely spam calls</string>
+    <string name="private_number_label">Private number</string>
+    <string name="unknown_number_label">Unknown number</string>
+    <string name="call_auto_answered_known_contact">Dex auto-answered %1$s because they are in your saved contacts.</string>
+    <string name="call_background_known_contact_prompt">Incoming call from %1$s. Use the Dex notification to answer or decline, or let Dex auto-answer saved contacts if you enabled that setting.</string>
     <string name="call_event_sent">Last call event sent: %1$s</string>
     <string name="call_prompt_template">Incoming call from %1$s. Say pick up, reject, answer on speaker, or take a message. You can also use the buttons on screen.</string>
     <string name="call_background_prompt_template">Incoming call from %1$s. Use the Dex notification to answer or decline without opening the app.</string>

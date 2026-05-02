@@ -1515,6 +1515,20 @@
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
 
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/autoAnswerKnownContactsSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/auto_answer_known_contacts" />
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/autoDeclineSpamSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/auto_decline_spam_calls" />
+
                 <LinearLayout
                     android:id="@+id/callActionsRow"
                     android:layout_width="match_parent"

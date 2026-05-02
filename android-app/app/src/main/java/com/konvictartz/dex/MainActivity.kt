@@ -491,6 +491,22 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (!binding.notificationsPermissionSwitch.isPressed) return@setOnCheckedChangeListener
             updatePermissions("notifications", isChecked)
         }
+        binding.autoAnswerKnownContactsSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (!binding.autoAnswerKnownContactsSwitch.isPressed) return@setOnCheckedChangeListener
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, isChecked)
+                .apply()
+            maintainBackgroundService()
+        }
+        binding.autoDeclineSpamSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (!binding.autoDeclineSpamSwitch.isPressed) return@setOnCheckedChangeListener
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_AUTO_DECLINE_SPAM, isChecked)
+                .apply()
+            maintainBackgroundService()
+        }
 
         binding.adminGenerateInviteButton.setOnClickListener {
             createAdminAffiliateInvite()
@@ -637,6 +653,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentPanelColor = prefs.getString(KEY_PANEL_COLOR, DEFAULT_PANEL_COLOR).orEmpty().ifBlank { DEFAULT_PANEL_COLOR }
         binding.emailInput.setText(prefs.getString(KEY_EMAIL, ""))
         binding.affiliateInviteInput.setText(prefs.getString(KEY_AFFILIATE_INVITE_CODE, ""))
+        binding.autoAnswerKnownContactsSwitch.isChecked = prefs.getBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
+        binding.autoDeclineSpamSwitch.isChecked = prefs.getBoolean(KEY_AUTO_DECLINE_SPAM, true)
         pendingIncomingSmsSender = prefs.getString(KEY_PENDING_INCOMING_SMS_SENDER, null)
         pendingIncomingSmsValue = prefs.getString(KEY_PENDING_INCOMING_SMS_VALUE, null)
         pendingIncomingSmsBody = prefs.getString(KEY_PENDING_INCOMING_SMS_BODY, null)
@@ -707,6 +725,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putBoolean(KEY_BACKGROUND_SERVICE_ENABLED, false)
             .putBoolean(KEY_AUTO_START_ASSISTANT, false)
             .putBoolean(KEY_PHONE_BACKEND_ENABLED, false)
+            .putBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
+            .putBoolean(KEY_AUTO_DECLINE_SPAM, true)
             .commit()
         binding.authMessage.text = getString(R.string.logged_out_message)
         DexLearningReminderScheduler.cancelReminder(this)
@@ -740,6 +760,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.phonePermissionSwitch.isEnabled = loggedIn
         binding.calendarPermissionSwitch.isEnabled = loggedIn
         binding.notificationsPermissionSwitch.isEnabled = loggedIn
+        binding.autoAnswerKnownContactsSwitch.isEnabled = loggedIn
+        binding.autoDeclineSpamSwitch.isEnabled = loggedIn
         binding.authMessage.text = if (loggedIn) getString(R.string.connected_as, binding.emailInput.text?.toString().orEmpty()) else getString(R.string.logged_out_message)
         updateDashboardHeader()
         if (!loggedIn) {
@@ -1840,7 +1862,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val autoStartEnabled = prefs.getBoolean(KEY_AUTO_START_ASSISTANT, false)
         val hasToken = !authToken.isNullOrBlank()
-        return autoStartEnabled && hasToken && hasAllAndroidPermissions()
+        val phoneReady =
+            phoneBackendEnabled &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ANSWER_PHONE_CALLS) == PackageManager.PERMISSION_GRANTED
+        val smsReady =
+            binding.notificationsPermissionSwitch.isChecked &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED &&
+                hasNotificationPermissionForReminder()
+        return autoStartEnabled && hasToken && (phoneReady || smsReady)
     }
 
     private fun setAppForegroundState(inForeground: Boolean) {
@@ -3804,6 +3834,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_AUTO_START_ASSISTANT = "auto_start_assistant"
         const val KEY_PHONE_BACKEND_ENABLED = "phone_backend_enabled"
         const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
+        const val KEY_AUTO_ANSWER_KNOWN_CONTACTS = "auto_answer_known_contacts"
+        const val KEY_AUTO_DECLINE_SPAM = "auto_decline_spam"
         const val KEY_APP_IN_FOREGROUND = "app_in_foreground"
         const val KEY_PENDING_INCOMING_SMS_SENDER = "pending_incoming_sms_sender"
         const val KEY_PENDING_INCOMING_SMS_VALUE = "pending_incoming_sms_value"
