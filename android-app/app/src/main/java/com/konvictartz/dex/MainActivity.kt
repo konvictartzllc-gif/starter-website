@@ -195,6 +195,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var finalSpeechUtteranceId: String? = null
     private var activeQuizSession: QuizSession? = null
     private var listeningForQuizAnswer = false
+    private var restoreWakeEngineAfterQuiz = false
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -1233,6 +1234,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         binding.learningQuizPreview.text = getString(R.string.learning_quiz_failed)
                     } else {
                         val quizTitle = quiz.optString("title").ifBlank { "Quiz" }
+                        restoreWakeEngineAfterQuiz = wakeWordEngineActive
+                        if (wakeWordEngineActive) {
+                            wakeWordEngine?.stop()
+                            wakeWordEngineActive = false
+                        }
                         activeQuizSession = QuizSession(quiz = quiz, title = quizTitle, questions = parsedQuestions)
                         binding.conversationStatus.text = "Dex is giving your quiz."
                         binding.lastReplyValue.text = "Quiz ready: $quizTitle"
@@ -1366,6 +1372,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val result = postJson("$serverUrl/dex/learning/quiz/submit", payload, token)
             result.onSuccess { response ->
                 activeQuizSession = null
+                maybeRestoreWakeEngineAfterQuiz()
                 val score = response.optInt("score", 0)
                 val total = response.optInt("totalQuestions", session.questions.size)
                 val percentage = response.optInt("percentage", 0)
@@ -1388,6 +1395,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 fetchDashboardData()
             }.onFailure {
                 activeQuizSession = null
+                maybeRestoreWakeEngineAfterQuiz()
                 val reply = getString(R.string.learning_quiz_failed)
                 binding.learningQuizPreview.append("\n\n$reply")
                 binding.lastReplyValue.text = reply
@@ -1395,6 +1403,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
             }
         }
+    }
+
+    private fun maybeRestoreWakeEngineAfterQuiz() {
+        if (restoreWakeEngineAfterQuiz && wakeModeEnabled) {
+            wakeWordEngineActive = wakeWordEngine?.start() == true
+        }
+        restoreWakeEngineAfterQuiz = false
     }
 
     private fun requestDashboardSection(sectionTitle: String, prompt: String, fallbackMessage: String) {

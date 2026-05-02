@@ -15,6 +15,18 @@ const router = Router();
 const CHAT_MEMORY_RETENTION_DAYS = 3;
 const SENSITIVE_INFO_WARNING =
         "I won't save sensitive information like bank details, card numbers, passwords, or Social Security numbers. Please remove that information and try again.";
+
+function normalizeEmergencyContactTarget(target) {
+        const value = String(target || "").trim();
+        if (!value) return "";
+        if (value.includes("@")) return value;
+        const digits = value.replace(/\D/g, "");
+        if (digits.length === 10) return `+1${digits}`;
+        if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+        if (value.startsWith("+") && digits.length >= 10) return `+${digits}`;
+        return value;
+}
+
 const FREE_SETTING_KEYS = new Set([
         "emergency_contact",
         "emergency_contact_permission",
@@ -1363,17 +1375,42 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 // Escalate: notify trusted contact if permission granted
                                 let trustedContactEnabled = false;
                                 let trustedContactConfigured = false;
+                                let trustedContactTarget = "";
                                 try {
                                         const memRows = await db.all("SELECT key, value FROM user_memory WHERE user_id = ?", [userId]);
                                         const memory = {};
                                         for (const row of memRows) memory[row.key] = row.value;
                                         trustedContactEnabled = memory.emergency_contact_permission === "1";
                                         trustedContactConfigured = Boolean(memory.emergency_contact);
+                                        trustedContactTarget = String(memory.emergency_contact || "").trim();
                                 } catch {}
+
+                                if (trustedContactEnabled && trustedContactConfigured && trustedContactTarget) {
+                                        const normalizedTrustedContactTarget = normalizeEmergencyContactTarget(trustedContactTarget);
+                                        const trustedContactMessage =
+                                                `Dex emergency alert for ${userInfo}. ` +
+                                                `A serious safety concern was detected from this message: "${message}". ` +
+                                                `Please check on them right away.`;
+                                        if (normalizedTrustedContactTarget.includes("@")) {
+                                                Promise.resolve(
+                                                        sendCustomEmail({
+                                                                to: normalizedTrustedContactTarget,
+                                                                subject: "Dex emergency contact alert",
+                                                                body: trustedContactMessage,
+                                                        })
+                                                ).catch((error) => {
+                                                        console.error("Emergency contact email error:", error?.message || error);
+                                                });
+                                        } else {
+                                                Promise.resolve(sendSms(normalizedTrustedContactTarget, trustedContactMessage)).catch((error) => {
+                                                        console.error("Emergency contact SMS error:", error?.message || error);
+                                                });
+                                        }
+                                }
 
                                 return res.json({
                                         reply: trustedContactEnabled && trustedContactConfigured
-                                                ? reply + " Your trusted contact is on file for emergency support if you choose to reach out."
+                                                ? reply + " I also used your emergency contact plan to reach out for extra support."
                                                 : reply,
                                         emergency: true,
                                         emergencyType: safetySignal.type,
