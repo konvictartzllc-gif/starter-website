@@ -1,4 +1,4 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import { body, validationResult } from "express-validator";
 import OpenAI from "openai";
 import { requireUser, optionalUser } from "../middleware/auth.js";
@@ -551,7 +551,7 @@ async function purgeExpiredChatHistory(db, userId) {
         return threshold;
 }
 
-// ── LEARNED PREFERENCES ENDPOINTS ───────────────────────────────────────────
+// â”€â”€ LEARNED PREFERENCES ENDPOINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Dex can get/set learned preferences (e.g., favorite contacts, routines)
 router.get("/preferences", requireUser, async (req, res) => {
         const db = getDb();
@@ -842,7 +842,7 @@ router.delete("/tasks/:id", requireUser, async (req, res) => {
         await db.run("DELETE FROM task_items WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
         res.json({ success: true });
 });
-// ── FETCH RECENT CALL EVENTS ENDPOINT ───────────────────────────────────────
+// â”€â”€ FETCH RECENT CALL EVENTS ENDPOINT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Web client can GET recent call events for the user
 router.get("/call-events", requireUser, async (req, res) => {
         const db = getDb();
@@ -854,7 +854,7 @@ router.get("/call-events", requireUser, async (req, res) => {
         );
         res.json({ events });
 });
-// ── ANDROID CALL EVENT ENDPOINT ─────────────────────────────────────────────
+// â”€â”€ ANDROID CALL EVENT ENDPOINT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Android app can POST call events (incoming, answered, declined)
 router.post("/call-event", requireUser, async (req, res) => {
         const db = getDb();
@@ -889,7 +889,7 @@ router.post("/call-event", requireUser, async (req, res) => {
                 [userId, event, caller, timestamp || new Date().toISOString()]
         );
 
-        // ── AUTO-LEARN FAVORITE CONTACTS ──────────────────────────────────────────
+        // â”€â”€ AUTO-LEARN FAVORITE CONTACTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (event === "incoming" && caller) {
                 const user = await getUserRecord(userId);
                 if (!isPaidSubscriber(user)) return res.json({ success: true, memoryUpdated: false });
@@ -925,7 +925,7 @@ router.post("/call-event", requireUser, async (req, res) => {
         }
         res.json({ success: true });
 });
-// ── USER PERMISSIONS ENDPOINTS ──────────────────────────────────────────────
+// â”€â”€ USER PERMISSIONS ENDPOINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Dex can get/set user permissions (e.g., phone, calendar, notifications)
 router.get("/permissions", requireUser, async (req, res) => {
         const db = getDb();
@@ -952,7 +952,7 @@ router.post("/permissions", requireUser, async (req, res) => {
         );
         res.json({ success: true });
 });
-// ── USER MEMORY ENDPOINTS ───────────────────────────────────────────────────
+// â”€â”€ USER MEMORY ENDPOINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Dex can store and retrieve per-user memory (preferences, facts, routines)
 router.get("/memory", requireUser, async (req, res) => {
         const db = getDb();
@@ -1268,6 +1268,16 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
 
               const isAdmin = user.role === "admin";
     let hasAccess = isAdmin;
+              const learningPreferences = await loadPreferenceMap(db, userId, [
+                    "learning_target_language",
+                    "learning_level",
+                    "learning_focus",
+                    "learning_style",
+                    "conversation_tone",
+                    "comfort_style",
+                    "grounding_preference",
+                    "safety_follow_up_opt_in",
+              ]);
 
               if (!hasAccess) {
                     if (user.access_type === "paid") {
@@ -1359,16 +1369,6 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                     "SELECT role, content FROM chat_history WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 20",
                     [userId, historyThreshold]
                   );
-              const learningPreferences = await loadPreferenceMap(db, userId, [
-                    "learning_target_language",
-                    "learning_level",
-                    "learning_focus",
-                    "learning_style",
-                    "conversation_tone",
-                    "comfort_style",
-                    "grounding_preference",
-                    "safety_follow_up_opt_in",
-              ]);
               const learningContext = buildLearningContext(learningPreferences);
               await ensureRelationshipAliasesTable(db);
               const relationshipAliases = await db.all(
@@ -1404,7 +1404,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
       const reply = completion.choices[0].message.content.trim();
                     await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, reply]);
 
-                        // ── AUTO-LEARN CHAT INTENTS ─────────────────────────────────────────---
+                        // Auto-learn frequent chat intents.
                         // Track frequent intents (e.g., schedule, call, remind)
                         const intentPatterns = [
                                 { key: "schedule", regex: /\b(schedule|book|appointment|set up|add to (my )?calendar)\b/i },
@@ -1448,7 +1448,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 }
                         }
 
-                        // ── PROACTIVE AUTOMATION (with user consent) ─────────────────────────--
+                        // â”€â”€ PROACTIVE AUTOMATION (with user consent) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€--
                         // Only perform if user enabled automation
                         let automationPerformed = false;
                         // Check user preferences for enabled automations
@@ -1499,7 +1499,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
 });
 
 
-// ── POST /api/dex/access — check access without chatting ─────────────────────
+// â”€â”€ POST /api/dex/access â€” check access without chatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get("/access", requireUser, async (req, res) => {
     const db = getDb();
     const user = await db.get("SELECT * FROM users WHERE id = ?", [req.user.id]);
@@ -1545,7 +1545,7 @@ router.post("/appointment", requireUser, [
                 [req.user.id, title, description || null, start_time, end_time || null]
         );
 
-        // ── AUTO-LEARN ROUTINE ─────────────────────────────────────────────────---
+        // â”€â”€ AUTO-LEARN ROUTINE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€---
         const user = await getUserRecord(req.user.id);
         if (isPaidSubscriber(user)) {
                 await ensureMemoryTable(db);
