@@ -144,15 +144,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 override fun onError(error: Int) {
                     val mode = activeListenMode
                     activeListenMode = null
-                    if (
-                        mode == BackgroundListenMode.CALL_COMMAND &&
-                        lastCallState == TelephonyManager.CALL_STATE_RINGING &&
-                        (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
-                    ) {
-                        speakAndThenListen(
-                            getString(R.string.call_listening_retry),
-                            BackgroundListenMode.CALL_COMMAND
-                        )
+                    if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                        repromptBackgroundListenMode(mode)
                     }
                 }
 
@@ -605,13 +598,52 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleBackgroundVoiceTranscript(mode: BackgroundListenMode?, transcript: String) {
         val normalized = transcript.trim().lowercase(Locale.US)
-        if (normalized.isBlank()) return
+        if (normalized.isBlank()) {
+            repromptBackgroundListenMode(mode)
+            return
+        }
         when (mode) {
             BackgroundListenMode.CALL_COMMAND -> handleBackgroundCallCommand(normalized)
             BackgroundListenMode.SMS_COMMAND -> handleBackgroundSmsCommand(normalized)
             BackgroundListenMode.SMS_REPLY -> sendPendingSmsReply(transcript)
             BackgroundListenMode.NOTIFICATION_COMMAND -> handleBackgroundNotificationCommand(normalized)
             BackgroundListenMode.CALLER_MESSAGE -> handleCallerMessage(transcript)
+            null -> Unit
+        }
+    }
+
+    private fun repromptBackgroundListenMode(mode: BackgroundListenMode?) {
+        when (mode) {
+            BackgroundListenMode.CALL_COMMAND ->
+                if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
+                    speakAndThenListen(
+                        getString(R.string.call_listening_retry),
+                        BackgroundListenMode.CALL_COMMAND
+                    )
+                }
+            BackgroundListenMode.SMS_COMMAND ->
+                speakAndThenListen(
+                    getString(R.string.incoming_sms_command_retry),
+                    BackgroundListenMode.SMS_COMMAND
+                )
+            BackgroundListenMode.SMS_REPLY -> {
+                val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+                val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, "them").orEmpty()
+                speakAndThenListen(
+                    getString(R.string.incoming_sms_reply_retry, sender),
+                    BackgroundListenMode.SMS_REPLY
+                )
+            }
+            BackgroundListenMode.NOTIFICATION_COMMAND ->
+                speakAndThenListen(
+                    getString(R.string.notification_command_retry),
+                    BackgroundListenMode.NOTIFICATION_COMMAND
+                )
+            BackgroundListenMode.CALLER_MESSAGE ->
+                speakAndThenListen(
+                    getString(R.string.call_message_answer_prompt),
+                    BackgroundListenMode.CALLER_MESSAGE
+                )
             null -> Unit
         }
     }
