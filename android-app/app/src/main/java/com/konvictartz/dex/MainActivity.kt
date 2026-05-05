@@ -217,6 +217,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var lastDexChatMessage = ""
     private var lastDexChatSentAt = 0L
     private var lastLocalEmergencySmsSentAt = 0L
+    private var lastDexSpokenText = ""
+    private var lastDexSpokenAt = 0L
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -2515,6 +2517,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return true
         }
 
+        if (isRecentDexSpeechEcho(normalized)) {
+            binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
+            scheduleWakeListeningRestart(1800)
+            return true
+        }
+
         binding.lastHeardValue.text = sanitizeWakeTranscriptForDisplay(normalized)
 
         if (normalized.contains("stop listening") || normalized.contains("go to sleep")) {
@@ -2581,6 +2589,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return getString(R.string.wake_mode_detected)
         }
         return cleanedCommand.ifBlank { transcript }
+    }
+
+    private fun isRecentDexSpeechEcho(transcript: String): Boolean {
+        val spokenAt = lastDexSpokenAt
+        if (spokenAt == 0L || SystemClock.elapsedRealtime() - spokenAt > DEX_SPEECH_ECHO_GUARD_MS) {
+            return false
+        }
+
+        val transcriptNormalized = normalizeEchoGuardText(transcript)
+        val spokenNormalized = normalizeEchoGuardText(lastDexSpokenText)
+        if (transcriptNormalized.isBlank() || spokenNormalized.isBlank()) return false
+        if (transcriptNormalized == spokenNormalized) return true
+
+        val transcriptWords = transcriptNormalized.split(" ").filter { it.isNotBlank() }
+        if (transcriptWords.size < 4) return false
+
+        return spokenNormalized.contains(transcriptNormalized)
+    }
+
+    private fun normalizeEchoGuardText(text: String): String {
+        return stripWakeWord(text.lowercase(Locale.US))
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
     @Suppress("DEPRECATION")
@@ -2764,6 +2796,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!resumeWakeModeAfterSpeech) {
             mainHandler.removeCallbacks(restartWakeListeningRunnable)
         }
+        lastDexSpokenText = text
+        lastDexSpokenAt = SystemClock.elapsedRealtime()
         textToSpeech?.stop()
         applyTtsProfile(speechProfile)
         val result = textToSpeech?.speak(
@@ -2802,6 +2836,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         this.resumeWakeListeningAfterSpeech = resumeWakeModeAfterSpeech
         pendingSpeechCompletion = onComplete
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
+        lastDexSpokenText = cleanedSegments.joinToString(" ")
+        lastDexSpokenAt = SystemClock.elapsedRealtime()
         textToSpeech?.stop()
         finalSpeechUtteranceId = "dex_voice_final_${System.currentTimeMillis()}"
         val chunks = cleanedSegments.flatMap { buildSpeechChunks(it, speechProfile) }
@@ -5213,6 +5249,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val CALL_ANSWER_RETRY_DELAY_MS = 350L
         private const val CALL_COMMAND_RETRY_DELAY_MS = 400L
         private const val CALL_COMMAND_PROMPT_GUARD_DELAY_MS = 900L
+        private const val DEX_SPEECH_ECHO_GUARD_MS = 8000L
         private const val WAKE_LISTEN_MIN_GAP_MS = 3500L
     }
 }
