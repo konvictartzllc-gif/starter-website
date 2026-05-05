@@ -13,13 +13,18 @@ function getConfig() {
     clientId: process.env.RC_CLIENT_ID,
     clientSecret: process.env.RC_CLIENT_SECRET,
     jwt: process.env.RC_JWT,
+    username: process.env.RC_USERNAME,
+    password: process.env.RC_PASSWORD,
+    extension: process.env.RC_EXTENSION || process.env.RC_EXTENSION_NUMBER,
     server: process.env.RC_SERVER || "https://platform.ringcentral.com",
     fromNumber: process.env.RC_PHONE_NUMBER || process.env.SUPPORT_PHONE || process.env.OWNER_PHONE,
   };
 }
 
 function hasRequiredConfig(config) {
-  return Boolean(config.clientId && config.clientSecret && config.jwt);
+  const hasJwtAuth = Boolean(config.jwt);
+  const hasPasswordAuth = Boolean(config.username && config.password);
+  return Boolean(config.clientId && config.clientSecret && (hasJwtAuth || hasPasswordAuth));
 }
 
 async function fetchJson(url, options = {}) {
@@ -53,7 +58,7 @@ async function loginRingCentral(force = false) {
       configured: false,
       ready: false,
       reason: "missing_credentials",
-      detail: "Missing RC_CLIENT_ID, RC_CLIENT_SECRET, or RC_JWT.",
+      detail: "Missing RingCentral auth. Set RC_CLIENT_ID, RC_CLIENT_SECRET, and either RC_JWT or RC_USERNAME plus RC_PASSWORD.",
     };
     return null;
   }
@@ -86,10 +91,19 @@ async function loginRingCentral(force = false) {
   };
 
   const credentials = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
-  const body = new URLSearchParams({
-    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-    assertion: config.jwt,
-  });
+  const body = new URLSearchParams(
+    config.jwt
+      ? {
+          grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+          assertion: config.jwt,
+        }
+      : {
+          grant_type: "password",
+          username: config.username,
+          password: config.password,
+          ...(config.extension ? { extension: config.extension } : {}),
+        }
+  );
 
   try {
     const token = await fetchJson(`${config.server}/restapi/oauth/token`, {
@@ -138,8 +152,7 @@ async function callRingCentral(path, payload) {
   const config = getConfig();
   const token = await loginRingCentral();
   if (!token) {
-    console.warn("RingCentral not ready, request skipped.");
-    return null;
+    throw new Error(ringCentralStatus.detail || `RingCentral not ready: ${ringCentralStatus.reason}`);
   }
 
   try {
@@ -175,8 +188,7 @@ export async function initRingCentral() {
 export async function sendSms(to, body) {
   const { fromNumber } = getConfig();
   if (!fromNumber) {
-    console.warn("RingCentral missing sender number, SMS skipped.");
-    return;
+    throw new Error("RingCentral missing sender number, SMS skipped.");
   }
   try {
     await callRingCentral("/restapi/v1.0/account/~/extension/~/sms", {
@@ -185,8 +197,10 @@ export async function sendSms(to, body) {
       text: body,
     });
     console.log(`SMS sent to ${to}`);
+    return true;
   } catch (err) {
     console.error("SMS error:", err.message);
+    throw err;
   }
 }
 

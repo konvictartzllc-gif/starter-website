@@ -1387,13 +1387,21 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 let trustedContactEnabled = false;
                                 let trustedContactConfigured = false;
                                 let trustedContactTarget = "";
+                                let trustedContactDelivered = false;
+                                let trustedContactDeliveryError = null;
                                 try {
                                         const memRows = await db.all("SELECT key, value FROM user_memory WHERE user_id = ?", [userId]);
                                         const memory = {};
                                         for (const row of memRows) memory[row.key] = row.value;
-                                        trustedContactEnabled = memory.emergency_contact_permission === "1";
-                                        trustedContactConfigured = Boolean(memory.emergency_contact);
-                                        trustedContactTarget = String(memory.emergency_contact || "").trim();
+                                        trustedContactEnabled =
+                                                memory.emergency_contact_permission === "1" ||
+                                                memory["pref:emergency_contact_permission"] === "1";
+                                        trustedContactTarget = String(
+                                                memory.emergency_contact ||
+                                                memory["pref:emergency_contact"] ||
+                                                ""
+                                        ).trim();
+                                        trustedContactConfigured = Boolean(trustedContactTarget);
                                 } catch {}
 
                                 if (trustedContactEnabled && trustedContactConfigured && trustedContactTarget) {
@@ -1403,30 +1411,41 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                                 `A serious safety concern was detected from this message: "${message}". ` +
                                                 `Please check on them right away.`;
                                         if (normalizedTrustedContactTarget.includes("@")) {
-                                                Promise.resolve(
-                                                        sendCustomEmail({
+                                                try {
+                                                        trustedContactDelivered = await sendCustomEmail({
                                                                 to: normalizedTrustedContactTarget,
                                                                 subject: "Dex emergency contact alert",
                                                                 body: trustedContactMessage,
-                                                        })
-                                                ).catch((error) => {
+                                                        });
+                                                        if (!trustedContactDelivered) {
+                                                                trustedContactDeliveryError = "email_not_sent";
+                                                        }
+                                                } catch (error) {
+                                                        trustedContactDeliveryError = error?.message || "email_failed";
                                                         console.error("Emergency contact email error:", error?.message || error);
-                                                });
+                                                }
                                         } else {
-                                                Promise.resolve(sendSms(normalizedTrustedContactTarget, trustedContactMessage)).catch((error) => {
+                                                try {
+                                                        trustedContactDelivered = await sendSms(normalizedTrustedContactTarget, trustedContactMessage);
+                                                } catch (error) {
+                                                        trustedContactDeliveryError = error?.message || "sms_failed";
                                                         console.error("Emergency contact SMS error:", error?.message || error);
-                                                });
+                                                }
                                         }
                                 }
 
                                 return res.json({
-                                        reply: trustedContactEnabled && trustedContactConfigured
+                                        reply: trustedContactDelivered
                                                 ? reply + " I also used your emergency contact plan to reach out for extra support."
-                                                : reply,
+                                                : trustedContactEnabled && trustedContactConfigured
+                                                        ? reply + " I tried to reach your emergency contact, but the message could not be confirmed. Please contact them directly if you can."
+                                                        : reply,
                                         emergency: true,
                                         emergencyType: safetySignal.type,
                                         trustedContactEnabled,
                                         trustedContactConfigured,
+                                        trustedContactDelivered,
+                                        trustedContactDeliveryError,
                                 });
                         }
 
