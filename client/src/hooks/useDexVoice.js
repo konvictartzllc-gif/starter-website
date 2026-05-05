@@ -10,12 +10,24 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
   const listeningForCommandRef = useRef(false);
   const wakeTimeoutRef = useRef(null);
   const synthRef = useRef(window.speechSynthesis);
+  const isSpeakingRef = useRef(false);
+  const lastCommandRef = useRef({ text: "", at: 0 });
 
   const clearWakeTimeout = useCallback(() => {
     if (wakeTimeoutRef.current) {
       clearTimeout(wakeTimeoutRef.current);
       wakeTimeoutRef.current = null;
     }
+  }, []);
+
+  const shouldIgnoreCommand = useCallback((command) => {
+    const now = Date.now();
+    const isDuplicate =
+      lastCommandRef.current.text === command &&
+      now - lastCommandRef.current.at < 2500;
+    if (isDuplicate) return true;
+    lastCommandRef.current = { text: command, at: now };
+    return false;
   }, []);
 
   useEffect(() => {
@@ -35,6 +47,8 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     recognitionRef.current = recognition;
 
     recognition.onresult = (event) => {
+      if (isSpeakingRef.current) return;
+
       const results = Array.from(event.results);
       const lastResult = results[results.length - 1];
       const transcript = lastResult[0].transcript.toLowerCase().trim();
@@ -50,6 +64,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
           // If the user says the wake phrase and command in the same utterance,
           // send it immediately instead of waiting for a second transcript.
           if (lastResult.isFinal && spokenCommand.length > 2) {
+            if (shouldIgnoreCommand(spokenCommand)) return;
             clearWakeTimeout();
             listeningForCommandRef.current = false;
             setStatus("listening");
@@ -69,6 +84,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
         if (lastResult.isFinal && transcript.trim()) {
           const command = transcript.replace(WAKE_WORD, "").trim();
           if (command.length > 2) {
+            if (shouldIgnoreCommand(command)) return;
             clearWakeTimeout();
             listeningForCommandRef.current = false;
             setStatus("listening");
@@ -91,7 +107,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
 
     recognition.onend = () => {
       // Auto-restart to keep listening
-      if (enabled) {
+      if (enabled && !isSpeakingRef.current) {
         try { recognition.start(); } catch {}
       }
     };
@@ -110,18 +126,22 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
       recognitionRef.current = null;
       setStatus("idle");
     };
-  }, [enabled, onWakeWord, onTranscript, clearWakeTimeout]);
+  }, [enabled, onWakeWord, onTranscript, clearWakeTimeout, shouldIgnoreCommand]);
 
   const speak = useCallback((text) => {
     const synth = synthRef.current;
     if (!synth || !text?.trim()) return;
 
     const speakNow = () => {
+      isSpeakingRef.current = true;
+      clearWakeTimeout();
+      listeningForCommandRef.current = false;
+      try { recognitionRef.current?.stop(); } catch {}
       synth.cancel();
       if (typeof synth.resume === "function") synth.resume();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
+      utterance.rate = 0.9;
+      utterance.pitch = 0.95;
       utterance.volume = 1.0;
       // Try to pick a natural voice
       const voices = synth.getVoices();
@@ -136,8 +156,13 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
         );
       if (preferred) utterance.voice = preferred;
       setStatus("speaking");
-      utterance.onend = () => setStatus("listening");
-      utterance.onerror = () => setStatus("listening");
+      const resumeListening = () => {
+        isSpeakingRef.current = false;
+        setStatus("listening");
+        try { recognitionRef.current?.start(); } catch {}
+      };
+      utterance.onend = resumeListening;
+      utterance.onerror = resumeListening;
       synth.speak(utterance);
     };
 
@@ -155,8 +180,10 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     const synth = synthRef.current;
     if (!synth) return;
     synth.cancel();
+    isSpeakingRef.current = false;
     setStatus("listening");
-  }, []);
+    try { recognitionRef.current?.start(); } catch {}
+  }, [clearWakeTimeout]);
 
   return { status, isSupported, speak, stopSpeaking };
 }

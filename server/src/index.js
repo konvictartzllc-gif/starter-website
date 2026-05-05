@@ -18,6 +18,7 @@ import affiliateRoutes from "./routes/affiliate.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
+app.set("trust proxy", 1);
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 const defaultOrigins = [
@@ -111,12 +112,16 @@ app.use(express.json());
 // Rate limiting
 const limiter = rateLimit({ 
   windowMs: 15 * 60 * 1000, 
-  max: 50,
+  max: Number(process.env.API_RATE_LIMIT_PER_15_MINUTES || 300),
+  skip: (req) =>
+    req.path === "/dex/chat" ||
+    req.path === "/health" ||
+    req.path === "/diagnostics/providers",
   message: { error: "Too many requests. Please try again later." }
 });
 const chatLimiter = rateLimit({ 
   windowMs: 60 * 1000, 
-  max: 5, 
+  max: Number(process.env.CHAT_RATE_LIMIT_PER_MINUTE || 60),
   message: { error: "Dex is busy. Please wait a minute before sending more messages." } 
 });
 app.use("/api/", limiter);

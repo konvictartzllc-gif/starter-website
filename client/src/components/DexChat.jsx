@@ -76,7 +76,7 @@ export default function DexChat() {
       } catch {
         // Ignore background polling failures in the widget.
       }
-    }, 5000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [user, speak]);
 

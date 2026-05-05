@@ -1,8 +1,8 @@
 ﻿import { Router } from "express";
 import { body, validationResult } from "express-validator";
-import OpenAI from "openai";
 import { requireUser, optionalUser } from "../middleware/auth.js";
 import { getDb } from "../db.js";
+import { getAIClient, getAIStatus } from "../services/ai.js";
 import { triggerEmergencyAlert, sendLowInventoryAlert, sendSms, makeCall } from "../services/ringcentral.js";
 import { createEvent, listEvents } from "../services/calendar.js";
 import { verifyOta, spamFilter } from "../middleware/security.js";
@@ -1114,7 +1114,7 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
                                         content:
                                                 `Create a daily ${learning.language} lesson for a ${learning.level} learner focused on ${learning.focus}. ` +
                                                 `Teaching style: ${learning.style}. Topic: ${learning.topic}. ` +
-                                                "Return a short title on the first line, then a concise lesson with: vocabulary, pronunciation help, two example sentences, and a mini practice prompt.",
+                                                "Return a short title on the first line, then a concise lesson with: vocabulary, pronunciation help, two example sentences, and a mini practice prompt. For pronunciation, put sound-it-out phonetics in parentheses after the word, like hola (oh lah); do not spell words letter by letter.",
                                 },
                         ],
                         max_tokens: 700,
@@ -1282,7 +1282,18 @@ router.post("/learning/quiz/submit", requireUser, async (req, res) => {
 
 
 function getOpenAI() {
-    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const status = getAIStatus();
+    if (!status.ready) {
+        const error = new Error(
+                status.reason === "missing_api_key"
+                        ? "AI provider is not configured. Add OPENAI_API_KEY to server/.env or choose a configured AI_PROVIDER."
+                        : "AI provider is not ready."
+        );
+        error.statusCode = 503;
+        error.code = status.reason || "ai_not_ready";
+        throw error;
+    }
+    return getAIClient();
 }
 
 const DEX_SYSTEM_PROMPT = `You are Dex, a friendly and empathetic AI assistant for Konvict Artz. You help users with scheduling, questions, general support, and teaching. Be warm, concise, and helpful.

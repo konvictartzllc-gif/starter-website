@@ -99,6 +99,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ttsReady = false
             return
         }
+        textToSpeech?.setSpeechRate(DEX_TTS_BACKGROUND_RATE)
+        textToSpeech?.setPitch(DEX_TTS_PITCH)
         val languageResult = textToSpeech?.setLanguage(Locale.US) ?: TextToSpeech.ERROR
         ttsReady = languageResult != TextToSpeech.LANG_MISSING_DATA &&
             languageResult != TextToSpeech.LANG_NOT_SUPPORTED &&
@@ -644,6 +646,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun speakNow(text: String) {
+        textToSpeech?.setSpeechRate(DEX_TTS_BACKGROUND_RATE)
+        textToSpeech?.setPitch(DEX_TTS_PITCH)
         textToSpeech?.speak(
             text,
             TextToSpeech.QUEUE_FLUSH,
@@ -703,5 +707,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val EXTRA_NOTIFICATION_TITLE = "extra_notification_title"
         const val EXTRA_NOTIFICATION_TEXT = "extra_notification_text"
         const val KEY_REMOTE_REPLY_TEXT = "dex_remote_reply_text"
+        private const val DEX_TTS_BACKGROUND_RATE = 0.88f
+        private const val DEX_TTS_PITCH = 0.95f
     }
 }

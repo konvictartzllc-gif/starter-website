@@ -82,6 +82,12 @@ private enum class DecorationPickTarget {
     RIGHT_STICKER,
 }
 
+private enum class DexSpeechProfile {
+    CONVERSATION,
+    TEACHING,
+    PRONUNCIATION,
+}
+
 private data class PendingAction(
     val kind: PendingActionKind,
     val summary: String,
@@ -123,6 +129,12 @@ private data class QuizSession(
     val questions: List<QuizQuestion>,
     val answers: MutableList<String> = mutableListOf(),
     var currentIndex: Int = 0,
+)
+
+private data class SpeechChunk(
+    val text: String,
+    val profile: DexSpeechProfile,
+    val pauseAfterMs: Long = 450L,
 )
 
 private enum class PendingContactAction {
@@ -196,6 +208,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var activeQuizSession: QuizSession? = null
     private var listeningForQuizAnswer = false
     private var restoreWakeEngineAfterQuiz = false
+    private var dexChatInFlight = false
+    private var lastDexChatMessage = ""
+    private var lastDexChatSentAt = 0L
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -397,8 +412,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build()
         )
-        textToSpeech?.setSpeechRate(1.0f)
-        textToSpeech?.setPitch(1.0f)
+        applyTtsProfile(DexSpeechProfile.CONVERSATION)
 
         val languageResult = textToSpeech?.setLanguage(Locale.US) ?: TextToSpeech.ERROR
         ttsReady = languageResult != TextToSpeech.LANG_MISSING_DATA &&
@@ -2691,7 +2705,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun speakDex(
         text: String,
         activeStatusResId: Int = R.string.voice_speaking,
-        resumeWakeModeAfterSpeech: Boolean = false
+        resumeWakeModeAfterSpeech: Boolean = false,
+        speechProfile: DexSpeechProfile = DexSpeechProfile.CONVERSATION
     ) {
         if (!ttsReady) {
             if (shouldResumeCallListeningAfterSpeech && lastCallState == TelephonyManager.CALL_STATE_RINGING) {
@@ -2710,6 +2725,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             mainHandler.removeCallbacks(restartWakeListeningRunnable)
         }
         textToSpeech?.stop()
+        applyTtsProfile(speechProfile)
         val result = textToSpeech?.speak(
             text,
             TextToSpeech.QUEUE_FLUSH,
@@ -2730,6 +2746,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         segments: List<String>,
         activeStatusResId: Int = R.string.voice_speaking,
         resumeWakeModeAfterSpeech: Boolean = false,
+        speechProfile: DexSpeechProfile = DexSpeechProfile.TEACHING,
         onComplete: (() -> Unit)? = null
     ) {
         val cleanedSegments = segments.map { it.trim() }.filter { it.isNotBlank() }
@@ -2738,7 +2755,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
         if (!ttsReady) {
-            speakDex(cleanedSegments.joinToString(" "), activeStatusResId, resumeWakeModeAfterSpeech)
+            speakDex(cleanedSegments.joinToString(" "), activeStatusResId, resumeWakeModeAfterSpeech, speechProfile)
             onComplete?.invoke()
             return
         }
@@ -2747,18 +2764,68 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
         textToSpeech?.stop()
         finalSpeechUtteranceId = "dex_voice_final_${System.currentTimeMillis()}"
-        cleanedSegments.forEachIndexed { index, segment ->
+        val chunks = cleanedSegments.flatMap { buildSpeechChunks(it, speechProfile) }
+        chunks.forEachIndexed { index, chunk ->
             val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
             val utteranceId =
-                if (index == cleanedSegments.lastIndex) finalSpeechUtteranceId
+                if (index == chunks.lastIndex) finalSpeechUtteranceId
                 else "dex_voice_part_${System.currentTimeMillis()}_$index"
-            textToSpeech?.speak(segment, queueMode, null, utteranceId)
-            if (index < cleanedSegments.lastIndex) {
-                textToSpeech?.playSilentUtterance(450L, TextToSpeech.QUEUE_ADD, null)
+            applyTtsProfile(chunk.profile)
+            textToSpeech?.speak(chunk.text, queueMode, null, utteranceId)
+            if (index < chunks.lastIndex) {
+                textToSpeech?.playSilentUtterance(chunk.pauseAfterMs, TextToSpeech.QUEUE_ADD, null)
             }
         }
         ttsStatusMessage = getString(activeStatusResId)
         refreshVoiceStatus()
+    }
+
+    private fun applyTtsProfile(profile: DexSpeechProfile) {
+        val rate = when (profile) {
+            DexSpeechProfile.CONVERSATION -> DEX_TTS_CONVERSATION_RATE
+            DexSpeechProfile.TEACHING -> DEX_TTS_TEACHING_RATE
+            DexSpeechProfile.PRONUNCIATION -> DEX_TTS_PRONUNCIATION_RATE
+        }
+        textToSpeech?.setSpeechRate(rate)
+        textToSpeech?.setPitch(DEX_TTS_PITCH)
+    }
+
+    private fun buildSpeechChunks(segment: String, defaultProfile: DexSpeechProfile): List<SpeechChunk> {
+        val matches = Regex("\\(([^()]{2,80})\\)").findAll(segment).toList()
+        if (matches.isEmpty()) {
+            return listOf(SpeechChunk(segment, defaultProfile, TEACHING_PAUSE_MS))
+        }
+
+        val chunks = mutableListOf<SpeechChunk>()
+        var cursor = 0
+        for (match in matches) {
+            val before = segment.substring(cursor, match.range.first).trim()
+            if (before.isNotBlank()) {
+                chunks += SpeechChunk(before, defaultProfile, TEACHING_PAUSE_MS)
+            }
+
+            val pronunciation = normalizePronunciationText(match.groupValues[1])
+            if (pronunciation.isNotBlank()) {
+                chunks += SpeechChunk("pronounced $pronunciation", DexSpeechProfile.PRONUNCIATION, PRONUNCIATION_PAUSE_MS)
+            }
+            cursor = match.range.last + 1
+        }
+
+        val after = segment.substring(cursor).trim()
+        if (after.isNotBlank()) {
+            chunks += SpeechChunk(after, defaultProfile, TEACHING_PAUSE_MS)
+        }
+        return chunks.ifEmpty { listOf(SpeechChunk(segment, defaultProfile, TEACHING_PAUSE_MS)) }
+    }
+
+    private fun normalizePronunciationText(text: String): String {
+        return text
+            .replace("/", " ")
+            .replace("-", " ")
+            .replace("·", " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .lowercase(Locale.US)
     }
 
     private fun openVoiceSetup() {
@@ -3749,6 +3816,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.conversationStatus.text = getString(R.string.wake_mode_server_needed)
             return
         }
+        val normalizedMessage = message.trim().lowercase(Locale.US)
+        val now = SystemClock.elapsedRealtime()
+        if (dexChatInFlight) {
+            binding.conversationStatus.text = getString(R.string.wake_mode_thinking)
+            return
+        }
+        if (normalizedMessage == lastDexChatMessage && now - lastDexChatSentAt < DEX_CHAT_DUPLICATE_GUARD_MS) {
+            return
+        }
+        dexChatInFlight = true
+        lastDexChatMessage = normalizedMessage
+        lastDexChatSentAt = now
         awaitingWakeCommand = false
         mainHandler.removeCallbacks(resetWakeWindowRunnable)
         binding.lastHeardValue.text = message
@@ -3763,6 +3842,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 conversationActive = true
                 scheduleConversationTimeout()
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                dexChatInFlight = false
             }.onFailure { error ->
                 val fallback = error.message ?: getString(R.string.wake_mode_fallback_reply)
                 binding.lastReplyValue.text = fallback
@@ -3770,6 +3850,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 conversationActive = true
                 scheduleConversationTimeout()
                 speakDex(fallback, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                dexChatInFlight = false
             }
         }
     }
@@ -4828,6 +4909,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEFAULT_ACCENT_COLOR = "#69C6FF"
         private const val DEFAULT_BACKGROUND_COLOR = "#0F172A"
         private const val DEFAULT_PANEL_COLOR = "#182131"
+        private const val DEX_TTS_CONVERSATION_RATE = 0.88f
+        private const val DEX_TTS_TEACHING_RATE = 0.74f
+        private const val DEX_TTS_PRONUNCIATION_RATE = 0.55f
+        private const val DEX_TTS_PITCH = 0.95f
+        private const val TEACHING_PAUSE_MS = 650L
+        private const val PRONUNCIATION_PAUSE_MS = 950L
         private const val MAX_DASHBOARD_SECTIONS = 8
         private const val THEME_OCEAN = "ocean"
         private const val THEME_SUNSET = "sunset"
@@ -4841,6 +4928,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             "hey dick's"
         )
         private const val CONVERSATION_TIMEOUT_MS = 45_000L
+        private const val DEX_CHAT_DUPLICATE_GUARD_MS = 4_000L
         private const val MAX_CALL_ANSWER_RETRIES = 2
         private const val CALL_ANSWER_RETRY_DELAY_MS = 350L
         private const val CALL_COMMAND_RETRY_DELAY_MS = 400L

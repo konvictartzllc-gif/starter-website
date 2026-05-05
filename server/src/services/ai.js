@@ -1,4 +1,10 @@
 import OpenAI from "openai";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 let aiClient = null;
 let aiProvider = null;
@@ -15,7 +21,8 @@ export async function initAI() {
 
   try {
     if (aiProvider === "groq") {
-      if (!process.env.GROQ_API_KEY) {
+      const groqApiKey = process.env.GROQ_API_KEY?.trim();
+      if (!groqApiKey) {
         aiStatus = {
           configured: false,
           ready: false,
@@ -27,7 +34,7 @@ export async function initAI() {
         return;
       }
       aiClient = new OpenAI({
-        apiKey: process.env.GROQ_API_KEY,
+        apiKey: groqApiKey,
         baseURL: "https://api.groq.com/openai/v1",
       });
       console.log("✅ AI Provider: Groq (Free & Fast)");
@@ -39,7 +46,8 @@ export async function initAI() {
       console.log("✅ AI Provider: Ollama (Self-Hosted)");
     } else {
       // Default to OpenAI
-      if (!process.env.OPENAI_API_KEY) {
+      const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
+      if (!openaiApiKey) {
         aiStatus = {
           configured: false,
           ready: false,
@@ -51,7 +59,7 @@ export async function initAI() {
         return;
       }
       aiClient = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
+        apiKey: openaiApiKey,
       });
       console.log("✅ AI Provider: OpenAI");
     }
