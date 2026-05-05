@@ -3619,7 +3619,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun handleCallReminderIntent(message: String): String? {
-        val normalized = message.trim().lowercase(Locale.US)
+        val resolvedMessage = resolveAliasesInSentence(message.trim())
+        val normalized = resolvedMessage.lowercase(Locale.US)
         val reminderIntent =
             normalized.contains("remind me") ||
                 normalized.contains("set a reminder") ||
@@ -3627,15 +3628,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 normalized.contains("make a reminder")
         if (!reminderIntent || !normalized.contains("call ")) return null
 
-        val match = Regex(
-            "(?:remind me|set a reminder|create a reminder|make a reminder)(?:\\s+to)?\\s+call\\s+(.+?)\\s+(?:at|for|on)\\s+(.+)$",
-            RegexOption.IGNORE_CASE
-        ).find(message.trim()) ?: return null
-
-        val rawTarget = match.groupValues[1].trim().trimEnd('.', '!', '?')
+        val rawTarget = extractReminderCallTarget(resolvedMessage)
         if (rawTarget.isBlank()) return null
 
-        val reminderAt = inferDateTimeFromCommand(message)
+        val reminderAt = inferDateTimeFromCommand(resolvedMessage)
         val reminderTarget =
             findExactPhoneContactByName(resolveContactAlias(rawTarget))?.displayName
                 ?: findPhoneContactByName(resolveContactAlias(rawTarget))?.displayName
@@ -3648,6 +3644,44 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         val spokenTime = reminderAt.format(DateTimeFormatter.ofPattern("h:mm a", Locale.US))
         return getString(R.string.call_reminder_set, reminderTarget, spokenTime)
+    }
+
+    private fun extractReminderCallTarget(message: String): String {
+        val lowered = message.lowercase(Locale.US)
+        val callIndex = lowered.lastIndexOf("call ")
+        if (callIndex < 0) return ""
+
+        var target = message.substring(callIndex + 5)
+            .trim()
+            .trimEnd('.', '!', '?', ',')
+
+        target = target
+            .replace(
+                Regex(
+                    "\\b(?:at|for|on)\\s+\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?\\b.*$",
+                    RegexOption.IGNORE_CASE
+                ),
+                ""
+            )
+            .replace(
+                Regex(
+                    "\\b(?:today|tomorrow|tonight|this morning|this afternoon|this evening|next week|next monday|next tuesday|next wednesday|next thursday|next friday|next saturday|next sunday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b.*$",
+                    RegexOption.IGNORE_CASE
+                ),
+                ""
+            )
+            .replace(
+                Regex(
+                    "\\b(?:in the morning|in the afternoon|in the evening)\\b.*$",
+                    RegexOption.IGNORE_CASE
+                ),
+                ""
+            )
+            .replace(Regex("^(?:to\\s+)", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s+(?:please|for me)$", RegexOption.IGNORE_CASE), "")
+            .trim()
+
+        return target
     }
 
     private fun consumePendingNotification(normalized: String): Boolean? {
