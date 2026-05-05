@@ -219,6 +219,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var lastLocalEmergencySmsSentAt = 0L
     private var lastDexSpokenText = ""
     private var lastDexSpokenAt = 0L
+    private var lastEmergencyTriggerReason = ""
+    private var lastEmergencySmsStatus = ""
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -667,6 +669,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.previewEmergencyPlanButton.setOnClickListener {
             previewEmergencyPlan()
         }
+        binding.testEmergencySmsButton.setOnClickListener {
+            testEmergencySms()
+        }
 
         binding.getDailyLessonButton.setOnClickListener {
             requestDailyLesson()
@@ -910,6 +915,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.lastReplyValue.text = getString(R.string.voice_dash)
         binding.conversationStatus.text = getString(R.string.wake_mode_off)
         binding.safetyProfileMessage.text = ""
+        binding.safetyDiagnosticsValue.text = ""
         binding.learningLessonPreview.text = ""
         binding.learningQuizPreview.text = ""
         updatePendingActionUi()
@@ -1150,6 +1156,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.safetyProfileMessage.text =
                 if (failed) getString(R.string.safety_profile_failed) else getString(R.string.safety_profile_saved)
             if (!failed) fetchSafetyPreferences()
+            refreshSafetyDiagnostics()
         }
     }
 
@@ -1164,6 +1171,43 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.safetyProfileMessage.text = reply
         binding.lastReplyValue.text = reply
         speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
+        refreshSafetyDiagnostics()
+    }
+
+    private fun testEmergencySms() {
+        val savedContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
+        val phoneNumber = normalizeSmsPhoneNumber(savedContact)
+        if (phoneNumber.isBlank()) {
+            val reply = getString(R.string.test_emergency_sms_missing_contact)
+            binding.safetyProfileMessage.text = reply
+            binding.lastReplyValue.text = reply
+            refreshSafetyDiagnostics(lastStatus = reply)
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            val reply = getString(R.string.local_emergency_sms_permission_missing)
+            binding.safetyProfileMessage.text = reply
+            binding.lastReplyValue.text = reply
+            refreshSafetyDiagnostics(lastStatus = reply)
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
+            return
+        }
+
+        val userName = currentUserName.ifBlank { getString(R.string.dex_user_fallback_name) }
+        val body = getString(R.string.test_emergency_sms_body, userName)
+        val status = sendLocalEmergencySmsWithStatus(
+            phoneNumber = phoneNumber,
+            smsBody = body,
+            startedAt = SystemClock.elapsedRealtime(),
+            countForCooldown = false,
+            triggerReason = "manual emergency sms test"
+        )
+        val reply = getString(R.string.test_emergency_sms_sent)
+        binding.safetyProfileMessage.text = reply
+        binding.lastReplyValue.text = listOf(reply, status).joinToString(" ")
+        refreshSafetyDiagnostics(lastStatus = status, lastTrigger = "manual emergency sms test")
+        speakDex(binding.lastReplyValue.text.toString(), R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
     }
 
     private fun previewEmergencyPlan() {
@@ -2222,9 +2266,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.safetyProfileMessage.text =
                     if (contactPermission) getString(R.string.safety_notify_contact)
                     else getString(R.string.safety_contact_none)
+                refreshSafetyDiagnostics()
             }.onFailure {
                 binding.safetyProfileSummary.text = getString(R.string.safety_profile_default)
                 binding.safetyProfileMessage.text = getString(R.string.safety_contact_none)
+                refreshSafetyDiagnostics()
             }
         }
     }
@@ -2402,6 +2448,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (ready) getString(R.string.android_permissions_ready)
             else getString(R.string.android_permissions_missing)
         if (!ready) autoWakeStarted = false
+        refreshSafetyDiagnostics()
     }
 
     private fun autoStartWakeModeIfReady() {
@@ -4107,6 +4154,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val emergency = forceEmergency || response?.optBoolean("emergency", false) == true
         if (!emergency) return null
         if (response?.optBoolean("trustedContactDelivered", false) == true) return null
+        if (lastEmergencyTriggerReason.isBlank()) {
+            lastEmergencyTriggerReason =
+                if (forceEmergency) "local high-risk phrase" else "server emergency response"
+        }
 
         val now = SystemClock.elapsedRealtime()
         if (now - lastLocalEmergencySmsSentAt < LOCAL_EMERGENCY_SMS_COOLDOWN_MS) return null
@@ -4122,13 +4173,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (phoneNumber.isBlank()) return null
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            return getString(R.string.local_emergency_sms_permission_missing)
+            return getString(R.string.local_emergency_sms_permission_missing).also {
+                refreshSafetyDiagnostics(lastStatus = it)
+            }
         }
 
         val userName = currentUserName.ifBlank { getString(R.string.dex_user_fallback_name) }
         val shortMessage = triggerMessage.trim().replace(Regex("\\s+"), " ").take(72)
         val smsBody = getString(R.string.local_emergency_sms_body, userName, shortMessage)
-        return sendLocalEmergencySmsWithStatus(phoneNumber, smsBody, now)
+        return sendLocalEmergencySmsWithStatus(
+            phoneNumber = phoneNumber,
+            smsBody = smsBody,
+            startedAt = now,
+            triggerReason = lastEmergencyTriggerReason
+        )
     }
 
     private fun isHighRiskEmergencyMessage(message: String): Boolean {
@@ -4180,7 +4238,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return highRiskPhrases.any { normalized.contains(it) }
     }
 
-    private fun sendLocalEmergencySmsWithStatus(phoneNumber: String, smsBody: String, startedAt: Long): String {
+    private fun sendLocalEmergencySmsWithStatus(
+        phoneNumber: String,
+        smsBody: String,
+        startedAt: Long,
+        countForCooldown: Boolean = true,
+        triggerReason: String = lastEmergencyTriggerReason.ifBlank { "unknown" }
+    ): String {
         val token = startedAt.toInt()
         val sentIntent = Intent(ACTION_LOCAL_EMERGENCY_SMS_SENT).putExtra(EXTRA_SMS_TOKEN, token)
         val deliveredIntent = Intent(ACTION_LOCAL_EMERGENCY_SMS_DELIVERED).putExtra(EXTRA_SMS_TOKEN, token)
@@ -4197,6 +4261,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         registerLocalEmergencySmsStatusReceiver(token)
+        lastEmergencyTriggerReason = triggerReason
 
         return runCatching {
             val smsManager = resolveSmsManager()
@@ -4216,11 +4281,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }.fold(
             onSuccess = {
-                lastLocalEmergencySmsSentAt = startedAt
-                getString(R.string.local_emergency_sms_attempting)
+                if (countForCooldown) {
+                    lastLocalEmergencySmsSentAt = startedAt
+                }
+                getString(R.string.local_emergency_sms_attempting).also {
+                    refreshSafetyDiagnostics(lastStatus = it, lastTrigger = triggerReason)
+                }
             },
             onFailure = {
-                getString(R.string.local_emergency_sms_failed)
+                getString(R.string.local_emergency_sms_failed).also {
+                    refreshSafetyDiagnostics(lastStatus = it, lastTrigger = triggerReason)
+                }
             }
         )
     }
@@ -4235,6 +4306,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (message.isNotBlank()) {
                 binding.conversationStatus.text = message
                 binding.lastReplyValue.text = "${binding.lastReplyValue.text} $message".trim()
+                refreshSafetyDiagnostics(lastStatus = message)
             }
             runCatching { unregisterReceiver(receiver) }
         }
@@ -4281,6 +4353,34 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 }
             )
         }, LOCAL_EMERGENCY_SMS_DELIVERY_TIMEOUT_MS)
+    }
+
+    private fun refreshSafetyDiagnostics(lastStatus: String? = null, lastTrigger: String? = null) {
+        lastStatus?.let { lastEmergencySmsStatus = it }
+        lastTrigger?.let { lastEmergencyTriggerReason = it }
+        val savedContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
+        val normalizedTarget = normalizeSmsPhoneNumber(savedContact).ifBlank { getString(R.string.safety_contact_none) }
+        val alertsEnabled = if (binding.safetyNotifyTrustedContactSwitch.isChecked) {
+            getString(R.string.diagnostic_enabled)
+        } else {
+            getString(R.string.diagnostic_disabled)
+        }
+        val smsPermission = if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+            getString(R.string.diagnostic_granted)
+        } else {
+            getString(R.string.diagnostic_missing)
+        }
+        val trigger = lastEmergencyTriggerReason.ifBlank { getString(R.string.diagnostic_none) }
+        val status = lastEmergencySmsStatus.ifBlank { getString(R.string.diagnostic_none) }
+        binding.safetyDiagnosticsValue.text = getString(
+            R.string.safety_diagnostics_template,
+            savedContact.ifBlank { getString(R.string.safety_contact_none) },
+            normalizedTarget,
+            alertsEnabled,
+            smsPermission,
+            trigger,
+            status
+        )
     }
 
     private fun normalizeSmsPhoneNumber(value: String): String {

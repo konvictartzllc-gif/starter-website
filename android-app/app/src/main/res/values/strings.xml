@@ -134,6 +134,7 @@
     <string name="safety_contact_none">not set</string>
     <string name="test_safety_check_in">Test check-in</string>
     <string name="preview_emergency_plan">Preview emergency plan</string>
+    <string name="test_emergency_sms">Test emergency SMS</string>
     <string name="safety_check_in_scheduled">Dex will send a support check-in in about one minute.</string>
     <string name="safety_check_in_title">Dex check-in</string>
     <string name="safety_check_in_text">Hey, Dex is checking in on you. Take a breath, drink some water if you can, and open Dex if you want support.</string>
@@ -306,6 +307,15 @@
     <string name="local_emergency_sms_sent_no_receipt">This phone sent the emergency text to your carrier, but Android did not provide a delivery receipt. Please still contact your trusted contact directly if you can.</string>
     <string name="local_emergency_sms_permission_missing">Dex needs Android text-message permission before it can text your trusted contact from this phone.</string>
     <string name="local_emergency_sms_failed">Dex could not send the emergency text from this phone. Please contact your trusted contact directly if you can.</string>
+    <string name="test_emergency_sms_body">Dex emergency SMS test for %1$s. If you received this, the trusted-contact text path is working on this phone.</string>
+    <string name="test_emergency_sms_sent">Dex sent a test emergency text request to your trusted contact.</string>
+    <string name="test_emergency_sms_missing_contact">Add a trusted contact phone number before testing emergency SMS.</string>
+    <string name="safety_diagnostics_template">Saved contact: %1$s\nNormalized SMS target: %2$s\nTrusted-contact alerts: %3$s\nSMS permission: %4$s\nLast emergency trigger: %5$s\nLast SMS status: %6$s</string>
+    <string name="diagnostic_enabled">enabled</string>
+    <string name="diagnostic_disabled">disabled</string>
+    <string name="diagnostic_granted">granted</string>
+    <string name="diagnostic_missing">missing</string>
+    <string name="diagnostic_none">none yet</string>
     <string name="email_draft_opened">I opened the email draft for %1$s.</string>
     <string name="call_direct_started">Calling %1$s now.</string>
     <string name="app_opened">I opened %1$s.</string>
