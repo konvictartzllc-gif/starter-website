@@ -318,6 +318,16 @@
     <string name="diagnostic_granted">granted</string>
     <string name="diagnostic_missing">missing</string>
     <string name="diagnostic_none">none yet</string>
+    <string name="alias_manager_title">Contact voice aliases</string>
+    <string name="alias_manager_summary">Teach Dex nicknames and spoken shortcuts for your saved contacts.</string>
+    <string name="alias_name_hint">Alias to say</string>
+    <string name="alias_contact_hint">Saved contact name</string>
+    <string name="save_alias">Save alias</string>
+    <string name="clear_aliases">Clear aliases</string>
+    <string name="alias_saved">Dex saved that alias.</string>
+    <string name="alias_missing">Enter both an alias and the saved contact name.</string>
+    <string name="alias_summary_none">No local aliases saved yet.</string>
+    <string name="alias_clear_done">Dex cleared your local aliases.</string>
     <string name="email_draft_opened">I opened the email draft for %1$s.</string>
     <string name="call_direct_started">Calling %1$s now.</string>
     <string name="app_opened">I opened %1$s.</string>

@@ -710,6 +710,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.testEmergencySmsButton.setOnClickListener {
             testEmergencySms()
         }
+        binding.saveAliasButton.setOnClickListener {
+            saveLocalRelationshipAlias()
+        }
+        binding.clearAliasesButton.setOnClickListener {
+            clearLocalRelationshipAliases()
+        }
 
         binding.getDailyLessonButton.setOnClickListener {
             requestDailyLesson()
@@ -954,6 +960,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.conversationStatus.text = getString(R.string.wake_mode_off)
         binding.safetyProfileMessage.text = ""
         binding.safetyDiagnosticsValue.text = ""
+        binding.aliasSummaryValue.text = ""
         binding.learningLessonPreview.text = ""
         binding.learningQuizPreview.text = ""
         updatePendingActionUi()
@@ -2319,21 +2326,93 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         lifecycleScope.launch {
             val result = getJson("$serverUrl/dex/relationship-aliases", token)
             result.onSuccess { response ->
-                val aliases = response.optJSONArray("aliases") ?: JSONArray()
-                val map = mutableMapOf<String, String>()
-                for (index in 0 until aliases.length()) {
-                    val item = aliases.optJSONObject(index) ?: continue
-                    val alias = item.optString("alias").trim().lowercase(Locale.US)
-                    val contactName = item.optString("contact_name").trim()
-                    if (alias.isNotBlank() && contactName.isNotBlank()) {
-                        map[alias] = contactName
-                    }
-                }
-                relationshipAliases = map
+                relationshipAliases = parseRelationshipAliases(response.optJSONArray("aliases"))
+                    .toMutableMap()
+                    .apply { putAll(loadLocalRelationshipAliases()) }
+                refreshRelationshipAliasSummary()
             }.onFailure {
-                relationshipAliases = emptyMap()
+                relationshipAliases = loadLocalRelationshipAliases()
+                refreshRelationshipAliasSummary()
             }
         }
+    }
+
+    private fun parseRelationshipAliases(aliases: JSONArray?): Map<String, String> {
+        val map = mutableMapOf<String, String>()
+        val items = aliases ?: return emptyMap()
+        for (index in 0 until items.length()) {
+            val item = items.optJSONObject(index) ?: continue
+            val alias = item.optString("alias").trim().lowercase(Locale.US)
+            val contactName = item.optString("contact_name").trim()
+            if (alias.isNotBlank() && contactName.isNotBlank()) {
+                map[alias] = contactName
+            }
+        }
+        return map
+    }
+
+    private fun loadLocalRelationshipAliases(): Map<String, String> {
+        val raw = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_LOCAL_RELATIONSHIP_ALIASES, null)
+            .orEmpty()
+        if (raw.isBlank()) return emptyMap()
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyMap()
+        val map = mutableMapOf<String, String>()
+        json.keys().forEach { key ->
+            val alias = key.trim().lowercase(Locale.US)
+            val contactName = json.optString(key).trim()
+            if (alias.isNotBlank() && contactName.isNotBlank()) {
+                map[alias] = contactName
+            }
+        }
+        return map
+    }
+
+    private fun persistLocalRelationshipAliases(aliases: Map<String, String>) {
+        val json = JSONObject()
+        aliases.toSortedMap().forEach { (alias, contactName) ->
+            json.put(alias, contactName)
+        }
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_LOCAL_RELATIONSHIP_ALIASES, json.toString())
+            .apply()
+    }
+
+    private fun saveLocalRelationshipAlias() {
+        val alias = binding.aliasNameInput.text?.toString()?.trim().orEmpty().lowercase(Locale.US)
+        val contactName = binding.aliasContactInput.text?.toString()?.trim().orEmpty()
+        if (alias.isBlank() || contactName.isBlank()) {
+            binding.safetyProfileMessage.text = getString(R.string.alias_missing)
+            return
+        }
+        val localAliases = loadLocalRelationshipAliases().toMutableMap()
+        localAliases[alias] = contactName
+        persistLocalRelationshipAliases(localAliases)
+        relationshipAliases = relationshipAliases.toMutableMap().apply { put(alias, contactName) }
+        binding.aliasNameInput.setText("")
+        binding.aliasContactInput.setText("")
+        binding.safetyProfileMessage.text = getString(R.string.alias_saved)
+        refreshRelationshipAliasSummary()
+    }
+
+    private fun clearLocalRelationshipAliases() {
+        persistLocalRelationshipAliases(emptyMap())
+        fetchRelationshipAliases()
+        binding.safetyProfileMessage.text = getString(R.string.alias_clear_done)
+    }
+
+    private fun refreshRelationshipAliasSummary() {
+        if (!::binding.isInitialized) return
+        val localAliases = loadLocalRelationshipAliases()
+        binding.aliasSummaryValue.text =
+            if (localAliases.isEmpty()) {
+                getString(R.string.alias_summary_none)
+            } else {
+                localAliases.entries
+                    .sortedBy { it.key }
+                    .joinToString("\n") { "${it.key} -> ${it.value}" }
+            }
     }
 
     private fun updatePermissions(key: String, enabled: Boolean) {
@@ -5584,6 +5663,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_LAST_SMS_EVENT_AT = "last_sms_event_at"
         const val KEY_EMERGENCY_CONTACT = "emergency_contact"
         const val KEY_EMERGENCY_CONTACT_PERMISSION = "emergency_contact_permission"
+        const val KEY_LOCAL_RELATIONSHIP_ALIASES = "local_relationship_aliases"
         const val KEY_VOSK_MODEL_ASSET = "vosk_model_asset"
         const val KEY_VOSK_WAKE_PHRASE = "vosk_wake_phrase"
         const val KEY_LEARNING_REMINDER_ENABLED = "learning_reminder_enabled"
