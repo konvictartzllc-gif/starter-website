@@ -23,6 +23,8 @@
     <string name="register">Register</string>
     <string name="logout">Log Out</string>
     <string name="dashboard_title">Your dashboard</string>
+    <string name="dashboard_overline">Workspace overview</string>
+    <string name="dashboard_professional_summary">Keep your account, voice tools, safety controls, and learning activity in one organized place.</string>
     <string name="dashboard_welcome">Welcome back, %1$s</string>
     <string name="dashboard_role">Role: %1$s</string>
     <string name="dashboard_access">Plan: %1$s</string>
@@ -36,6 +38,9 @@
     <string name="dashboard_access_unknown">Unknown</string>
     <string name="user_dashboard_title">Your activity</string>
     <string name="user_dashboard_summary">Track your Dex chats, language lessons, and quiz progress here.</string>
+    <string name="dashboard_metric_chat">Chat history</string>
+    <string name="dashboard_metric_lessons">Lessons</string>
+    <string name="dashboard_metric_quiz">Quiz progress</string>
     <string name="chat_history_count">Chat messages: %1$d</string>
     <string name="lesson_history_count">Lessons completed: %1$d</string>
     <string name="quiz_score_summary">Quiz average: %1$s</string>

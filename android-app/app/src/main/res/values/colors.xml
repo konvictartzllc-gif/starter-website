@@ -2,7 +2,10 @@
 <resources>
     <color name="dex_background">#10131A</color>
     <color name="dex_panel">#191F2A</color>
+    <color name="dex_panel_strong">#131A24</color>
+    <color name="dex_panel_elevated">#222B3A</color>
     <color name="dex_border">#2C3645</color>
     <color name="dex_accent">#6ED0FF</color>
+    <color name="dex_accent_soft">#18384A</color>
     <color name="dex_text_secondary">#B7C2D0</color>
 </resources>
