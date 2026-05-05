@@ -28,6 +28,16 @@ class DexNotificationListenerService : NotificationListenerService() {
         if (!notificationsEnabled || !hasToken || appInForeground) return
 
         val content = if (text.isNotBlank()) text else title
+        val notificationSignature = "${title.lowercase()}|${content.lowercase()}"
+        val lastSmsSignature = prefs.getString(MainActivity.KEY_LAST_SMS_EVENT_SIGNATURE, null)
+        val lastSmsAt = prefs.getLong(MainActivity.KEY_LAST_SMS_EVENT_AT, 0L)
+        val now = System.currentTimeMillis()
+        if (
+            lastSmsSignature == notificationSignature &&
+            now - lastSmsAt <= SMS_NOTIFICATION_DEDUPE_WINDOW_MS
+        ) {
+            return
+        }
         prefs.edit()
             .putString(MainActivity.KEY_PENDING_NOTIFICATION_APP, appLabel)
             .putString(MainActivity.KEY_PENDING_NOTIFICATION_TITLE, title)
@@ -44,4 +54,8 @@ class DexNotificationListenerService : NotificationListenerService() {
     }
 
     private fun packageName(): String = applicationContext.packageName
+
+    companion object {
+        private const val SMS_NOTIFICATION_DEDUPE_WINDOW_MS = 8_000L
+    }
 }

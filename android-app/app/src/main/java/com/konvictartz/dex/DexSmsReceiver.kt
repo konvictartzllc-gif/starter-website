@@ -22,6 +22,13 @@ class DexSmsReceiver : BroadcastReceiver() {
         val body = messages.joinToString(separator = "") { it.messageBody.orEmpty() }.trim()
         if (sender.isBlank() || body.isBlank()) return
 
+        val signature = "${sender.lowercase()}|${body.lowercase()}"
+        context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(MainActivity.KEY_LAST_SMS_EVENT_SIGNATURE, signature)
+            .putLong(MainActivity.KEY_LAST_SMS_EVENT_AT, System.currentTimeMillis())
+            .apply()
+
         val serviceIntent = Intent(context, DexForegroundService::class.java).apply {
             action = DexForegroundService.ACTION_ANNOUNCE_SMS
             putExtra(DexForegroundService.EXTRA_SMS_SENDER, sender)

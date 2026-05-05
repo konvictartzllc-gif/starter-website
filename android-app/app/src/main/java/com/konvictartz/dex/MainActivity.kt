@@ -5050,6 +5050,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_PENDING_NOTIFICATION_APP = "pending_notification_app"
         const val KEY_PENDING_NOTIFICATION_TITLE = "pending_notification_title"
         const val KEY_PENDING_NOTIFICATION_TEXT = "pending_notification_text"
+        const val KEY_LAST_SMS_EVENT_SIGNATURE = "last_sms_event_signature"
+        const val KEY_LAST_SMS_EVENT_AT = "last_sms_event_at"
         const val KEY_EMERGENCY_CONTACT = "emergency_contact"
         const val KEY_EMERGENCY_CONTACT_PERMISSION = "emergency_contact_permission"
         const val KEY_VOSK_MODEL_ASSET = "vosk_model_asset"
