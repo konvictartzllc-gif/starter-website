@@ -650,11 +650,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleBackgroundCallCommand(normalized: String) {
         when {
-            normalized == "yes" ||
-                normalized == "yeah" ||
-                normalized == "yep" ||
-                normalized == "okay" ||
-                normalized == "ok" -> handleCallAnswerAction()
+            isAffirmativeCommand(normalized) -> handleCallAnswerAction()
             normalized.contains("take a message") ||
                 normalized.contains("take the message") ||
                 normalized.contains("ask who") ||
@@ -683,11 +679,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleBackgroundSmsCommand(normalized: String) {
         when {
-            normalized == "yes" ||
-                normalized == "yeah" ||
-                normalized == "yep" ||
-                normalized == "okay" ||
-                normalized == "ok" -> {
+            isAffirmativeCommand(normalized) -> {
                 if (awaitingSmsReplyChoice) {
                     promptForPendingSmsReply()
                 } else {
@@ -717,15 +709,31 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleBackgroundNotificationCommand(normalized: String) {
         when {
-            normalized == "yes" ||
-                normalized == "yeah" ||
-                normalized == "yep" ||
-                normalized == "okay" ||
-                normalized == "ok" -> handleNotificationReadAction()
+            isAffirmativeCommand(normalized) -> handleNotificationReadAction()
             normalized.contains("read") -> handleNotificationReadAction()
             normalized.contains("ignore") ||
                 normalized.contains("leave it") -> handleNotificationIgnoreAction()
         }
+    }
+
+    private fun isAffirmativeCommand(normalized: String): Boolean {
+        return normalized == "yes" ||
+            normalized.startsWith("yes ") ||
+            normalized == "yeah" ||
+            normalized.startsWith("yeah ") ||
+            normalized == "yep" ||
+            normalized.startsWith("yep ") ||
+            normalized == "okay" ||
+            normalized.startsWith("okay ") ||
+            normalized == "ok" ||
+            normalized.startsWith("ok ") ||
+            normalized == "sure" ||
+            normalized.startsWith("sure ") ||
+            normalized == "please do" ||
+            normalized.contains("read it") ||
+            normalized.contains("read that") ||
+            normalized.contains("reply to it") ||
+            normalized.contains("reply back")
     }
 
     private fun handleCallerMessage(transcript: String) {

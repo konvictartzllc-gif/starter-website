@@ -3575,13 +3575,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 normalized == "text them back" ||
                 normalized == "reply back" ||
                 normalized == "answer it" ||
-                (pendingIncomingSmsReplyChoice && (
-                    normalized == "yes" ||
-                    normalized == "yeah" ||
-                    normalized == "yep" ||
-                    normalized == "ok" ||
-                    normalized == "okay"
-                )) -> {
+                (pendingIncomingSmsReplyChoice && isAffirmativeVoiceReply(normalized)) -> {
                 val number = senderValue?.trim().orEmpty()
                 if (number.isBlank()) {
                     val reply = getString(R.string.contact_not_found_phone, sender)
@@ -3681,6 +3675,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .remove(KEY_PENDING_NOTIFICATION_TITLE)
             .remove(KEY_PENDING_NOTIFICATION_TEXT)
             .apply()
+    }
+
+    private fun isAffirmativeVoiceReply(normalized: String): Boolean {
+        return normalized == "yes" ||
+            normalized.startsWith("yes ") ||
+            normalized == "yeah" ||
+            normalized.startsWith("yeah ") ||
+            normalized == "yep" ||
+            normalized.startsWith("yep ") ||
+            normalized == "ok" ||
+            normalized.startsWith("ok ") ||
+            normalized == "okay" ||
+            normalized.startsWith("okay ") ||
+            normalized == "sure" ||
+            normalized.startsWith("sure ")
     }
 
     private fun buildDashboardSectionIntent(message: String): Triple<String, String, String>? {
