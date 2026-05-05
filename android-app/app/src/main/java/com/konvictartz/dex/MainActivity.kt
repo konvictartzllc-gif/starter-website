@@ -198,6 +198,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingNotificationApp: String? = null
     private var pendingNotificationTitle: String? = null
     private var pendingNotificationText: String? = null
+    private var pendingNotificationReplyChoice = false
     private var currentThemePreset: String = THEME_STUDIO
     private var currentAccentColor: String = DEFAULT_ACCENT_COLOR
     private var currentBackgroundColor: String = DEFAULT_BACKGROUND_COLOR
@@ -3868,15 +3869,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val text = pendingNotificationText
             ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_TEXT, null)
         if (app.isNullOrBlank() || text.isNullOrBlank()) return null
+        val senderName = title?.takeUnless { it.isBlank() || it.equals(app, ignoreCase = true) }
+        val replyContact = senderName?.let { findPhoneContactByName(resolveContactAlias(it)) }
 
         return when {
             normalized == "read it" ||
                 normalized == "read the notification" ||
                 normalized == "read that notification" ||
-                normalized == "yes read it" -> {
+                normalized == "yes read it" ||
+                isAffirmativeVoiceReply(normalized) -> {
+                pendingNotificationReplyChoice = replyContact != null
                 val reply =
-                    if (!title.isNullOrBlank() && !title.equals(app, ignoreCase = true)) {
-                        getString(R.string.notification_readback_with_sender, app, title, text)
+                    if (replyContact != null) {
+                        getString(R.string.notification_readback_with_sender_and_reply_offer, app, replyContact.displayName, text)
+                    } else if (!senderName.isNullOrBlank()) {
+                        getString(R.string.notification_readback_with_sender, app, senderName, text)
                     } else {
                         getString(R.string.notification_readback, app, text)
                     }
@@ -3885,19 +3892,54 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
                 true
             }
+            normalized == "reply" ||
+                normalized == "reply to it" ||
+                normalized == "reply to that" ||
+                normalized == "text them back" ||
+                normalized == "respond" ||
+                (pendingNotificationReplyChoice && isAffirmativeVoiceReply(normalized)) -> {
+                if (replyContact == null) {
+                    pendingNotificationReplyChoice = false
+                    val reply = getString(R.string.notification_reply_unavailable)
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    false
+                } else {
+                    pendingNotificationReplyChoice = false
+                    pendingSmsRecipient = replyContact
+                    pendingSmsBodyDraft = null
+                    val reply = getString(R.string.incoming_sms_reply_prompt, replyContact.displayName)
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    true
+                }
+            }
             normalized == "ignore it" ||
                 normalized == "ignore the notification" ||
                 normalized == "ignore that" ||
                 normalized == "no" ||
                 normalized == "cancel" -> {
                 val reply = getString(R.string.notification_ignored)
+                pendingNotificationReplyChoice = false
                 binding.conversationStatus.text = reply
                 binding.lastReplyValue.text = reply
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
                 clearPendingNotification()
                 true
             }
-            else -> null
+            else -> {
+                val reply = if (pendingNotificationReplyChoice) {
+                    getString(R.string.notification_command_retry_with_reply)
+                } else {
+                    getString(R.string.notification_command_retry)
+                }
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                false
+            }
         }
     }
 
@@ -3918,6 +3960,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingNotificationApp = null
         pendingNotificationTitle = null
         pendingNotificationText = null
+        pendingNotificationReplyChoice = false
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_PENDING_NOTIFICATION_APP)
