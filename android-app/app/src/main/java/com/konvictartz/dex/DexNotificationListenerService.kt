@@ -1,6 +1,7 @@
 package com.konvictartz.dex
 
 import android.content.Intent
+import android.provider.Telephony
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
@@ -9,6 +10,8 @@ class DexNotificationListenerService : NotificationListenerService() {
         val notification = sbn?.notification ?: return
         val packageName = sbn.packageName ?: return
         if (packageName == packageName()) return
+        val defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this)
+        if (!defaultSmsPackage.isNullOrBlank() && packageName == defaultSmsPackage) return
         if (notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0) return
         if (notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY != 0) return
 
