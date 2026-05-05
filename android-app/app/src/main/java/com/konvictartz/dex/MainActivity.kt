@@ -3898,8 +3898,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val triggerAtMillis = reminderAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         DexSafetyCheckInScheduler.scheduleOneTimeCheckInAt(this, triggerAtMillis, title, text)
 
-        val spokenTime = reminderAt.format(DateTimeFormatter.ofPattern("h:mm a", Locale.US))
-        return getString(R.string.call_reminder_set, reminderTarget, spokenTime)
+        val spokenDateTime = formatReminderDateTime(reminderAt)
+        return getString(R.string.call_reminder_set, reminderTarget, spokenDateTime)
     }
 
     private fun extractReminderCallTarget(message: String): String {
@@ -4904,8 +4904,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .replace("p.m.", "pm")
             .replace("a.m", "am")
             .replace("p.m", "pm")
+        val now = LocalDateTime.now()
+        val relativeMinuteMatch = Regex("\\bin\\s+(\\d{1,3})\\s+minutes?\\b", RegexOption.IGNORE_CASE).find(normalized)
+        if (relativeMinuteMatch != null) {
+            return now.plusMinutes(relativeMinuteMatch.groupValues[1].toLong())
+        }
+        val relativeHourMatch = Regex("\\bin\\s+(\\d{1,2})\\s+hours?\\b", RegexOption.IGNORE_CASE).find(normalized)
+        if (relativeHourMatch != null) {
+            return now.plusHours(relativeHourMatch.groupValues[1].toLong())
+        }
         val date = inferRequestedDate(normalized)
-        val timeMatch = Regex("(\\d{1,2})(?::(\\d{2}))?\\s*(a\\.?m\\.?|p\\.?m\\.?)", RegexOption.IGNORE_CASE).find(normalized)
+        val timeMatch = Regex("(?:\\bat\\s+)?(\\d{1,2})(?::(\\d{2}))?\\s*(a\\.?m\\.?|p\\.?m\\.?)", RegexOption.IGNORE_CASE).find(normalized)
         val time = if (timeMatch != null) {
             var hour = timeMatch.groupValues[1].toInt()
             val minute = timeMatch.groupValues[2].ifBlank { "0" }.toInt()
@@ -4913,20 +4922,58 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (meridiem == "pm" && hour < 12) hour += 12
             if (meridiem == "am" && hour == 12) hour = 0
             LocalTime.of(hour, minute)
-        } else if (normalized.contains("noon")) {
-            LocalTime.NOON
-        } else if (normalized.contains("midnight")) {
-            LocalTime.MIDNIGHT
-        } else if (normalized.contains("morning")) {
-            LocalTime.of(9, 0)
-        } else if (normalized.contains("afternoon")) {
-            LocalTime.of(15, 0)
-        } else if (normalized.contains("evening") || normalized.contains("tonight")) {
-            LocalTime.of(18, 0)
         } else {
-            LocalTime.of(9, 0)
+            val bareTime = Regex("\\bat\\s+(\\d{1,2})(?::(\\d{2}))?\\b", RegexOption.IGNORE_CASE).find(normalized)
+            if (bareTime != null) {
+                val hourRaw = bareTime.groupValues[1].toInt()
+                val minute = bareTime.groupValues[2].ifBlank { "0" }.toInt()
+                val inferredHour = inferHourWithoutMeridiem(hourRaw, date, now)
+                LocalTime.of(inferredHour, minute)
+            } else if (normalized.contains("noon")) {
+                LocalTime.NOON
+            } else if (normalized.contains("midnight")) {
+                LocalTime.MIDNIGHT
+            } else if (normalized.contains("morning")) {
+                LocalTime.of(9, 0)
+            } else if (normalized.contains("afternoon")) {
+                LocalTime.of(15, 0)
+            } else if (normalized.contains("evening") || normalized.contains("tonight")) {
+                LocalTime.of(18, 0)
+            } else {
+                LocalTime.of(9, 0)
+            }
         }
         return LocalDateTime.of(date, time)
+    }
+
+    private fun inferHourWithoutMeridiem(hourRaw: Int, date: LocalDate, now: LocalDateTime): Int {
+        val normalizedHour = hourRaw.coerceIn(0, 23)
+        if (hourRaw > 12) return normalizedHour
+
+        val candidateMorning = LocalDateTime.of(date, LocalTime.of(if (hourRaw == 12) 0 else hourRaw, 0))
+        val candidateEveningHour = when {
+            hourRaw == 12 -> 12
+            hourRaw < 12 -> hourRaw + 12
+            else -> hourRaw
+        }
+        val candidateEvening = LocalDateTime.of(date, LocalTime.of(candidateEveningHour, 0))
+        return when {
+            date.isAfter(now.toLocalDate()) -> if (hourRaw in 1..7) candidateEvening.hour else candidateMorning.hour
+            candidateMorning.isAfter(now) -> candidateMorning.hour
+            candidateEvening.isAfter(now) -> candidateEvening.hour
+            else -> candidateMorning.hour
+        }
+    }
+
+    private fun formatReminderDateTime(dateTime: LocalDateTime): String {
+        val today = LocalDate.now()
+        val targetDate = dateTime.toLocalDate()
+        val timePart = dateTime.format(DateTimeFormatter.ofPattern("h:mm a", Locale.US))
+        return when (targetDate) {
+            today -> "today at $timePart"
+            today.plusDays(1) -> "tomorrow at $timePart"
+            else -> dateTime.format(DateTimeFormatter.ofPattern("EEE, MMM d 'at' h:mm a", Locale.US))
+        }
     }
 
     private fun inferRequestedDate(command: String): LocalDate {
