@@ -224,6 +224,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var lastDexSpokenAt = 0L
     private var lastEmergencyTriggerReason = ""
     private var lastEmergencySmsStatus = ""
+    private val activityLogEntries = ArrayDeque<String>()
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -967,6 +968,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.safetyProfileMessage.text = ""
         binding.safetyDiagnosticsValue.text = ""
         binding.aliasSummaryValue.text = ""
+        binding.activityLogValue.text = getString(R.string.activity_log_empty)
         binding.learningLessonPreview.text = ""
         binding.learningQuizPreview.text = ""
         updatePendingActionUi()
@@ -1254,6 +1256,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             countForCooldown = false,
             triggerReason = "manual emergency sms test"
         )
+        appendActivityLog("Safety", "manual emergency sms test -> $status")
         val reply = getString(R.string.test_emergency_sms_sent)
         binding.safetyProfileMessage.text = reply
         binding.lastReplyValue.text = listOf(reply, status).joinToString(" ")
@@ -2419,6 +2422,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     .sortedBy { it.key }
                     .joinToString("\n") { "${it.key} -> ${it.value}" }
             }
+    }
+
+    private fun appendActivityLog(category: String, detail: String) {
+        if (!::binding.isInitialized) return
+        val time = java.time.LocalTime.now().format(DateTimeFormatter.ofPattern("h:mm a", Locale.US))
+        val entry = "[$time] $category: $detail"
+        activityLogEntries.addFirst(entry)
+        while (activityLogEntries.size > 8) {
+            activityLogEntries.removeLast()
+        }
+        binding.activityLogValue.text =
+            if (activityLogEntries.isEmpty()) getString(R.string.activity_log_empty)
+            else activityLogEntries.joinToString("\n")
     }
 
     private fun updatePermissions(key: String, enabled: Boolean) {
@@ -4383,6 +4399,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             return getString(R.string.local_emergency_sms_permission_missing).also {
                 refreshSafetyDiagnostics(lastStatus = it)
+                appendActivityLog("Safety", it)
             }
         }
 
@@ -4494,11 +4511,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 }
                 getString(R.string.local_emergency_sms_attempting).also {
                     refreshSafetyDiagnostics(lastStatus = it, lastTrigger = triggerReason)
+                    appendActivityLog("Safety", "$triggerReason -> $it")
                 }
             },
             onFailure = {
                 getString(R.string.local_emergency_sms_failed).also {
                     refreshSafetyDiagnostics(lastStatus = it, lastTrigger = triggerReason)
+                    appendActivityLog("Safety", "$triggerReason -> $it")
                 }
             }
         )
@@ -4515,6 +4534,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.conversationStatus.text = message
                 binding.lastReplyValue.text = "${binding.lastReplyValue.text} $message".trim()
                 refreshSafetyDiagnostics(lastStatus = message)
+                appendActivityLog("Safety", message)
             }
             runCatching { unregisterReceiver(receiver) }
         }
@@ -5618,8 +5638,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val result = postJson("$serverUrl/dex/call-event", payload, token)
             result.onSuccess {
                 binding.callMonitorStatus.text = getString(R.string.call_event_sent, "$event ($caller)")
+                appendActivityLog("Call", "$event ($caller)")
             }.onFailure { error ->
                 binding.callMonitorStatus.text = error.message ?: getString(R.string.call_monitor_waiting)
+                appendActivityLog("Call", error.message ?: getString(R.string.call_monitor_waiting))
             }
         }
     }
