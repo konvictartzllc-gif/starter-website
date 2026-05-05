@@ -11,16 +11,22 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import android.provider.ContactsContract
 import android.provider.Telephony
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.telephony.SmsManager
 import android.telecom.TelecomManager
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
@@ -34,18 +40,31 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.Locale
 
+private enum class BackgroundListenMode {
+    CALL_COMMAND,
+    SMS_COMMAND,
+    SMS_REPLY,
+    NOTIFICATION_COMMAND,
+    CALLER_MESSAGE,
+}
+
 class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private val client = OkHttpClient()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private var telephonyManager: TelephonyManager? = null
     private var telecomManager: TelecomManager? = null
+    private var audioManager: AudioManager? = null
     private var phoneStateListener: PhoneStateListener? = null
     private var textToSpeech: TextToSpeech? = null
+    private var speechRecognizer: SpeechRecognizer? = null
     private var ttsReady = false
     private var lastCallState = TelephonyManager.CALL_STATE_IDLE
     private var lastCaller = "Unknown caller"
+    private var lastIncomingNumber: String? = null
     private var currentCallWasAnswered = false
     private var pendingSpeechText: String? = null
+    private var pendingListenMode: BackgroundListenMode? = null
+    private var activeListenMode: BackgroundListenMode? = null
     private var wakeWordEngine: DexWakeWordEngine? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     override fun onCreate() {
@@ -54,7 +73,20 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         startForeground(NOTIFICATION_ID, buildNotification())
         telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
         telecomManager = getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         textToSpeech = TextToSpeech(this, this)
+        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) = Unit
+
+            override fun onDone(utteranceId: String?) {
+                mainHandler.post { startPendingBackgroundListening() }
+            }
+
+            override fun onError(utteranceId: String?) {
+                mainHandler.post { startPendingBackgroundListening() }
+            }
+        })
+        setupSpeechRecognizer()
         wakeWordEngine = DexWakeWordEngine(
             this,
             onWakeWordDetected = { launchWakeAssistantSurface() },
@@ -73,6 +105,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ACTION_SAFETY_CHECK_IN -> handleSafetyCheckIn(intent)
             ACTION_CALL_ANSWER -> handleCallAnswerAction()
             ACTION_CALL_DECLINE -> handleCallDeclineAction()
+            ACTION_CALL_TAKE_MESSAGE -> handleCallTakeMessageAction()
             ACTION_SMS_READ -> handleSmsReadAction()
             ACTION_SMS_IGNORE -> handleSmsIgnoreAction()
             ACTION_SMS_REPLY -> handleSmsReplyAction(intent)
@@ -87,12 +120,55 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     override fun onDestroy() {
         stopCallMonitoring()
         stopBackgroundWakeWordListening()
+        speechRecognizer?.destroy()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun setupSpeechRecognizer() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) return
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+            setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) = Unit
+                override fun onBeginningOfSpeech() = Unit
+                override fun onRmsChanged(rmsdB: Float) = Unit
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+                override fun onEndOfSpeech() = Unit
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+                override fun onPartialResults(partialResults: Bundle?) = Unit
+
+                override fun onError(error: Int) {
+                    val mode = activeListenMode
+                    activeListenMode = null
+                    if (
+                        mode == BackgroundListenMode.CALL_COMMAND &&
+                        lastCallState == TelephonyManager.CALL_STATE_RINGING &&
+                        (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
+                    ) {
+                        speakAndThenListen(
+                            getString(R.string.call_listening_retry),
+                            BackgroundListenMode.CALL_COMMAND
+                        )
+                    }
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val mode = activeListenMode
+                    activeListenMode = null
+                    val transcript = results
+                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        .orEmpty()
+                        .firstOrNull()
+                        ?.trim()
+                        .orEmpty()
+                    handleBackgroundVoiceTranscript(mode, transcript)
+                }
+            })
+        }
+    }
 
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) {
@@ -242,6 +318,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
                 currentCallWasAnswered = false
+                lastIncomingNumber = rawNumber.ifBlank { null }
                 lastCaller = resolvedCaller
                 if (autoDeclineSpam && isLikelySpamCaller(resolvedCaller, phoneNumber)) {
                     postCallEvent("declined", resolvedCaller)
@@ -266,6 +343,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     postCallEvent("declined", resolvedCaller)
                 }
                 lastCaller = "Unknown caller"
+                lastIncomingNumber = null
                 currentCallWasAnswered = false
             }
         }
@@ -292,7 +370,15 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun lookupContactName(phoneNumber: String): String? {
         if (!hasPermission(Manifest.permission.READ_CONTACTS)) return null
         val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
-        val candidates = linkedSetOf(phoneNumber, phoneNumber.filter { it.isDigit() || it == '+' })
+        val digits = phoneNumber.filter { it.isDigit() }
+        val candidates = linkedSetOf(
+            phoneNumber,
+            phoneNumber.filter { it.isDigit() || it == '+' },
+            digits,
+            if (digits.length == 10) "+1$digits" else "",
+            if (digits.length == 11 && digits.startsWith("1")) "+$digits" else "",
+            if (digits.length > 10) digits.takeLast(10) else ""
+        )
         for (candidate in candidates) {
             if (candidate.isBlank()) continue
             val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(candidate))
@@ -318,7 +404,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun speakIncomingCallPrompt(caller: String) {
-        speakShortStatus(getString(R.string.call_background_prompt_template, caller))
+        speakAndThenListen(getString(R.string.call_background_prompt_template, caller), BackgroundListenMode.CALL_COMMAND)
     }
 
     private fun handleIncomingSms(intent: Intent) {
@@ -341,7 +427,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
         showIncomingSmsNotification(sender, smsBody)
         mainHandler.postDelayed({
-            speakShortStatus(getString(R.string.incoming_sms_prompt, sender))
+            speakAndThenListen(getString(R.string.incoming_sms_prompt, sender), BackgroundListenMode.SMS_COMMAND)
         }, 700L)
     }
 
@@ -364,7 +450,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             .apply()
 
         showIncomingNotificationPrompt(appName, body)
-        speakShortStatus(getString(R.string.notification_prompt, appName))
+        speakAndThenListen(getString(R.string.notification_prompt, appName), BackgroundListenMode.NOTIFICATION_COMMAND)
     }
 
     private fun handleSafetyCheckIn(intent: Intent) {
@@ -379,15 +465,19 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
-    private fun answerRingingCall() {
-        if (!hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)) return
-        try {
-            val manager = telecomManager ?: return
+    private fun answerRingingCall(): Boolean {
+        if (!hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)) return false
+        return try {
+            val manager = telecomManager ?: return false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 manager.acceptRingingCall()
+                true
+            } else {
+                false
             }
         } catch (_: Exception) {
             // Some OEMs can still block background answering. We leave the call ringing if that happens.
+            false
         }
     }
 
@@ -405,16 +495,35 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun handleCallAnswerAction() {
-        answerRingingCall()
-        currentCallWasAnswered = true
+        val answered = answerRingingCall()
+        currentCallWasAnswered = answered
         dismissNotification(CALL_NOTIFICATION_ID)
-        speakShortStatus(getString(R.string.call_answered))
+        speakShortStatus(if (answered) getString(R.string.call_answered) else getString(R.string.call_answer_failed))
     }
 
     private fun handleCallDeclineAction() {
         declineRingingCall()
         dismissNotification(CALL_NOTIFICATION_ID)
         speakShortStatus(getString(R.string.call_declined))
+    }
+
+    private fun handleCallTakeMessageAction() {
+        if (lastCallState != TelephonyManager.CALL_STATE_RINGING) {
+            speakShortStatus(getString(R.string.call_message_unavailable))
+            return
+        }
+        val answered = answerRingingCall()
+        if (!answered) {
+            speakShortStatus(getString(R.string.call_answer_failed))
+            return
+        }
+        currentCallWasAnswered = true
+        enableSpeakerForActiveCall()
+        dismissNotification(CALL_NOTIFICATION_ID)
+        speakAndThenListen(
+            getString(R.string.call_message_answer_prompt),
+            BackgroundListenMode.CALLER_MESSAGE
+        )
     }
 
     private fun handleSmsReadAction() {
@@ -444,21 +553,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
         if (sender.isNullOrBlank() || senderValue.isNullOrBlank()) return
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            speakShortStatus(getString(R.string.sms_send_permission_missing))
-            return
-        }
-
-        runCatching {
-            val smsManager = resolveSmsManager()
-            smsManager.sendTextMessage(senderValue, null, replyText, null, null)
-        }.onSuccess {
-            clearPendingIncomingSms()
-            dismissNotification(SMS_NOTIFICATION_ID)
-            speakShortStatus(getString(R.string.sms_sent_directly, sender))
-        }.onFailure {
-            speakShortStatus(getString(R.string.sms_send_failed, sender))
-        }
+        sendPhoneSms(senderValue, replyText, sender)
     }
 
     private fun handleNotificationReadAction() {
@@ -473,6 +568,102 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun handleNotificationIgnoreAction() {
         clearPendingNotification()
         dismissNotification(NOTIFICATION_PROMPT_ID)
+    }
+
+    private fun handleBackgroundVoiceTranscript(mode: BackgroundListenMode?, transcript: String) {
+        val normalized = transcript.trim().lowercase(Locale.US)
+        if (normalized.isBlank()) return
+        when (mode) {
+            BackgroundListenMode.CALL_COMMAND -> handleBackgroundCallCommand(normalized)
+            BackgroundListenMode.SMS_COMMAND -> handleBackgroundSmsCommand(normalized)
+            BackgroundListenMode.SMS_REPLY -> sendPendingSmsReply(transcript)
+            BackgroundListenMode.NOTIFICATION_COMMAND -> handleBackgroundNotificationCommand(normalized)
+            BackgroundListenMode.CALLER_MESSAGE -> handleCallerMessage(transcript)
+            null -> Unit
+        }
+    }
+
+    private fun handleBackgroundCallCommand(normalized: String) {
+        when {
+            normalized.contains("take a message") ||
+                normalized.contains("take the message") ||
+                normalized.contains("ask who") ||
+                normalized.contains("ask them") -> handleCallTakeMessageAction()
+            normalized.contains("answer on speaker") ||
+                normalized.contains("pick up on speaker") -> {
+                val answered = answerRingingCall()
+                currentCallWasAnswered = answered
+                if (answered) enableSpeakerForActiveCall()
+                speakShortStatus(if (answered) getString(R.string.call_answered) else getString(R.string.call_answer_failed))
+            }
+            normalized == "answer" ||
+                normalized.startsWith("answer ") ||
+                normalized.contains("pick up") ||
+                normalized.contains("take the call") -> handleCallAnswerAction()
+            normalized == "decline" ||
+                normalized.startsWith("decline ") ||
+                normalized.contains("reject") ||
+                normalized.contains("hang up") ||
+                normalized.contains("ignore") -> handleCallDeclineAction()
+            else -> if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
+                speakAndThenListen(getString(R.string.call_listening_retry), BackgroundListenMode.CALL_COMMAND)
+            }
+        }
+    }
+
+    private fun handleBackgroundSmsCommand(normalized: String) {
+        when {
+            normalized.contains("read") -> handleSmsReadAction()
+            normalized.contains("reply") ||
+                normalized.contains("text back") ||
+                normalized.contains("respond") -> {
+                val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+                val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, "them").orEmpty()
+                speakAndThenListen(getString(R.string.incoming_sms_reply_prompt, sender), BackgroundListenMode.SMS_REPLY)
+            }
+            normalized.contains("ignore") ||
+                normalized.contains("leave it") -> handleSmsIgnoreAction()
+        }
+    }
+
+    private fun handleBackgroundNotificationCommand(normalized: String) {
+        when {
+            normalized.contains("read") -> handleNotificationReadAction()
+            normalized.contains("ignore") ||
+                normalized.contains("leave it") -> handleNotificationIgnoreAction()
+        }
+    }
+
+    private fun handleCallerMessage(transcript: String) {
+        val caller = lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" }
+            ?: lastIncomingNumber
+            ?: getString(R.string.unknown_number_label)
+        postCallEvent("message", "$caller: ${transcript.trim()}")
+        speakShortStatus(getString(R.string.call_message_saved, caller))
+    }
+
+    private fun sendPendingSmsReply(replyText: String) {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, null)
+        val senderValue = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_VALUE, null)
+        if (sender.isNullOrBlank() || senderValue.isNullOrBlank()) return
+        sendPhoneSms(senderValue, replyText, sender)
+    }
+
+    private fun sendPhoneSms(number: String, body: String, spokenTarget: String) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            speakShortStatus(getString(R.string.sms_send_permission_missing))
+            return
+        }
+        runCatching {
+            resolveSmsManager().sendTextMessage(number, null, body, null, null)
+        }.onSuccess {
+            clearPendingIncomingSms()
+            dismissNotification(SMS_NOTIFICATION_ID)
+            speakShortStatus(getString(R.string.sms_sent_directly, spokenTarget))
+        }.onFailure {
+            speakShortStatus(getString(R.string.sms_send_failed, spokenTarget))
+        }
     }
 
     private fun showIncomingCallNotification(caller: String) {
@@ -499,6 +690,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             Intent(this, DexForegroundService::class.java).apply { action = ACTION_CALL_DECLINE },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val takeMessageIntent = PendingIntent.getService(
+            this,
+            103,
+            Intent(this, DexForegroundService::class.java).apply { action = ACTION_CALL_TAKE_MESSAGE },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val notification = NotificationCompat.Builder(this, ACTION_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.sym_call_incoming)
@@ -510,6 +707,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             .setContentIntent(openAppIntent)
             .setFullScreenIntent(openAppIntent, true)
             .addAction(0, getString(R.string.answer_call), answerIntent)
+            .addAction(0, getString(R.string.take_message_call), takeMessageIntent)
             .addAction(0, getString(R.string.decline_call), declineIntent)
             .build()
 
@@ -636,6 +834,46 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         speakNow(text)
     }
 
+    private fun speakAndThenListen(text: String, mode: BackgroundListenMode) {
+        pendingListenMode = mode
+        speakShortStatus(text)
+    }
+
+    private fun startPendingBackgroundListening() {
+        val mode = pendingListenMode ?: return
+        pendingListenMode = null
+        startBackgroundListening(mode)
+    }
+
+    private fun startBackgroundListening(mode: BackgroundListenMode) {
+        if (!hasPermission(Manifest.permission.RECORD_AUDIO)) return
+        val recognizer = speechRecognizer ?: return
+        activeListenMode = mode
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000L)
+        }
+        runCatching {
+            recognizer.cancel()
+            recognizer.startListening(intent)
+        }.onFailure {
+            activeListenMode = null
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun enableSpeakerForActiveCall() {
+        runCatching {
+            audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager?.isSpeakerphoneOn = true
+        }
+    }
+
     private fun resolveSmsManager(): SmsManager {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             getSystemService(SmsManager::class.java)
@@ -696,6 +934,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val ACTION_SAFETY_CHECK_IN = "com.konvictartz.dex.action.SAFETY_CHECK_IN"
         const val ACTION_CALL_ANSWER = "com.konvictartz.dex.action.CALL_ANSWER"
         const val ACTION_CALL_DECLINE = "com.konvictartz.dex.action.CALL_DECLINE"
+        const val ACTION_CALL_TAKE_MESSAGE = "com.konvictartz.dex.action.CALL_TAKE_MESSAGE"
         const val ACTION_SMS_READ = "com.konvictartz.dex.action.SMS_READ"
         const val ACTION_SMS_IGNORE = "com.konvictartz.dex.action.SMS_IGNORE"
         const val ACTION_SMS_REPLY = "com.konvictartz.dex.action.SMS_REPLY"

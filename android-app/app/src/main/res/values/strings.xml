@@ -321,7 +321,7 @@
     <string name="call_background_known_contact_prompt">Incoming call from %1$s. Use the Dex notification to answer, decline, or take a message.</string>
     <string name="call_event_sent">Last call event sent: %1$s</string>
     <string name="call_prompt_template">Incoming call from %1$s. Say pick up, reject, answer on speaker, or take a message. You can also use the buttons on screen.</string>
-    <string name="call_background_prompt_template">Incoming call from %1$s. Use the Dex notification to answer or decline without opening the app.</string>
+    <string name="call_background_prompt_template">Incoming call from %1$s. Say answer, decline, or take a message. You can also use the Dex notification.</string>
     <string name="call_speaking">Dex is speaking the incoming call prompt.</string>
     <string name="call_answering">Dex is trying to answer the ringing call.</string>
     <string name="call_answered">Dex answered the ringing call.</string>
@@ -343,7 +343,10 @@
     <string name="call_message_draft_summary">I saved a follow-up task and drafted a text for %1$s.</string>
     <string name="call_message_draft_detail">Approve this and Android will open a text draft asking %1$s to send their message.</string>
     <string name="call_message_sms_body">I am tied up right now. Please text me the message you wanted to leave and I will get back to you as soon as I can.</string>
+    <string name="call_message_answer_prompt">This is Dex. Who is calling, and what message would you like to leave?</string>
+    <string name="call_message_saved">I saved the message from %1$s.</string>
     <string name="answer_call">Answer</string>
+    <string name="take_message_call">Take message</string>
     <string name="decline_call">Decline</string>
     <string name="logged_in_message">You are connected to Dex on this phone.</string>
     <string name="logged_out_message">Log in or create an account to start using Dex.</string>
