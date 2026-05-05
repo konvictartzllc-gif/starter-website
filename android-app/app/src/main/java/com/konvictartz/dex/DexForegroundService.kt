@@ -446,6 +446,24 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val body = intent.getStringExtra(EXTRA_NOTIFICATION_TEXT).orEmpty().trim()
         if (appName.isBlank() || body.isBlank()) return
 
+        if (isMessageNotification(appName, title)) {
+            val sender = title.ifBlank { appName }
+            val senderValue = findPhoneNumberByContactName(sender).orEmpty()
+            awaitingSmsReplyChoice = false
+            prefs.edit()
+                .putString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, sender)
+                .putString(MainActivity.KEY_PENDING_INCOMING_SMS_VALUE, senderValue)
+                .putString(MainActivity.KEY_PENDING_INCOMING_SMS_BODY, body)
+                .putString(MainActivity.KEY_PENDING_NOTIFICATION_APP, appName)
+                .putString(MainActivity.KEY_PENDING_NOTIFICATION_TITLE, title)
+                .putString(MainActivity.KEY_PENDING_NOTIFICATION_TEXT, body)
+                .apply()
+
+            showIncomingSmsNotification(sender, body)
+            speakAndThenListen(getString(R.string.incoming_sms_prompt, sender), BackgroundListenMode.SMS_COMMAND)
+            return
+        }
+
         prefs.edit()
             .putString(MainActivity.KEY_PENDING_NOTIFICATION_APP, appName)
             .putString(MainActivity.KEY_PENDING_NOTIFICATION_TITLE, title)
@@ -567,9 +585,16 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun handleNotificationReadAction() {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val appName = prefs.getString(MainActivity.KEY_PENDING_NOTIFICATION_APP, null)
+        val title = prefs.getString(MainActivity.KEY_PENDING_NOTIFICATION_TITLE, null)
         val body = prefs.getString(MainActivity.KEY_PENDING_NOTIFICATION_TEXT, null)
         if (!appName.isNullOrBlank() && !body.isNullOrBlank()) {
-            speakShortStatus(getString(R.string.notification_readback, appName, body))
+            val readback =
+                if (!title.isNullOrBlank() && !title.equals(appName, ignoreCase = true)) {
+                    getString(R.string.notification_readback_with_sender, appName, title, body)
+                } else {
+                    getString(R.string.notification_readback, appName, body)
+                }
+            speakShortStatus(readback)
         }
     }
 
@@ -650,6 +675,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         awaitingSmsReplyChoice = false
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, "them").orEmpty()
+        val senderValue = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_VALUE, null).orEmpty()
+        if (senderValue.isBlank()) {
+            speakShortStatus(getString(R.string.incoming_sms_reply_number_missing, sender))
+            return
+        }
         speakAndThenListen(getString(R.string.incoming_sms_reply_prompt, sender), BackgroundListenMode.SMS_REPLY)
     }
 
@@ -678,9 +708,49 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, null)
         val senderValue = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_VALUE, null)
-        if (sender.isNullOrBlank() || senderValue.isNullOrBlank()) return
+        if (sender.isNullOrBlank()) return
+        if (senderValue.isNullOrBlank()) {
+            speakShortStatus(getString(R.string.incoming_sms_reply_number_missing, sender))
+            return
+        }
         awaitingSmsReplyChoice = false
         sendPhoneSms(senderValue, replyText, sender)
+    }
+
+    private fun isMessageNotification(appName: String, title: String): Boolean {
+        if (title.isBlank()) return false
+        val lower = appName.lowercase(Locale.US)
+        return lower.contains("message") ||
+            lower.contains("messenger") ||
+            lower.contains("sms") ||
+            lower.contains("text")
+    }
+
+    private fun findPhoneNumberByContactName(name: String): String? {
+        if (!hasPermission(Manifest.permission.READ_CONTACTS)) return null
+        val cleanedName = name.trim()
+        if (cleanedName.isBlank()) return null
+        val projection = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            ContactsContract.CommonDataKinds.Phone.NUMBER
+        )
+        val cursor: Cursor? = contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            projection,
+            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
+            arrayOf("%$cleanedName%"),
+            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC"
+        )
+        cursor?.use {
+            while (it.moveToNext()) {
+                val displayName = it.getString(0).orEmpty()
+                val number = it.getString(1).orEmpty()
+                if (number.isNotBlank() && displayName.contains(cleanedName, ignoreCase = true)) {
+                    return number
+                }
+            }
+        }
+        return null
     }
 
     private fun sendPhoneSms(number: String, body: String, spokenTarget: String) {

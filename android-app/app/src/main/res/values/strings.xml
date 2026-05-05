@@ -252,6 +252,7 @@
     <string name="notification_read_action">Read</string>
     <string name="notification_ignore_action">Ignore</string>
     <string name="notification_readback">%1$s says: %2$s</string>
+    <string name="notification_readback_with_sender">%1$s from %2$s says: %3$s</string>
     <string name="notification_none">There is not a recent notification for me to read back.</string>
     <string name="notification_ignored">Okay, I will ignore that notification.</string>
     <string name="last_heard">Last thing Dex heard</string>
@@ -366,6 +367,7 @@
     <string name="incoming_sms_readback_with_reply_offer">Here is the text from %1$s: %2$s. Do you want to reply?</string>
     <string name="incoming_sms_readback_again">Reading the text from %1$s again: %2$s</string>
     <string name="incoming_sms_reply_prompt">What would you like me to text back to %1$s?</string>
+    <string name="incoming_sms_reply_number_missing">I can read messages from %1$s, but Android did not give me a phone number to reply to from this notification.</string>
     <string name="incoming_sms_ignored">Okay. I will leave the text from %1$s unread aloud.</string>
     <string name="background_actions_channel_name">Dex call and text actions</string>
     <string name="background_actions_channel_description">Lets Dex show answer, decline, read, and reply actions while the app stays closed.</string>

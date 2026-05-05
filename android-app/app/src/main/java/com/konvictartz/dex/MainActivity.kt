@@ -3620,6 +3620,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun consumePendingNotification(normalized: String): Boolean? {
         val app = pendingNotificationApp
             ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_APP, null)
+        val title = pendingNotificationTitle
+            ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_TITLE, null)
         val text = pendingNotificationText
             ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_TEXT, null)
         if (app.isNullOrBlank() || text.isNullOrBlank()) return null
@@ -3629,7 +3631,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 normalized == "read the notification" ||
                 normalized == "read that notification" ||
                 normalized == "yes read it" -> {
-                val reply = getString(R.string.notification_readback, app, text)
+                val reply =
+                    if (!title.isNullOrBlank() && !title.equals(app, ignoreCase = true)) {
+                        getString(R.string.notification_readback_with_sender, app, title, text)
+                    } else {
+                        getString(R.string.notification_readback, app, text)
+                    }
                 binding.conversationStatus.text = reply
                 binding.lastReplyValue.text = reply
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
