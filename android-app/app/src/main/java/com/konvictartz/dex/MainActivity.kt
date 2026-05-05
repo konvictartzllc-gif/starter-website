@@ -559,7 +559,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             action == CallVoiceAction.DECLINE -> declineRingingCall()
                             action == CallVoiceAction.TAKE_MESSAGE -> takeMessageForCurrentCaller()
                             lastCallState == TelephonyManager.CALL_STATE_RINGING -> {
-                                binding.callMonitorStatus.text = getString(R.string.call_voice_unavailable)
+                                binding.callMonitorStatus.text = getString(R.string.call_command_retry_prompt)
+                                speakDex(
+                                    getString(R.string.call_command_retry_prompt),
+                                    R.string.voice_speaking,
+                                    resumeWakeModeAfterSpeech = false
+                                )
+                                mainHandler.postDelayed({ startListeningForCallCommand() }, CALL_COMMAND_RETRY_DELAY_MS)
                             }
                         }
                     } else if (listeningForQuizAnswer) {
@@ -2912,21 +2918,34 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return when {
             normalized.contains("take a message") ||
                 normalized.contains("take the message") ||
+                normalized.contains("take message") ||
+                normalized.contains("let them leave a message") ||
+                normalized.contains("send them to voicemail") ||
                 normalized.contains("message them instead") ||
                 normalized.contains("send it to voicemail") -> CallVoiceAction.TAKE_MESSAGE
             normalized.contains("answer on speaker") ||
                 normalized.contains("pick up on speaker") ||
+                normalized.contains("put it on speaker") ||
+                normalized.contains("speaker phone") ||
                 normalized.contains("take the call on speaker") -> CallVoiceAction.ANSWER_ON_SPEAKER
+            normalized == "yes" ||
+                normalized.startsWith("yes ") ||
             normalized == "answer" ||
                 normalized.startsWith("answer ") ||
+                normalized == "answer it" ||
+                normalized == "pick it up" ||
                 normalized == "accept" ||
                 normalized.startsWith("accept ") ||
                 normalized.contains("pick up") ||
                 normalized.contains("take the call") -> CallVoiceAction.ANSWER
+            normalized == "no" ||
+                normalized.startsWith("no ") ||
             normalized == "decline" ||
                 normalized.startsWith("decline ") ||
+                normalized == "decline it" ||
                 normalized == "reject" ||
                 normalized.startsWith("reject ") ||
+                normalized == "send it away" ||
                 normalized.contains("hang up") ||
                 normalized.contains("ignore the call") -> CallVoiceAction.DECLINE
             else -> null
