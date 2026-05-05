@@ -172,6 +172,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var ttsReady = false
     private var ttsStatusMessage: String? = null
     private var speechRecognizer: SpeechRecognizer? = null
+    private var wakeSpeechRecognizer: SpeechRecognizer? = null
     private var wakeWordEngine: DexWakeWordEngine? = null
     private var wakeWordEngineActive = false
     private var isListeningForCallCommand = false
@@ -179,6 +180,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var wakeModeEnabled = false
     private var awaitingWakeCommand = false
     private var conversationActive = false
+    private var isListeningForDexCommand = false
     private var resumeWakeListeningAfterSpeech = false
     private var resumeCommandCaptureAfterWakePrompt = false
     private var pendingAction: PendingAction? = null
@@ -235,7 +237,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private val restartWakeListeningRunnable = Runnable {
         if (wakeModeEnabled && !isListeningForCallCommand && lastCallState != TelephonyManager.CALL_STATE_RINGING) {
-            if (!wakeWordEngineActive || awaitingWakeCommand || conversationActive) {
+            if (awaitingWakeCommand || conversationActive) {
+                startDexCommandListening()
+            } else if (!wakeWordEngineActive) {
                 startWakeWordListening()
             }
         }
@@ -294,7 +298,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     }
                     if (resumeCommandCaptureAfterWakePrompt && wakeModeEnabled) {
                         resumeCommandCaptureAfterWakePrompt = false
-                        startWakeWordListening()
+                        startDexCommandListening()
                     }
                     if (resumeWakeListeningAfterSpeech && wakeModeEnabled) {
                         resetWakeSessionIfTaskFinished()
@@ -318,7 +322,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     }
                     if (resumeCommandCaptureAfterWakePrompt && wakeModeEnabled) {
                         resumeCommandCaptureAfterWakePrompt = false
-                        startWakeWordListening()
+                        startDexCommandListening()
                     }
                     if (resumeWakeListeningAfterSpeech && wakeModeEnabled) {
                         resetWakeSessionIfTaskFinished()
@@ -332,7 +336,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 }
             }
         })
-        setupSpeechRecognizer()
+        setupSpeechRecognizers()
         wakeWordEngine = DexWakeWordEngine(
             this,
             onWakeWordDetected = {
@@ -404,6 +408,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         mainHandler.removeCallbacks(resetWakeWindowRunnable)
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
         wakeWordEngine?.stop()
+        wakeSpeechRecognizer?.destroy()
         speechRecognizer?.destroy()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
@@ -461,16 +466,44 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         runCatching { tts.voice = preferred }
     }
 
-    private fun setupSpeechRecognizer() {
+    private fun setupSpeechRecognizers() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) return
+        wakeSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+            setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    if (wakeModeEnabled && !awaitingWakeCommand && !conversationActive) {
+                        binding.conversationStatus.text = getString(R.string.wake_mode_waiting)
+                    }
+                }
+
+                override fun onBeginningOfSpeech() = Unit
+                override fun onRmsChanged(rmsdB: Float) = Unit
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+                override fun onEndOfSpeech() = Unit
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+                override fun onPartialResults(partialResults: Bundle?) = Unit
+
+                override fun onError(error: Int) {
+                    if (wakeModeEnabled) {
+                        handleWakeRecognitionError(error)
+                    }
+                }
+
+                override fun onResults(results: Bundle?) {
+                    if (wakeModeEnabled) {
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+                        handleWakeRecognitionMatches(matches)
+                    }
+                }
+            })
+        }
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     when {
                         isListeningForCallCommand -> binding.callMonitorStatus.text = getString(R.string.call_listening)
                         listeningForQuizAnswer -> binding.learningQuizPreview.append("\n\nListening for your answer...")
-                        wakeModeEnabled && (awaitingWakeCommand || conversationActive) ->
-                            binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
+                        isListeningForDexCommand -> binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
                     }
                 }
 
@@ -500,8 +533,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                                 repeatCurrentQuizQuestion()
                             }
                         }
-                    } else if (wakeModeEnabled) {
-                        handleWakeRecognitionError(error)
+                    } else if (isListeningForDexCommand) {
+                        isListeningForDexCommand = false
+                        if (wakeModeEnabled) {
+                            handleWakeRecognitionError(error)
+                        }
                     }
                 }
 
@@ -529,7 +565,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         listeningForQuizAnswer = false
                         val transcript = matches.firstOrNull()?.trim().orEmpty().lowercase(Locale.US)
                         handleQuizAnswerTranscript(transcript)
-                    } else if (wakeModeEnabled) {
+                    } else if (isListeningForDexCommand && wakeModeEnabled) {
+                        isListeningForDexCommand = false
                         handleWakeRecognitionMatches(matches)
                     }
                 }
@@ -3030,7 +3067,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
         }
+        isListeningForDexCommand = false
         isListeningForCallCommand = true
+        recognizer.cancel()
         recognizer.startListening(intent)
     }
 
@@ -3040,6 +3079,34 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         shouldResumeCallListeningAfterSpeech = false
         speechRecognizer?.stopListening()
         speechRecognizer?.cancel()
+    }
+
+    private fun startDexCommandListening() {
+        if (!wakeModeEnabled || isListeningForCallCommand || listeningForQuizAnswer || isListeningForDexCommand) return
+        val recognizer = speechRecognizer ?: return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            binding.conversationStatus.text = getString(R.string.wake_mode_permission_needed)
+            return
+        }
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 0L)
+        }
+        try {
+            wakeSpeechRecognizer?.cancel()
+            recognizer.cancel()
+            isListeningForDexCommand = true
+            lastWakeListenStartedAt = SystemClock.elapsedRealtime()
+            recognizer.startListening(intent)
+        } catch (_: Exception) {
+            isListeningForDexCommand = false
+            binding.conversationStatus.text = getString(R.string.wake_mode_unavailable)
+        }
     }
 
     private fun startWakeMode(automatic: Boolean = false) {
@@ -3055,7 +3122,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.conversationStatus.text = getString(R.string.wake_mode_permission_needed)
             return
         }
-        if (speechRecognizer == null) {
+        if (speechRecognizer == null || wakeSpeechRecognizer == null) {
             binding.conversationStatus.text = getString(R.string.wake_mode_unavailable)
             return
         }
@@ -3090,6 +3157,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
         wakeWordEngine?.stop()
         wakeWordEngineActive = false
+        isListeningForDexCommand = false
+        wakeSpeechRecognizer?.cancel()
         if (!isListeningForCallCommand) {
             speechRecognizer?.cancel()
         }
@@ -3099,22 +3168,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun startWakeWordListening() {
         if (!wakeModeEnabled || isListeningForCallCommand) return
-        val recognizer = speechRecognizer ?: return
-        val commandMode = awaitingWakeCommand || conversationActive
+        if (awaitingWakeCommand || conversationActive) {
+            startDexCommandListening()
+            return
+        }
+        val recognizer = wakeSpeechRecognizer ?: return
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            if (commandMode) {
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 0L)
-            } else {
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5500L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 15000L)
-            }
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 15000L)
         }
         try {
             recognizer.cancel()
@@ -3136,6 +3202,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun handleWakeWordEngineDetection() {
         if (!wakeModeEnabled || isListeningForCallCommand || lastCallState == TelephonyManager.CALL_STATE_RINGING) return
         if (awaitingWakeCommand || conversationActive) return
+        wakeSpeechRecognizer?.cancel()
         binding.lastHeardValue.text = getString(R.string.wake_mode_detected)
         awaitingWakeCommand = true
         conversationActive = true
