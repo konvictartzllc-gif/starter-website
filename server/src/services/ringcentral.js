@@ -6,7 +6,10 @@ let ringCentralStatus = {
   ready: false,
   reason: "not_configured",
   detail: null,
+  lastSms: null,
 };
+
+let smsSenderNumberCache = null;
 
 function getConfig() {
   return {
@@ -48,16 +51,55 @@ async function fetchJson(url, options = {}) {
   }
 
   if (!response.ok) {
+    const firstError = Array.isArray(json?.errors) ? json.errors[0] : null;
     const detail =
       json?.message ||
+      firstError?.message ||
       json?.error_description ||
       json?.error ||
       text ||
       `${response.status} ${response.statusText}`;
-    throw new Error(detail);
+    const code = firstError?.errorCode || json?.errorCode || json?.error;
+    throw new Error(code ? `${detail} (${code})` : detail);
   }
 
   return json;
+}
+
+async function callRingCentralGet(path) {
+  const config = getConfig();
+  const token = await loginRingCentral();
+  if (!token) {
+    throw new Error(ringCentralStatus.detail || `RingCentral not ready: ${ringCentralStatus.reason}`);
+  }
+
+  return fetchJson(`${config.server}${path}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+async function getSmsCapableSenderNumber() {
+  if (smsSenderNumberCache) return smsSenderNumberCache;
+
+  const response = await callRingCentralGet("/restapi/v1.0/account/~/extension/~/phone-number?perPage=100");
+  const records = Array.isArray(response?.records) ? response.records : [];
+  const smsNumber = records.find((record) => {
+    const features = Array.isArray(record.features) ? record.features : [];
+    return record.phoneNumber && features.some((feature) => String(feature).toLowerCase() === "smssender");
+  });
+  smsSenderNumberCache = normalizePhoneNumber(smsNumber?.phoneNumber || "");
+  return smsSenderNumberCache;
+}
+
+async function postSms(fromNumber, toNumber, body) {
+  return callRingCentral("/restapi/v1.0/account/~/extension/~/sms", {
+    from: { phoneNumber: fromNumber },
+    to: [{ phoneNumber: toNumber }],
+    text: body,
+  });
 }
 
 async function loginRingCentral(force = false) {
@@ -206,14 +248,37 @@ export async function sendSms(to, body) {
     throw new Error("RingCentral missing recipient number, SMS skipped.");
   }
   try {
-    await callRingCentral("/restapi/v1.0/account/~/extension/~/sms", {
-      from: { phoneNumber: normalizedFrom },
-      to: [{ phoneNumber: normalizedTo }],
-      text: body,
-    });
+    await postSms(normalizedFrom, normalizedTo, body);
     console.log(`SMS sent to ${normalizedTo}`);
+    ringCentralStatus = {
+      ...ringCentralStatus,
+      lastSms: { ok: true, to: normalizedTo, at: new Date().toISOString(), error: null },
+    };
     return true;
   } catch (err) {
+    const smsSenderNumber = await getSmsCapableSenderNumber().catch(() => "");
+    if (smsSenderNumber && smsSenderNumber !== normalizedFrom) {
+      try {
+        await postSms(smsSenderNumber, normalizedTo, body);
+        console.log(`SMS sent to ${normalizedTo} from discovered RingCentral SMS sender ${smsSenderNumber}`);
+        ringCentralStatus = {
+          ...ringCentralStatus,
+          lastSms: { ok: true, to: normalizedTo, at: new Date().toISOString(), error: null },
+        };
+        return true;
+      } catch (retryErr) {
+        console.error("SMS retry error:", retryErr.message);
+        ringCentralStatus = {
+          ...ringCentralStatus,
+          lastSms: { ok: false, to: normalizedTo, at: new Date().toISOString(), error: retryErr.message },
+        };
+        throw retryErr;
+      }
+    }
+    ringCentralStatus = {
+      ...ringCentralStatus,
+      lastSms: { ok: false, to: normalizedTo, at: new Date().toISOString(), error: err.message },
+    };
     console.error("SMS error:", err.message);
     throw err;
   }

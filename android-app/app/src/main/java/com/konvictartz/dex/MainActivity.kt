@@ -1,9 +1,13 @@
 package com.konvictartz.dex
 
 import android.Manifest
+import android.app.Activity
+import android.app.PendingIntent
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.database.Cursor
@@ -3908,17 +3912,87 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val userName = currentUserName.ifBlank { getString(R.string.dex_user_fallback_name) }
         val shortMessage = triggerMessage.trim().replace(Regex("\\s+"), " ").take(120)
         val smsBody = getString(R.string.local_emergency_sms_body, userName, shortMessage)
+        return sendLocalEmergencySmsWithStatus(phoneNumber, smsBody, now)
+    }
+
+    private fun sendLocalEmergencySmsWithStatus(phoneNumber: String, smsBody: String, startedAt: Long): String {
+        val token = startedAt.toInt()
+        val sentIntent = Intent(ACTION_LOCAL_EMERGENCY_SMS_SENT).putExtra(EXTRA_SMS_TOKEN, token)
+        val deliveredIntent = Intent(ACTION_LOCAL_EMERGENCY_SMS_DELIVERED).putExtra(EXTRA_SMS_TOKEN, token)
+        val sentPendingIntent = PendingIntent.getBroadcast(
+            this,
+            token,
+            sentIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val deliveredPendingIntent = PendingIntent.getBroadcast(
+            this,
+            token + 1,
+            deliveredIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        registerLocalEmergencySmsStatusReceiver(token)
+
         return runCatching {
-            resolveSmsManager().sendTextMessage(phoneNumber, null, smsBody, null, null)
+            resolveSmsManager().sendTextMessage(phoneNumber, null, smsBody, sentPendingIntent, deliveredPendingIntent)
         }.fold(
             onSuccess = {
-                lastLocalEmergencySmsSentAt = now
-                getString(R.string.local_emergency_sms_sent)
+                lastLocalEmergencySmsSentAt = startedAt
+                getString(R.string.local_emergency_sms_attempting)
             },
             onFailure = {
                 getString(R.string.local_emergency_sms_failed)
             }
         )
+    }
+
+    private fun registerLocalEmergencySmsStatusReceiver(token: Int) {
+        var isFinished = false
+        lateinit var receiver: BroadcastReceiver
+        fun finish(message: String) {
+            if (isFinished) return
+            isFinished = true
+            if (message.isNotBlank()) {
+                binding.conversationStatus.text = message
+                binding.lastReplyValue.text = "${binding.lastReplyValue.text} $message".trim()
+            }
+            runCatching { unregisterReceiver(receiver) }
+        }
+
+        receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.getIntExtra(EXTRA_SMS_TOKEN, -1) != token) return
+                when (intent.action) {
+                    ACTION_LOCAL_EMERGENCY_SMS_SENT -> {
+                        if (resultCode != Activity.RESULT_OK) {
+                            finish(getString(R.string.local_emergency_sms_failed))
+                        }
+                    }
+                    ACTION_LOCAL_EMERGENCY_SMS_DELIVERED -> {
+                        finish(
+                            if (resultCode == Activity.RESULT_OK) {
+                                getString(R.string.local_emergency_sms_delivered)
+                            } else {
+                                getString(R.string.local_emergency_sms_not_delivered)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        val filter = IntentFilter().apply {
+            addAction(ACTION_LOCAL_EMERGENCY_SMS_SENT)
+            addAction(ACTION_LOCAL_EMERGENCY_SMS_DELIVERED)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(receiver, filter)
+        }
+        mainHandler.postDelayed({
+            finish(getString(R.string.local_emergency_sms_no_delivery_confirmation))
+        }, LOCAL_EMERGENCY_SMS_DELIVERY_TIMEOUT_MS)
     }
 
     private fun normalizeSmsPhoneNumber(value: String): String {
@@ -4967,6 +5041,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_HOME_LEFT_STICKER_URI = "home_left_sticker_uri"
         const val KEY_HOME_RIGHT_STICKER_URI = "home_right_sticker_uri"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
+        const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
+        const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"
+        const val EXTRA_SMS_TOKEN = "sms_token"
         const val EXTRA_ASSISTANT_SURFACE = "assistant_surface"
         const val EXTRA_ASSISTANT_CALLER = "assistant_caller"
         const val DEFAULT_SERVER_URL = "https://konvict-artz.onrender.com/api"
@@ -4998,6 +5075,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val CONVERSATION_TIMEOUT_MS = 45_000L
         private const val DEX_CHAT_DUPLICATE_GUARD_MS = 4_000L
         private const val LOCAL_EMERGENCY_SMS_COOLDOWN_MS = 5 * 60 * 1000L
+        private const val LOCAL_EMERGENCY_SMS_DELIVERY_TIMEOUT_MS = 90_000L
         private const val MAX_CALL_ANSWER_RETRIES = 2
         private const val CALL_ANSWER_RETRY_DELAY_MS = 350L
         private const val CALL_COMMAND_RETRY_DELAY_MS = 400L

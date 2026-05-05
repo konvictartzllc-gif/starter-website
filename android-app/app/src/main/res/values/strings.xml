@@ -294,6 +294,10 @@
     <string name="dex_user_fallback_name">the Dex user</string>
     <string name="local_emergency_sms_body">Dex emergency alert for %1$s. Dex detected a serious safety concern from this message: "%2$s". Please check on them right away. If there is immediate danger, call emergency services.</string>
     <string name="local_emergency_sms_sent">I also sent your trusted contact a text from this phone.</string>
+    <string name="local_emergency_sms_attempting">I also asked this phone to text your trusted contact. I will only mark it delivered if Android confirms delivery.</string>
+    <string name="local_emergency_sms_delivered">Android confirmed the emergency text was delivered.</string>
+    <string name="local_emergency_sms_not_delivered">Android could not confirm the emergency text was delivered. Please contact your trusted contact directly if you can.</string>
+    <string name="local_emergency_sms_no_delivery_confirmation">Android did not give Dex a delivery confirmation for the emergency text. Please contact your trusted contact directly if you can.</string>
     <string name="local_emergency_sms_permission_missing">Dex needs Android text-message permission before it can text your trusted contact from this phone.</string>
     <string name="local_emergency_sms_failed">Dex could not send the emergency text from this phone. Please contact your trusted contact directly if you can.</string>
     <string name="email_draft_opened">I opened the email draft for %1$s.</string>
