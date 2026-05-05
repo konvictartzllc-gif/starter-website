@@ -2305,6 +2305,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .setPositiveButton(R.string.permissions_disclosure_continue) { _, _ ->
                 val permissions = mutableListOf(
                     Manifest.permission.READ_PHONE_STATE,
+                    Manifest.permission.READ_CALL_LOG,
                     Manifest.permission.READ_CONTACTS,
                     Manifest.permission.ANSWER_PHONE_CALLS,
                     Manifest.permission.CALL_PHONE,
@@ -2372,6 +2373,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun hasAllAndroidPermissions(): Boolean {
         val required = mutableListOf(
             Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG,
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.CALL_PHONE,

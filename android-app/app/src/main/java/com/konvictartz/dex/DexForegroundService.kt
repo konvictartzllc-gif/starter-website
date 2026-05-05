@@ -249,6 +249,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             !appInForeground &&
             phoneBackendEnabled &&
             hasPermission(Manifest.permission.READ_PHONE_STATE) &&
+            hasPermission(Manifest.permission.READ_CALL_LOG) &&
             hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)
     }
 
@@ -585,6 +586,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleBackgroundCallCommand(normalized: String) {
         when {
+            normalized == "yes" ||
+                normalized == "yeah" ||
+                normalized == "yep" ||
+                normalized == "okay" ||
+                normalized == "ok" -> handleCallAnswerAction()
             normalized.contains("take a message") ||
                 normalized.contains("take the message") ||
                 normalized.contains("ask who") ||
@@ -613,6 +619,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleBackgroundSmsCommand(normalized: String) {
         when {
+            normalized == "yes" ||
+                normalized == "yeah" ||
+                normalized == "yep" ||
+                normalized == "okay" ||
+                normalized == "ok" -> handleSmsReadAction()
             normalized.contains("read") -> handleSmsReadAction()
             normalized.contains("reply") ||
                 normalized.contains("text back") ||
@@ -628,6 +639,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleBackgroundNotificationCommand(normalized: String) {
         when {
+            normalized == "yes" ||
+                normalized == "yeah" ||
+                normalized == "yep" ||
+                normalized == "okay" ||
+                normalized == "ok" -> handleNotificationReadAction()
             normalized.contains("read") -> handleNotificationReadAction()
             normalized.contains("ignore") ||
                 normalized.contains("leave it") -> handleNotificationIgnoreAction()
