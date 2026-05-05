@@ -186,9 +186,9 @@
     <string name="permission_notifications">Allow Dex to send notifications</string>
     <string name="request_android_permissions">Review and grant Android permissions</string>
     <string name="android_permissions_missing">Android runtime permissions still need approval on this device.</string>
-    <string name="android_permissions_ready">Android runtime permissions are granted for phone state, contacts, call controls, microphone, and notifications.</string>
+    <string name="android_permissions_ready">Android runtime permissions are granted for phone state, contacts, call controls, text messages, microphone, and notifications.</string>
     <string name="permissions_disclosure_title">Before Dex requests Android permissions</string>
-    <string name="permissions_disclosure_message">Dex AI Assistant uses phone state and contacts to announce callers, answer or decline calls you approve, and place calls for saved contacts. Dex uses microphone access for voice commands like "Hey Dex" and "answer," and notifications for reminders and background status. Dex does not need call log access for these features. You can turn Dex features off later in Dex settings or Android system settings.</string>
+    <string name="permissions_disclosure_message">Dex AI Assistant uses phone state and contacts to announce callers, answer or decline calls you approve, and place calls for saved contacts. Dex uses text-message access for texts you approve and emergency trusted-contact texts when enabled. Dex uses microphone access for voice commands like "Hey Dex" and "answer," and notifications for reminders and background status. Dex does not need call log access for these features. You can turn Dex features off later in Dex settings or Android system settings.</string>
     <string name="permissions_disclosure_continue">Continue</string>
     <string name="permissions_disclosure_cancel">Not now</string>
     <string name="background_access_title">Background access setup</string>
@@ -291,6 +291,11 @@
     <string name="sms_sent_directly">I sent the text to %1$s.</string>
     <string name="sms_send_failed">I could not send the text to %1$s directly, so I opened the draft instead.</string>
     <string name="sms_send_permission_missing">Dex needs Android text-message permission before it can send texts for you. I opened the draft instead.</string>
+    <string name="dex_user_fallback_name">the Dex user</string>
+    <string name="local_emergency_sms_body">Dex emergency alert for %1$s. Dex detected a serious safety concern from this message: "%2$s". Please check on them right away. If there is immediate danger, call emergency services.</string>
+    <string name="local_emergency_sms_sent">I also sent your trusted contact a text from this phone.</string>
+    <string name="local_emergency_sms_permission_missing">Dex needs Android text-message permission before it can text your trusted contact from this phone.</string>
+    <string name="local_emergency_sms_failed">Dex could not send the emergency text from this phone. Please contact your trusted contact directly if you can.</string>
     <string name="email_draft_opened">I opened the email draft for %1$s.</string>
     <string name="call_direct_started">Calling %1$s now.</string>
     <string name="app_opened">I opened %1$s.</string>

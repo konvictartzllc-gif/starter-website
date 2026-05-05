@@ -211,6 +211,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexChatInFlight = false
     private var lastDexChatMessage = ""
     private var lastDexChatSentAt = 0L
+    private var lastLocalEmergencySmsSentAt = 0L
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -1106,12 +1107,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun saveSafetyProfile() {
         val token = authToken ?: return
+        val emergencyContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
+        val contactPermission = binding.safetyNotifyTrustedContactSwitch.isChecked
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_EMERGENCY_CONTACT, emergencyContact)
+            .putBoolean(KEY_EMERGENCY_CONTACT_PERMISSION, contactPermission)
+            .apply()
         val serverUrl = currentServerUrl()
         val updates = listOf(
-            "emergency_contact" to binding.safetyContactInput.text?.toString()?.trim().orEmpty(),
+            "emergency_contact" to emergencyContact,
             "comfort_style" to binding.safetyComfortInput.text?.toString()?.trim().orEmpty(),
             "grounding_preference" to binding.safetyGroundingInput.text?.toString()?.trim().orEmpty(),
-            "emergency_contact_permission" to if (binding.safetyNotifyTrustedContactSwitch.isChecked) "1" else "0",
+            "emergency_contact_permission" to if (contactPermission) "1" else "0",
             "safety_follow_up_opt_in" to if (binding.safetyFollowUpSwitch.isChecked) "1" else "0",
         )
         lifecycleScope.launch {
@@ -2178,6 +2186,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 val contactPermission = preferences.optString("emergency_contact_permission") == "1"
                 val followUp = preferences.optString("safety_follow_up_opt_in") == "1"
 
+                getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_EMERGENCY_CONTACT, emergencyContact)
+                    .putBoolean(KEY_EMERGENCY_CONTACT_PERMISSION, contactPermission)
+                    .apply()
                 binding.safetyContactInput.setText(emergencyContact)
                 binding.safetyComfortInput.setText(comfortStyle)
                 binding.safetyGroundingInput.setText(groundingPreference)
@@ -2358,6 +2371,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.CALL_PHONE,
+            Manifest.permission.SEND_SMS,
             Manifest.permission.RECEIVE_SMS,
             Manifest.permission.RECORD_AUDIO
         )
@@ -3837,11 +3851,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             result.onSuccess { response ->
                 val reply = response.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
                 maybeScheduleSafetyCheckIn(response)
-                binding.lastReplyValue.text = reply
+                val localSmsStatus = sendLocalEmergencySmsIfNeeded(response, message)
+                val spokenReply = listOfNotNull(reply, localSmsStatus).joinToString(" ")
+                binding.lastReplyValue.text = spokenReply
                 binding.conversationStatus.text = getString(R.string.wake_mode_replying)
                 conversationActive = true
                 scheduleConversationTimeout()
-                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                speakDex(spokenReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
                 dexChatInFlight = false
             }.onFailure { error ->
                 val fallback = error.message ?: getString(R.string.wake_mode_fallback_reply)
@@ -3866,6 +3882,56 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             title = title,
             text = text
         )
+    }
+
+    private fun sendLocalEmergencySmsIfNeeded(response: JSONObject, triggerMessage: String): String? {
+        if (!response.optBoolean("emergency", false)) return null
+        if (response.optBoolean("trustedContactDelivered", false)) return null
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastLocalEmergencySmsSentAt < LOCAL_EMERGENCY_SMS_COOLDOWN_MS) return null
+
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val contactPermission =
+            prefs.getBoolean(KEY_EMERGENCY_CONTACT_PERMISSION, false) || binding.safetyNotifyTrustedContactSwitch.isChecked
+        if (!contactPermission) return null
+
+        val savedContact = prefs.getString(KEY_EMERGENCY_CONTACT, null).orEmpty()
+        val contact = savedContact.ifBlank { binding.safetyContactInput.text?.toString()?.trim().orEmpty() }
+        val phoneNumber = normalizeSmsPhoneNumber(contact)
+        if (phoneNumber.isBlank()) return null
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return getString(R.string.local_emergency_sms_permission_missing)
+        }
+
+        val userName = currentUserName.ifBlank { getString(R.string.dex_user_fallback_name) }
+        val shortMessage = triggerMessage.trim().replace(Regex("\\s+"), " ").take(120)
+        val smsBody = getString(R.string.local_emergency_sms_body, userName, shortMessage)
+        return runCatching {
+            resolveSmsManager().sendTextMessage(phoneNumber, null, smsBody, null, null)
+        }.fold(
+            onSuccess = {
+                lastLocalEmergencySmsSentAt = now
+                getString(R.string.local_emergency_sms_sent)
+            },
+            onFailure = {
+                getString(R.string.local_emergency_sms_failed)
+            }
+        )
+    }
+
+    private fun normalizeSmsPhoneNumber(value: String): String {
+        val trimmed = value.trim()
+        if (trimmed.isBlank() || trimmed.contains("@")) return ""
+        val digits = trimmed.filter { it.isDigit() }
+        return when {
+            trimmed.startsWith("+") && digits.length >= 10 -> "+$digits"
+            digits.length == 10 -> "+1$digits"
+            digits.length == 11 && digits.startsWith("1") -> "+$digits"
+            digits.length >= 10 -> "+$digits"
+            else -> ""
+        }
     }
 
     private fun buildSmsDraft(message: String): PendingAction? {
@@ -4883,6 +4949,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_PENDING_NOTIFICATION_APP = "pending_notification_app"
         const val KEY_PENDING_NOTIFICATION_TITLE = "pending_notification_title"
         const val KEY_PENDING_NOTIFICATION_TEXT = "pending_notification_text"
+        const val KEY_EMERGENCY_CONTACT = "emergency_contact"
+        const val KEY_EMERGENCY_CONTACT_PERMISSION = "emergency_contact_permission"
         const val KEY_VOSK_MODEL_ASSET = "vosk_model_asset"
         const val KEY_VOSK_WAKE_PHRASE = "vosk_wake_phrase"
         const val KEY_LEARNING_REMINDER_ENABLED = "learning_reminder_enabled"
@@ -4929,6 +4997,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
         private const val CONVERSATION_TIMEOUT_MS = 45_000L
         private const val DEX_CHAT_DUPLICATE_GUARD_MS = 4_000L
+        private const val LOCAL_EMERGENCY_SMS_COOLDOWN_MS = 5 * 60 * 1000L
         private const val MAX_CALL_ANSWER_RETRIES = 2
         private const val CALL_ANSWER_RETRY_DELAY_MS = 350L
         private const val CALL_COMMAND_RETRY_DELAY_MS = 400L
