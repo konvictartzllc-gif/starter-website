@@ -186,7 +186,7 @@
     <string name="permission_notifications">Allow Dex to send notifications</string>
     <string name="request_android_permissions">Review and grant Android permissions</string>
     <string name="android_permissions_missing">Android runtime permissions still need approval on this device.</string>
-    <string name="android_permissions_ready">Android runtime permissions are granted for phone state, contacts, call controls, text messages, microphone, and notifications.</string>
+    <string name="android_permissions_ready">Android runtime permissions are granted for phone state, contacts, call controls, microphone, and notifications. Text-message permission is only needed when Dex sends SMS.</string>
     <string name="permissions_disclosure_title">Before Dex requests Android permissions</string>
     <string name="permissions_disclosure_message">Dex AI Assistant uses phone state and contacts to announce callers, answer or decline calls you approve, and place calls for saved contacts. Dex uses text-message access for texts you approve and emergency trusted-contact texts when enabled. Dex uses microphone access for voice commands like "Hey Dex" and "answer," and notifications for reminders and background status. Dex does not need call log access for these features. You can turn Dex features off later in Dex settings or Android system settings.</string>
     <string name="permissions_disclosure_continue">Continue</string>

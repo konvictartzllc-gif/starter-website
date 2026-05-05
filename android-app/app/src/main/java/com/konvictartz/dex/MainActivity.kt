@@ -2375,7 +2375,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.CALL_PHONE,
-            Manifest.permission.SEND_SMS,
             Manifest.permission.RECEIVE_SMS,
             Manifest.permission.RECORD_AUDIO
         )
@@ -2727,6 +2726,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         speechProfile: DexSpeechProfile = DexSpeechProfile.CONVERSATION
     ) {
         if (!ttsReady) {
+            if (resumeCommandCaptureAfterWakePrompt && wakeModeEnabled) {
+                resumeCommandCaptureAfterWakePrompt = false
+                startWakeWordListening()
+            }
+            if (resumeWakeModeAfterSpeech && wakeModeEnabled) {
+                scheduleWakeListeningRestart(500)
+            }
             if (shouldResumeCallListeningAfterSpeech && lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                 shouldResumeCallListeningAfterSpeech = false
                 startListeningForCallCommand()
