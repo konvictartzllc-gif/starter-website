@@ -501,10 +501,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
                 override fun onResults(results: Bundle?) {
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                    val transcript = matches.firstOrNull()?.trim().orEmpty().lowercase(Locale.US)
                     if (isListeningForCallCommand) {
                         isListeningForCallCommand = false
-                        val action = parseCallVoiceAction(transcript)
+                        val action = matches
+                            .asSequence()
+                            .map { it.trim().lowercase(Locale.US) }
+                            .firstNotNullOfOrNull { parseCallVoiceAction(it) }
                         when {
                             action == CallVoiceAction.ANSWER -> answerRingingCall()
                             action == CallVoiceAction.ANSWER_ON_SPEAKER -> {
@@ -519,9 +521,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         }
                     } else if (listeningForQuizAnswer) {
                         listeningForQuizAnswer = false
+                        val transcript = matches.firstOrNull()?.trim().orEmpty().lowercase(Locale.US)
                         handleQuizAnswerTranscript(transcript)
                     } else if (wakeModeEnabled) {
-                        handleWakeTranscript(transcript)
+                        handleWakeRecognitionMatches(matches)
                     }
                 }
             })
@@ -2494,12 +2497,22 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun handleWakeTranscript(transcript: String) {
-        if (!wakeModeEnabled) return
+    private fun handleWakeRecognitionMatches(matches: List<String>) {
+        val cleanedMatches = matches.map { it.trim() }.filter { it.isNotBlank() }
+        if (cleanedMatches.isEmpty()) {
+            scheduleWakeListeningRestart(5500)
+            return
+        }
+        cleanedMatches.firstOrNull { handleWakeTranscript(it, allowFallback = false) }?.let { return }
+        handleWakeTranscript(cleanedMatches.first(), allowFallback = true)
+    }
+
+    private fun handleWakeTranscript(transcript: String, allowFallback: Boolean = true): Boolean {
+        if (!wakeModeEnabled) return false
         val normalized = transcript.trim().lowercase(Locale.US)
         if (normalized.isBlank()) {
             scheduleWakeListeningRestart(5500)
-            return
+            return true
         }
 
         binding.lastHeardValue.text = sanitizeWakeTranscriptForDisplay(normalized)
@@ -2507,21 +2520,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (normalized.contains("stop listening") || normalized.contains("go to sleep")) {
             stopWakeMode()
             speakDex(getString(R.string.wake_mode_sleep_reply))
-            return
+            return true
         }
 
         if (!awaitingWakeCommand && !conversationActive) {
             if (!containsWakeWord(normalized)) {
                 binding.conversationStatus.text = getString(R.string.wake_mode_waiting)
                 scheduleWakeListeningRestart(5500)
-                return
+                return false
             }
 
             val spokenCommand = stripWakeWord(normalized)
             conversationActive = true
             scheduleConversationTimeout()
             if (spokenCommand.isNotBlank()) {
-                processDexCommand(spokenCommand)
+                return processDexCommand(spokenCommand, allowAiFallback = allowFallback)
             } else {
                 awaitingWakeCommand = true
                 binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
@@ -2530,8 +2543,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     R.string.voice_speaking,
                     resumeWakeModeAfterSpeech = true
                 )
+                return true
             }
-            return
         }
 
         conversationActive = true
@@ -2546,9 +2559,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
                 scheduleWakeListeningRestart(5500)
             }
-            return
+            return true
         }
-        processDexCommand(cleanedTranscript)
+        return processDexCommand(cleanedTranscript, allowAiFallback = allowFallback)
     }
 
     private fun containsWakeWord(transcript: String): Boolean =
@@ -3101,13 +3114,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun processDexCommand(message: String) {
-        if (handleTaskIntent(message)) return
+    private fun processDexCommand(message: String, allowAiFallback: Boolean = true): Boolean {
+        if (handleTaskIntent(message)) return true
         detectContactOnlyIntent(message)?.let { contact ->
             handleDetectedContactTarget(contact)
-            return
+            return true
         }
-        sendDexChat(message)
+        if (allowAiFallback) {
+            sendDexChat(message)
+            return true
+        }
+        return false
     }
 
     private fun openYoutube(query: String?) {
