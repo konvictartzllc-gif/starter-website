@@ -5180,53 +5180,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun findPhoneContactByName(name: String): ContactMatch? {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            return null
-        }
-        val cursor = contentResolver.query(
-            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-            arrayOf(
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                ContactsContract.CommonDataKinds.Phone.NUMBER
-            ),
-            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
-            arrayOf("%$name%"),
-            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC"
-        )
-        cursor?.use {
-            if (it.moveToFirst()) {
-                return ContactMatch(
-                    displayName = it.getString(0),
-                    value = it.getString(1)
-                )
-            }
-        }
-        return null
+        return findBestPhoneContactMatch(name, requireExact = false)
     }
 
     private fun findExactPhoneContactByName(name: String): ContactMatch? {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            return null
-        }
-        val cursor = contentResolver.query(
-            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-            arrayOf(
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                ContactsContract.CommonDataKinds.Phone.NUMBER
-            ),
-            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} = ? COLLATE NOCASE",
-            arrayOf(name),
-            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC"
-        )
-        cursor?.use {
-            if (it.moveToFirst()) {
-                return ContactMatch(
-                    displayName = it.getString(0),
-                    value = it.getString(1)
-                )
-            }
-        }
-        return null
+        return findBestPhoneContactMatch(name, requireExact = true)
     }
 
     private fun resolveContactAlias(name: String): String {
@@ -5254,7 +5212,65 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             return null
         }
-        val loweredMessage = message.lowercase(Locale.US)
+        val normalizedMessage = normalizeContactLookupText(resolveAliasesInSentence(message))
+        if (normalizedMessage.isBlank()) return null
+        return readPhoneContacts()
+            .mapNotNull { contact ->
+                val display = normalizeContactLookupText(contact.displayName)
+                if (display.isBlank()) {
+                    null
+                } else if (
+                    normalizedMessage.contains(display) ||
+                    normalizeCompactContactText(normalizedMessage).contains(normalizeCompactContactText(display))
+                ) {
+                    display.length to contact
+                } else {
+                    null
+                }
+            }
+            .maxByOrNull { it.first }
+            ?.second
+    }
+
+    private fun findBestPhoneContactMatch(name: String, requireExact: Boolean): ContactMatch? {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return null
+        }
+        val variants = buildContactLookupVariants(name)
+        if (variants.isEmpty()) return null
+
+        val contacts = readPhoneContacts()
+        val exactMatch = contacts.firstOrNull { contact ->
+            val display = normalizeContactLookupText(contact.displayName)
+            display.isNotBlank() && variants.any { it == display || normalizeCompactContactText(it) == normalizeCompactContactText(display) }
+        }
+        if (exactMatch != null || requireExact) return exactMatch
+
+        return contacts
+            .mapNotNull { contact ->
+                val display = normalizeContactLookupText(contact.displayName)
+                val compactDisplay = normalizeCompactContactText(display)
+                if (display.isBlank()) {
+                    null
+                } else {
+                    val score = variants.maxOfOrNull { candidate ->
+                        when {
+                            display == candidate -> 1000
+                            compactDisplay == normalizeCompactContactText(candidate) -> 950
+                            display.contains(candidate) || candidate.contains(display) -> minOf(display.length, candidate.length) + 300
+                            compactDisplay.contains(normalizeCompactContactText(candidate)) -> minOf(compactDisplay.length, candidate.length) + 250
+                            hasStrongContactTokenOverlap(display, candidate) -> sharedContactTokenCount(display, candidate) * 100 + minOf(display.length, candidate.length)
+                            else -> 0
+                        }
+                    } ?: 0
+                    if (score > 0) score to contact else null
+                }
+            }
+            .maxByOrNull { it.first }
+            ?.second
+    }
+
+    private fun readPhoneContacts(): List<ContactMatch> {
         val cursor = contentResolver.query(
             ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
             arrayOf(
@@ -5264,20 +5280,58 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             null,
             null,
             "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC"
-        )
-        cursor?.use {
+        ) ?: return emptyList()
+        val contacts = mutableListOf<ContactMatch>()
+        cursor.use {
             while (it.moveToNext()) {
                 val displayName = it.getString(0) ?: continue
                 val number = it.getString(1) ?: continue
-                if (loweredMessage.contains(displayName.lowercase(Locale.US))) {
-                    return ContactMatch(
-                        displayName = displayName,
-                        value = number
-                    )
-                }
+                contacts += ContactMatch(displayName = displayName, value = number)
             }
         }
-        return null
+        return contacts
+    }
+
+    private fun buildContactLookupVariants(name: String): List<String> {
+        val variants = linkedSetOf<String>()
+        val original = name.trim()
+        if (original.isBlank()) return emptyList()
+        val aliasResolved = resolveContactAlias(original)
+        listOf(original, aliasResolved).forEach { raw ->
+            val normalized = normalizeContactLookupText(raw)
+            if (normalized.isNotBlank()) {
+                variants += normalized
+                variants += normalized.replace(" ", "")
+                val dePossessive = normalized.replace(Regex("\\b('s|s')\\b"), "").trim()
+                if (dePossessive.isNotBlank()) variants += dePossessive
+            }
+        }
+        return variants.filter { it.isNotBlank() }
+    }
+
+    private fun normalizeContactLookupText(value: String): String {
+        return value
+            .trim()
+            .lowercase(Locale.US)
+            .replace("&", " and ")
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\b(?:my|the|a|an|please|for me|call|text|message|email|to)\\b"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun normalizeCompactContactText(value: String): String =
+        normalizeContactLookupText(value).replace(" ", "")
+
+    private fun sharedContactTokenCount(left: String, right: String): Int {
+        val leftTokens = left.split(" ").filter { it.length > 1 }.toSet()
+        val rightTokens = right.split(" ").filter { it.length > 1 }.toSet()
+        return leftTokens.intersect(rightTokens).size
+    }
+
+    private fun hasStrongContactTokenOverlap(left: String, right: String): Boolean {
+        val shared = sharedContactTokenCount(left, right)
+        return shared >= 2 || (shared == 1 && (left.contains(" ") || right.contains(" ")))
     }
 
     private fun findEmailContactByName(name: String): ContactMatch? {
