@@ -3675,7 +3675,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         target = target
             .replace(
                 Regex(
-                    "\\b(?:at|for|on)\\s+\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?\\b.*$",
+                    "\\b(?:at|for|on)\\s+\\d{1,2}(?::\\d{2})?\\s*(?:a\\.?m\\.?|p\\.?m\\.?)?\\b.*$",
                     RegexOption.IGNORE_CASE
                 ),
                 ""
@@ -4428,7 +4428,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val title = message
             .replace(Regex("\\b(schedule|book|appointment|add to my calendar|set up)\\b", RegexOption.IGNORE_CASE), "")
             .replace(Regex("\\b(today|tomorrow|next week|this week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next monday|next tuesday|next wednesday|next thursday|next friday|next saturday|next sunday)\\b", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("\\bat\\s+\\d{1,2}(?::\\d{2})?\\s*(am|pm)\\b", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\bat\\s+\\d{1,2}(?::\\d{2})?\\s*(?:a\\.?m\\.?|p\\.?m\\.?)\\b", RegexOption.IGNORE_CASE), "")
             .replace(Regex("\\b(noon|midnight|morning|afternoon|evening|tonight)\\b", RegexOption.IGNORE_CASE), "")
             .trim()
             .ifBlank { "Dex task" }
@@ -4448,24 +4448,29 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun inferDateTimeFromCommand(message: String): LocalDateTime {
         val lower = message.lowercase(Locale.US)
-        val date = inferRequestedDate(lower)
-        val timeMatch = Regex("(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)", RegexOption.IGNORE_CASE).find(lower)
+        val normalized = lower
+            .replace("a.m.", "am")
+            .replace("p.m.", "pm")
+            .replace("a.m", "am")
+            .replace("p.m", "pm")
+        val date = inferRequestedDate(normalized)
+        val timeMatch = Regex("(\\d{1,2})(?::(\\d{2}))?\\s*(a\\.?m\\.?|p\\.?m\\.?)", RegexOption.IGNORE_CASE).find(normalized)
         val time = if (timeMatch != null) {
             var hour = timeMatch.groupValues[1].toInt()
             val minute = timeMatch.groupValues[2].ifBlank { "0" }.toInt()
-            val meridiem = timeMatch.groupValues[3].lowercase(Locale.US)
+            val meridiem = timeMatch.groupValues[3].lowercase(Locale.US).replace(".", "")
             if (meridiem == "pm" && hour < 12) hour += 12
             if (meridiem == "am" && hour == 12) hour = 0
             LocalTime.of(hour, minute)
-        } else if (lower.contains("noon")) {
+        } else if (normalized.contains("noon")) {
             LocalTime.NOON
-        } else if (lower.contains("midnight")) {
+        } else if (normalized.contains("midnight")) {
             LocalTime.MIDNIGHT
-        } else if (lower.contains("morning")) {
+        } else if (normalized.contains("morning")) {
             LocalTime.of(9, 0)
-        } else if (lower.contains("afternoon")) {
+        } else if (normalized.contains("afternoon")) {
             LocalTime.of(15, 0)
-        } else if (lower.contains("evening") || lower.contains("tonight")) {
+        } else if (normalized.contains("evening") || normalized.contains("tonight")) {
             LocalTime.of(18, 0)
         } else {
             LocalTime.of(9, 0)
