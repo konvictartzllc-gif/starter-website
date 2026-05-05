@@ -273,6 +273,9 @@
     <string name="appointment_draft_detail">Time: %1$s</string>
     <string name="appointment_created">%1$s is on your Dex calendar now.</string>
     <string name="appointment_create_failed">I could not create that appointment.</string>
+    <string name="call_reminder_set">Okay. I will remind you to call %1$s at %2$s.</string>
+    <string name="call_reminder_title">Call %1$s</string>
+    <string name="call_reminder_text">Reminder to call %1$s.</string>
     <string name="contact_save_summary">I can save %1$s as a new contact.</string>
     <string name="contact_save_detail">Approve this and Android will open a contact draft with the number filled in so you can verify the caller and save the name.</string>
     <string name="contact_save_opened">I opened a new contact draft for %1$s.</string>

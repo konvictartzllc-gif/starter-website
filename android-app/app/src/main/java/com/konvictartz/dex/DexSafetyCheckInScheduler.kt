@@ -21,6 +21,14 @@ object DexSafetyCheckInScheduler {
 
     fun scheduleOneTimeCheckIn(context: Context, delayMinutes: Int, title: String, text: String) {
         val triggerAtMillis = System.currentTimeMillis() + (delayMinutes.coerceAtLeast(1) * 60_000L)
+        scheduleAtMillis(context, triggerAtMillis, title, text)
+    }
+
+    fun scheduleOneTimeCheckInAt(context: Context, triggerAtMillis: Long, title: String, text: String) {
+        scheduleAtMillis(context, triggerAtMillis, title, text)
+    }
+
+    private fun scheduleAtMillis(context: Context, triggerAtMillis: Long, title: String, text: String) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         alarmManager.cancel(createPendingIntent(context, title, text))
         alarmManager.setAndAllowWhileIdle(
