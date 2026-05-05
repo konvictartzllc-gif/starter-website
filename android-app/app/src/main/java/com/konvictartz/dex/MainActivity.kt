@@ -4053,9 +4053,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         lifecycleScope.launch {
             val result = postJson("$serverUrl/dex/chat", JSONObject().apply { put("message", message) }, token)
             result.onSuccess { response ->
-                val reply = response.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
-                maybeScheduleSafetyCheckIn(response)
-                val localSmsStatus = sendLocalEmergencySmsIfNeeded(response, message)
+                val localEmergency = isHighRiskEmergencyMessage(message)
+                val serverEmergency = response.optBoolean("emergency", false)
+                val reply = when {
+                    serverEmergency -> response.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
+                    localEmergency -> getString(R.string.local_emergency_reply)
+                    else -> response.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
+                }
+                maybeScheduleSafetyCheckIn(response, forceEmergency = localEmergency)
+                val localSmsStatus = sendLocalEmergencySmsIfNeeded(response, message, forceEmergency = localEmergency)
                 val spokenReply = listOfNotNull(reply, localSmsStatus).joinToString(" ")
                 binding.lastReplyValue.text = spokenReply
                 binding.conversationStatus.text = getString(R.string.wake_mode_replying)
@@ -4065,21 +4071,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 dexChatInFlight = false
             }.onFailure { error ->
                 val fallback = error.message ?: getString(R.string.wake_mode_fallback_reply)
-                binding.lastReplyValue.text = fallback
-                binding.conversationStatus.text = fallback
+                val localEmergency = isHighRiskEmergencyMessage(message)
+                val spokenReply = if (localEmergency) {
+                    listOfNotNull(
+                        getString(R.string.local_emergency_reply),
+                        sendLocalEmergencySmsIfNeeded(null, message, forceEmergency = true)
+                    ).joinToString(" ")
+                } else {
+                    fallback
+                }
+                binding.lastReplyValue.text = spokenReply
+                binding.conversationStatus.text = spokenReply
                 conversationActive = true
                 scheduleConversationTimeout()
-                speakDex(fallback, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                speakDex(spokenReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
                 dexChatInFlight = false
             }
         }
     }
 
-    private fun maybeScheduleSafetyCheckIn(response: JSONObject) {
-        if (!response.optBoolean("followUpSuggested", false)) return
-        val delayMinutes = response.optInt("followUpDelayMinutes", 15).coerceAtLeast(1)
-        val title = response.optString("followUpTitle").ifBlank { getString(R.string.safety_check_in_title) }
-        val text = response.optString("followUpMessage").ifBlank { getString(R.string.safety_check_in_text) }
+    private fun maybeScheduleSafetyCheckIn(response: JSONObject?, forceEmergency: Boolean = false) {
+        if (!forceEmergency && !(response?.optBoolean("followUpSuggested", false) == true)) return
+        val delayMinutes = response?.optInt("followUpDelayMinutes", 15)?.coerceAtLeast(1) ?: 15
+        val title = response?.optString("followUpTitle").orEmpty().ifBlank { getString(R.string.safety_check_in_title) }
+        val text = response?.optString("followUpMessage").orEmpty().ifBlank { getString(R.string.safety_check_in_text) }
         DexSafetyCheckInScheduler.scheduleOneTimeCheckIn(
             context = this,
             delayMinutes = delayMinutes,
@@ -4088,9 +4103,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
-    private fun sendLocalEmergencySmsIfNeeded(response: JSONObject, triggerMessage: String): String? {
-        if (!response.optBoolean("emergency", false)) return null
-        if (response.optBoolean("trustedContactDelivered", false)) return null
+    private fun sendLocalEmergencySmsIfNeeded(response: JSONObject?, triggerMessage: String, forceEmergency: Boolean = false): String? {
+        val emergency = forceEmergency || response?.optBoolean("emergency", false) == true
+        if (!emergency) return null
+        if (response?.optBoolean("trustedContactDelivered", false) == true) return null
 
         val now = SystemClock.elapsedRealtime()
         if (now - lastLocalEmergencySmsSentAt < LOCAL_EMERGENCY_SMS_COOLDOWN_MS) return null
@@ -4113,6 +4129,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val shortMessage = triggerMessage.trim().replace(Regex("\\s+"), " ").take(72)
         val smsBody = getString(R.string.local_emergency_sms_body, userName, shortMessage)
         return sendLocalEmergencySmsWithStatus(phoneNumber, smsBody, now)
+    }
+
+    private fun isHighRiskEmergencyMessage(message: String): Boolean {
+        val normalized = message.trim().lowercase(Locale.US)
+        if (normalized.isBlank()) return false
+        val highRiskPhrases = listOf(
+            "kill myself",
+            "want to kill myself",
+            "suicidal",
+            "i'm suicidal",
+            "im suicidal",
+            "end my life",
+            "take my life",
+            "want to die",
+            "don't want to live",
+            "do not want to live",
+            "hurt myself",
+            "harm myself",
+            "self harm",
+        )
+        return highRiskPhrases.any { normalized.contains(it) }
     }
 
     private fun sendLocalEmergencySmsWithStatus(phoneNumber: String, smsBody: String, startedAt: Long): String {
