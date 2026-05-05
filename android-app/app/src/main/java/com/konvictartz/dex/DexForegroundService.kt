@@ -65,6 +65,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var pendingSpeechText: String? = null
     private var pendingListenMode: BackgroundListenMode? = null
     private var activeListenMode: BackgroundListenMode? = null
+    private var awaitingSmsReplyChoice = false
     private var wakeWordEngine: DexWakeWordEngine? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     override fun onCreate() {
@@ -420,6 +421,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         if (rawSender.isBlank() || smsBody.isBlank()) return
 
         val sender = resolveCallerLabel(rawSender)
+        awaitingSmsReplyChoice = false
         prefs.edit()
             .putString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, sender)
             .putString(MainActivity.KEY_PENDING_INCOMING_SMS_VALUE, rawSender)
@@ -532,13 +534,18 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, null)
         val body = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_BODY, null)
         if (!sender.isNullOrBlank() && !body.isNullOrBlank()) {
-            speakShortStatus(getString(R.string.incoming_sms_readback, sender, body))
+            awaitingSmsReplyChoice = true
+            speakAndThenListen(
+                getString(R.string.incoming_sms_readback_with_reply_offer, sender, body),
+                BackgroundListenMode.SMS_COMMAND
+            )
         }
     }
 
     private fun handleSmsIgnoreAction() {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, "that sender").orEmpty()
+        awaitingSmsReplyChoice = false
         clearPendingIncomingSms()
         dismissNotification(SMS_NOTIFICATION_ID)
         speakShortStatus(getString(R.string.incoming_sms_ignored, sender))
@@ -623,18 +630,27 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 normalized == "yeah" ||
                 normalized == "yep" ||
                 normalized == "okay" ||
-                normalized == "ok" -> handleSmsReadAction()
+                normalized == "ok" -> {
+                if (awaitingSmsReplyChoice) {
+                    promptForPendingSmsReply()
+                } else {
+                    handleSmsReadAction()
+                }
+            }
             normalized.contains("read") -> handleSmsReadAction()
             normalized.contains("reply") ||
                 normalized.contains("text back") ||
-                normalized.contains("respond") -> {
-                val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-                val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, "them").orEmpty()
-                speakAndThenListen(getString(R.string.incoming_sms_reply_prompt, sender), BackgroundListenMode.SMS_REPLY)
-            }
+                normalized.contains("respond") -> promptForPendingSmsReply()
             normalized.contains("ignore") ||
                 normalized.contains("leave it") -> handleSmsIgnoreAction()
         }
+    }
+
+    private fun promptForPendingSmsReply() {
+        awaitingSmsReplyChoice = false
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, "them").orEmpty()
+        speakAndThenListen(getString(R.string.incoming_sms_reply_prompt, sender), BackgroundListenMode.SMS_REPLY)
     }
 
     private fun handleBackgroundNotificationCommand(normalized: String) {
@@ -663,6 +679,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val sender = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, null)
         val senderValue = prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_VALUE, null)
         if (sender.isNullOrBlank() || senderValue.isNullOrBlank()) return
+        awaitingSmsReplyChoice = false
         sendPhoneSms(senderValue, replyText, sender)
     }
 
@@ -820,6 +837,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun clearPendingIncomingSms() {
+        awaitingSmsReplyChoice = false
         getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER)
@@ -870,9 +888,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000L)
+            val completeSilenceMs = if (mode == BackgroundListenMode.SMS_REPLY) 5500L else 3500L
+            val possibleSilenceMs = if (mode == BackgroundListenMode.SMS_REPLY) 3500L else 2200L
+            val minimumMs = if (mode == BackgroundListenMode.SMS_REPLY) 12000L else 7000L
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, completeSilenceMs)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, possibleSilenceMs)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, minimumMs)
         }
         runCatching {
             recognizer.cancel()

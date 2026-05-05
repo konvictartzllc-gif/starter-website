@@ -192,6 +192,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingIncomingSmsSender: String? = null
     private var pendingIncomingSmsValue: String? = null
     private var pendingIncomingSmsBody: String? = null
+    private var pendingIncomingSmsReplyChoice = false
     private var pendingNotificationApp: String? = null
     private var pendingNotificationTitle: String? = null
     private var pendingNotificationText: String? = null
@@ -3553,7 +3554,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 normalized == "read the message" ||
                 normalized == "yes read it" ||
                 normalized == "yes read the text" -> {
-                val reply = getString(R.string.incoming_sms_readback, sender, body)
+                pendingIncomingSmsReplyChoice = true
+                val reply = getString(R.string.incoming_sms_readback_with_reply_offer, sender, body)
                 binding.conversationStatus.text = reply
                 binding.lastReplyValue.text = reply
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
@@ -3572,7 +3574,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 normalized == "reply to that" ||
                 normalized == "text them back" ||
                 normalized == "reply back" ||
-                normalized == "answer it" -> {
+                normalized == "answer it" ||
+                (pendingIncomingSmsReplyChoice && (
+                    normalized == "yes" ||
+                    normalized == "yeah" ||
+                    normalized == "yep" ||
+                    normalized == "ok" ||
+                    normalized == "okay"
+                )) -> {
                 val number = senderValue?.trim().orEmpty()
                 if (number.isBlank()) {
                     val reply = getString(R.string.contact_not_found_phone, sender)
@@ -3581,6 +3590,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
                     false
                 } else {
+                    pendingIncomingSmsReplyChoice = false
                     pendingSmsRecipient = ContactMatch(sender, number)
                     pendingSmsBodyDraft = null
                     val reply = getString(R.string.incoming_sms_reply_prompt, sender)
@@ -3596,6 +3606,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 normalized == "no" ||
                 normalized == "cancel" -> {
                 val reply = getString(R.string.incoming_sms_ignored, sender)
+                pendingIncomingSmsReplyChoice = false
                 binding.conversationStatus.text = reply
                 binding.lastReplyValue.text = reply
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
@@ -3644,6 +3655,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
         pendingIncomingSmsBody = null
+        pendingIncomingSmsReplyChoice = false
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_PENDING_INCOMING_SMS_SENDER)

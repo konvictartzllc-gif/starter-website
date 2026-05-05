@@ -363,6 +363,7 @@
     <string name="notifications_disabled">Notification access disabled for Dex.</string>
     <string name="incoming_sms_prompt">You just got a text from %1$s. Do you want me to read it to you?</string>
     <string name="incoming_sms_readback">Here is the text from %1$s: %2$s</string>
+    <string name="incoming_sms_readback_with_reply_offer">Here is the text from %1$s: %2$s. Do you want to reply?</string>
     <string name="incoming_sms_readback_again">Reading the text from %1$s again: %2$s</string>
     <string name="incoming_sms_reply_prompt">What would you like me to text back to %1$s?</string>
     <string name="incoming_sms_ignored">Okay. I will leave the text from %1$s unread aloud.</string>
