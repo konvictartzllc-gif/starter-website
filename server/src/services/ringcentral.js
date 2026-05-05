@@ -21,6 +21,16 @@ function getConfig() {
   };
 }
 
+function normalizePhoneNumber(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (raw.startsWith("+") && digits.length >= 10) return `+${digits}`;
+  return raw;
+}
+
 function hasRequiredConfig(config) {
   const hasJwtAuth = Boolean(config.jwt);
   const hasPasswordAuth = Boolean(config.username && config.password);
@@ -187,16 +197,21 @@ export async function initRingCentral() {
 
 export async function sendSms(to, body) {
   const { fromNumber } = getConfig();
+  const normalizedFrom = normalizePhoneNumber(fromNumber);
+  const normalizedTo = normalizePhoneNumber(to);
   if (!fromNumber) {
     throw new Error("RingCentral missing sender number, SMS skipped.");
   }
+  if (!normalizedTo) {
+    throw new Error("RingCentral missing recipient number, SMS skipped.");
+  }
   try {
     await callRingCentral("/restapi/v1.0/account/~/extension/~/sms", {
-      from: { phoneNumber: fromNumber },
-      to: [{ phoneNumber: to }],
+      from: { phoneNumber: normalizedFrom },
+      to: [{ phoneNumber: normalizedTo }],
       text: body,
     });
-    console.log(`SMS sent to ${to}`);
+    console.log(`SMS sent to ${normalizedTo}`);
     return true;
   } catch (err) {
     console.error("SMS error:", err.message);
@@ -206,17 +221,19 @@ export async function sendSms(to, body) {
 
 export async function makeCall(to, message) {
   const { fromNumber } = getConfig();
+  const normalizedFrom = normalizePhoneNumber(fromNumber);
+  const normalizedTo = normalizePhoneNumber(to);
   if (!fromNumber) {
     console.warn("RingCentral missing sender number, call skipped.");
     return;
   }
   try {
     await callRingCentral("/restapi/v1.0/account/~/extension/~/ring-out", {
-      from: { phoneNumber: fromNumber },
-      to: { phoneNumber: to },
+      from: { phoneNumber: normalizedFrom },
+      to: { phoneNumber: normalizedTo },
       playPrompt: true,
     });
-    console.log(`RingOut call placed to ${to}`);
+    console.log(`RingOut call placed to ${normalizedTo}`);
   } catch (err) {
     console.error("Call error:", err.message);
   }
@@ -230,8 +247,8 @@ export async function triggerEmergencyAlert(userInfo, triggerPhrase) {
     `EMERGENCY ALERT - Dex AI detected a safety concern.\n` +
     `User: ${userInfo}\nPhrase: "${triggerPhrase}"\nPlease respond immediately.`;
 
-  await makeCall(`+1${emergencyNumber}`, `Emergency alert from Konvict Artz Dex AI. User safety concern detected. Phrase: ${triggerPhrase}. User: ${userInfo}.`);
-  await sendSms(`+1${adminPhone}`, smsMsg);
+  await makeCall(emergencyNumber, `Emergency alert from Konvict Artz Dex AI. User safety concern detected. Phrase: ${triggerPhrase}. User: ${userInfo}.`);
+  await sendSms(adminPhone, smsMsg);
 }
 
 export async function sendLowInventoryAlert(itemName, quantity) {
@@ -240,7 +257,7 @@ export async function sendLowInventoryAlert(itemName, quantity) {
     `LOW INVENTORY ALERT - Konvict Artz\n` +
     `Item: ${itemName}\nCurrent Stock: ${quantity} units\n` +
     `Please reorder soon.`;
-  await sendSms(`+1${adminPhone}`, msg);
+  await sendSms(adminPhone, msg);
 }
 
 export function getRingCentralStatus() {
