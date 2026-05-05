@@ -295,6 +295,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         startWakeWordListening()
                     }
                     if (resumeWakeListeningAfterSpeech && wakeModeEnabled) {
+                        resetWakeSessionIfTaskFinished()
                         resumeWakeListeningAfterSpeech = false
                         scheduleWakeListeningRestart(1200)
                     }
@@ -318,6 +319,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         startWakeWordListening()
                     }
                     if (resumeWakeListeningAfterSpeech && wakeModeEnabled) {
+                        resetWakeSessionIfTaskFinished()
                         resumeWakeListeningAfterSpeech = false
                         scheduleWakeListeningRestart(1200)
                     }
@@ -3981,6 +3983,35 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun scheduleConversationTimeout() {
         mainHandler.removeCallbacks(resetWakeWindowRunnable)
         mainHandler.postDelayed(resetWakeWindowRunnable, CONVERSATION_TIMEOUT_MS)
+    }
+
+    private fun resetWakeSessionIfTaskFinished() {
+        if (!wakeModeEnabled) return
+        if (!shouldReturnToWakeWordMode()) return
+        awaitingWakeCommand = false
+        conversationActive = false
+        mainHandler.removeCallbacks(resetWakeWindowRunnable)
+        binding.conversationStatus.text =
+            if (wakeWordEngineActive) getString(R.string.wake_mode_hotword_ready)
+            else getString(R.string.wake_mode_waiting)
+    }
+
+    private fun shouldReturnToWakeWordMode(): Boolean {
+        return pendingAction == null &&
+            pendingNotificationText.isNullOrBlank() &&
+            pendingIncomingSmsSender.isNullOrBlank() &&
+            pendingIncomingSmsValue.isNullOrBlank() &&
+            pendingIncomingSmsBody.isNullOrBlank() &&
+            !pendingIncomingSmsReplyChoice &&
+            pendingContactTarget == null &&
+            pendingContactAction == null &&
+            pendingSmsRecipient == null &&
+            pendingSmsBodyDraft.isNullOrBlank() &&
+            !listeningForQuizAnswer &&
+            activeQuizSession == null &&
+            !dexChatInFlight &&
+            !shouldResumeCallListeningAfterSpeech &&
+            lastCallState != TelephonyManager.CALL_STATE_RINGING
     }
 
     private fun maybeQueueUnknownCallerSave() {
