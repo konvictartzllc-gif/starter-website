@@ -302,6 +302,7 @@
     <string name="local_emergency_sms_delivered">Android confirmed the emergency text was delivered.</string>
     <string name="local_emergency_sms_not_delivered">Android could not confirm the emergency text was delivered. Please contact your trusted contact directly if you can.</string>
     <string name="local_emergency_sms_no_delivery_confirmation">Android did not give Dex a delivery confirmation for the emergency text. Please contact your trusted contact directly if you can.</string>
+    <string name="local_emergency_sms_sent_no_receipt">This phone sent the emergency text to your carrier, but Android did not provide a delivery receipt. Please still contact your trusted contact directly if you can.</string>
     <string name="local_emergency_sms_permission_missing">Dex needs Android text-message permission before it can text your trusted contact from this phone.</string>
     <string name="local_emergency_sms_failed">Dex could not send the emergency text from this phone. Please contact your trusted contact directly if you can.</string>
     <string name="email_draft_opened">I opened the email draft for %1$s.</string>

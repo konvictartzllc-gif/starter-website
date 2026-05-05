@@ -4072,7 +4072,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         val userName = currentUserName.ifBlank { getString(R.string.dex_user_fallback_name) }
-        val shortMessage = triggerMessage.trim().replace(Regex("\\s+"), " ").take(120)
+        val shortMessage = triggerMessage.trim().replace(Regex("\\s+"), " ").take(72)
         val smsBody = getString(R.string.local_emergency_sms_body, userName, shortMessage)
         return sendLocalEmergencySmsWithStatus(phoneNumber, smsBody, now)
     }
@@ -4096,7 +4096,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         registerLocalEmergencySmsStatusReceiver(token)
 
         return runCatching {
-            resolveSmsManager().sendTextMessage(phoneNumber, null, smsBody, sentPendingIntent, deliveredPendingIntent)
+            val smsManager = resolveSmsManager()
+            val messageParts = smsManager.divideMessage(smsBody)
+            if (messageParts.size > 1) {
+                val sentIntents = ArrayList<PendingIntent?>(messageParts.size).apply {
+                    add(sentPendingIntent)
+                    repeat(messageParts.size - 1) { add(null) }
+                }
+                val deliveredIntents = ArrayList<PendingIntent?>(messageParts.size).apply {
+                    repeat(messageParts.size - 1) { add(null) }
+                    add(deliveredPendingIntent)
+                }
+                smsManager.sendMultipartTextMessage(phoneNumber, null, ArrayList(messageParts), sentIntents, deliveredIntents)
+            } else {
+                smsManager.sendTextMessage(phoneNumber, null, smsBody, sentPendingIntent, deliveredPendingIntent)
+            }
         }.fold(
             onSuccess = {
                 lastLocalEmergencySmsSentAt = startedAt
@@ -4110,6 +4124,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun registerLocalEmergencySmsStatusReceiver(token: Int) {
         var isFinished = false
+        var sentConfirmed = false
         lateinit var receiver: BroadcastReceiver
         fun finish(message: String) {
             if (isFinished) return
@@ -4128,6 +4143,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     ACTION_LOCAL_EMERGENCY_SMS_SENT -> {
                         if (resultCode != Activity.RESULT_OK) {
                             finish(getString(R.string.local_emergency_sms_failed))
+                        } else {
+                            sentConfirmed = true
                         }
                     }
                     ACTION_LOCAL_EMERGENCY_SMS_DELIVERED -> {
@@ -4153,7 +4170,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             registerReceiver(receiver, filter)
         }
         mainHandler.postDelayed({
-            finish(getString(R.string.local_emergency_sms_no_delivery_confirmation))
+            finish(
+                if (sentConfirmed) {
+                    getString(R.string.local_emergency_sms_sent_no_receipt)
+                } else {
+                    getString(R.string.local_emergency_sms_no_delivery_confirmation)
+                }
+            )
         }, LOCAL_EMERGENCY_SMS_DELIVERY_TIMEOUT_MS)
     }
 
