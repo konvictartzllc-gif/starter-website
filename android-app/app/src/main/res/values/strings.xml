@@ -311,6 +311,10 @@
     <string name="call_reminder_set">Okay. I will remind you to call %1$s at %2$s.</string>
     <string name="call_reminder_title">Call %1$s</string>
     <string name="call_reminder_text">Reminder to call %1$s.</string>
+    <string name="reminder_check_in_prompt">%1$s. %2$s. I am checking in. Do you want me to remind you again in ten minutes?</string>
+    <string name="reminder_check_in_retry">I missed that. Say yes if you want another reminder in ten minutes, or say no.</string>
+    <string name="reminder_check_in_confirmed">Okay. I will check back in ten minutes.</string>
+    <string name="reminder_check_in_declined">Okay. I will leave it there for now.</string>
     <string name="contact_save_summary">I can save %1$s as a new contact.</string>
     <string name="contact_save_detail">Approve this and Android will open a contact draft with the number filled in so you can verify the caller and save the name.</string>
     <string name="contact_save_opened">I opened a new contact draft for %1$s.</string>

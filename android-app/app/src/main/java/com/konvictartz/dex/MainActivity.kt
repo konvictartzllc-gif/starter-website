@@ -4097,7 +4097,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val title = getString(R.string.call_reminder_title, reminderTarget)
         val text = getString(R.string.call_reminder_text, reminderTarget)
         val triggerAtMillis = reminderAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        DexSafetyCheckInScheduler.scheduleOneTimeCheckInAt(this, triggerAtMillis, title, text)
+        DexSafetyCheckInScheduler.scheduleOneTimeCheckInAt(
+            context = this,
+            triggerAtMillis = triggerAtMillis,
+            title = title,
+            text = text,
+            voiceCheckIn = true
+        )
 
         val spokenDateTime = formatReminderDateTime(reminderAt)
         return getString(R.string.call_reminder_set, reminderTarget, spokenDateTime)

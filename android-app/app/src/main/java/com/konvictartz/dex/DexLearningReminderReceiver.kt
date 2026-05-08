@@ -12,6 +12,12 @@ class DexLearningReminderReceiver : BroadcastReceiver() {
             ?: context.getString(R.string.learning_reminder_text)
 
         DexLearningReminderScheduler.showReminderNotification(context, title, text)
+        val serviceIntent = Intent(context, DexForegroundService::class.java).apply {
+            action = DexForegroundService.ACTION_REMINDER_CHECK_IN
+            putExtra(DexLearningReminderScheduler.EXTRA_TITLE, title)
+            putExtra(DexLearningReminderScheduler.EXTRA_TEXT, text)
+        }
+        androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent)
         DexLearningReminderScheduler.rescheduleFromPrefs(context)
     }
 }

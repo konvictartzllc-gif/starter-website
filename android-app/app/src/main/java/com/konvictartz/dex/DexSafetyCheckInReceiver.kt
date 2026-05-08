@@ -10,10 +10,15 @@ class DexSafetyCheckInReceiver : BroadcastReceiver() {
             ?: context.getString(R.string.safety_check_in_title)
         val text = intent?.getStringExtra(DexSafetyCheckInScheduler.EXTRA_TEXT)
             ?: context.getString(R.string.safety_check_in_text)
+        val voiceCheckIn = intent?.getBooleanExtra(DexSafetyCheckInScheduler.EXTRA_VOICE_CHECK_IN, false) == true
 
         DexSafetyCheckInScheduler.showCheckInNotification(context, title, text)
         val serviceIntent = Intent(context, DexForegroundService::class.java).apply {
-            action = DexForegroundService.ACTION_SAFETY_CHECK_IN
+            action = if (voiceCheckIn) {
+                DexForegroundService.ACTION_REMINDER_CHECK_IN
+            } else {
+                DexForegroundService.ACTION_SAFETY_CHECK_IN
+            }
             putExtra(DexSafetyCheckInScheduler.EXTRA_TITLE, title)
             putExtra(DexSafetyCheckInScheduler.EXTRA_TEXT, text)
         }

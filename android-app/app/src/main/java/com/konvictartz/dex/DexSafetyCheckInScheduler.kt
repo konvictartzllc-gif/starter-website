@@ -18,23 +18,42 @@ object DexSafetyCheckInScheduler {
     const val CHANNEL_ID = "dex_safety_check_ins"
     const val EXTRA_TITLE = "extra_title"
     const val EXTRA_TEXT = "extra_text"
+    const val EXTRA_VOICE_CHECK_IN = "extra_voice_check_in"
 
-    fun scheduleOneTimeCheckIn(context: Context, delayMinutes: Int, title: String, text: String) {
+    fun scheduleOneTimeCheckIn(
+        context: Context,
+        delayMinutes: Int,
+        title: String,
+        text: String,
+        voiceCheckIn: Boolean = false
+    ) {
         val triggerAtMillis = System.currentTimeMillis() + (delayMinutes.coerceAtLeast(1) * 60_000L)
-        scheduleAtMillis(context, triggerAtMillis, title, text)
+        scheduleAtMillis(context, triggerAtMillis, title, text, voiceCheckIn)
     }
 
-    fun scheduleOneTimeCheckInAt(context: Context, triggerAtMillis: Long, title: String, text: String) {
-        scheduleAtMillis(context, triggerAtMillis, title, text)
+    fun scheduleOneTimeCheckInAt(
+        context: Context,
+        triggerAtMillis: Long,
+        title: String,
+        text: String,
+        voiceCheckIn: Boolean = false
+    ) {
+        scheduleAtMillis(context, triggerAtMillis, title, text, voiceCheckIn)
     }
 
-    private fun scheduleAtMillis(context: Context, triggerAtMillis: Long, title: String, text: String) {
+    private fun scheduleAtMillis(
+        context: Context,
+        triggerAtMillis: Long,
+        title: String,
+        text: String,
+        voiceCheckIn: Boolean
+    ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        alarmManager.cancel(createPendingIntent(context, title, text))
+        alarmManager.cancel(createPendingIntent(context, title, text, voiceCheckIn))
         alarmManager.setAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
             triggerAtMillis,
-            createPendingIntent(context, title, text)
+            createPendingIntent(context, title, text, voiceCheckIn)
         )
     }
 
@@ -67,10 +86,11 @@ object DexSafetyCheckInScheduler {
         NotificationManagerCompat.from(context).notify(CHECK_IN_REQUEST_CODE, notification)
     }
 
-    private fun createPendingIntent(context: Context, title: String, text: String): PendingIntent {
+    private fun createPendingIntent(context: Context, title: String, text: String, voiceCheckIn: Boolean): PendingIntent {
         val intent = Intent(context, DexSafetyCheckInReceiver::class.java).apply {
             putExtra(EXTRA_TITLE, title)
             putExtra(EXTRA_TEXT, text)
+            putExtra(EXTRA_VOICE_CHECK_IN, voiceCheckIn)
         }
         return PendingIntent.getBroadcast(
             context,

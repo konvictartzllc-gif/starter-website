@@ -46,6 +46,7 @@ private enum class BackgroundListenMode {
     SMS_REPLY,
     NOTIFICATION_COMMAND,
     CALLER_MESSAGE,
+    REMINDER_CHECK_IN,
 }
 
 class DexForegroundService : Service(), TextToSpeech.OnInitListener {
@@ -68,6 +69,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var pendingListenMode: BackgroundListenMode? = null
     private var activeListenMode: BackgroundListenMode? = null
     private var awaitingSmsReplyChoice = false
+    private var pendingReminderTitle: String? = null
+    private var pendingReminderText: String? = null
     private var wakeWordEngine: DexWakeWordEngine? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -124,6 +127,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ACTION_ANNOUNCE_SMS -> handleIncomingSms(intent)
             ACTION_ANNOUNCE_NOTIFICATION -> handleIncomingNotification(intent)
             ACTION_SAFETY_CHECK_IN -> handleSafetyCheckIn(intent)
+            ACTION_REMINDER_CHECK_IN -> handleReminderCheckIn(intent)
             ACTION_CALL_ANSWER -> handleCallAnswerAction()
             ACTION_CALL_DECLINE -> handleCallDeclineAction()
             ACTION_CALL_TAKE_MESSAGE -> handleCallTakeMessageAction()
@@ -513,6 +517,23 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }, 700L)
     }
 
+    private fun handleReminderCheckIn(intent: Intent) {
+        val title = intent.getStringExtra(DexLearningReminderScheduler.EXTRA_TITLE)
+            ?: intent.getStringExtra(DexSafetyCheckInScheduler.EXTRA_TITLE)
+            ?: getString(R.string.learning_reminder_title)
+        val text = intent.getStringExtra(DexLearningReminderScheduler.EXTRA_TEXT)
+            ?: intent.getStringExtra(DexSafetyCheckInScheduler.EXTRA_TEXT)
+            ?: getString(R.string.learning_reminder_text)
+        pendingReminderTitle = title
+        pendingReminderText = text
+        mainHandler.postDelayed({
+            speakAndThenListen(
+                getString(R.string.reminder_check_in_prompt, title, text),
+                BackgroundListenMode.REMINDER_CHECK_IN
+            )
+        }, 700L)
+    }
+
     @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     private fun answerRingingCall(): Boolean {
@@ -653,6 +674,10 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 if (!handled) repromptBackgroundListenMode(mode)
             }
             BackgroundListenMode.CALLER_MESSAGE -> handleCallerMessage(cleaned.first())
+            BackgroundListenMode.REMINDER_CHECK_IN -> {
+                val handled = cleaned.any { handleBackgroundReminderCheckIn(it.lowercase(Locale.US)) }
+                if (!handled) repromptBackgroundListenMode(mode)
+            }
             null -> Unit
         }
     }
@@ -688,6 +713,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 speakAndThenListen(
                     getString(R.string.call_message_answer_prompt),
                     BackgroundListenMode.CALLER_MESSAGE
+                )
+            BackgroundListenMode.REMINDER_CHECK_IN ->
+                speakAndThenListen(
+                    getString(R.string.reminder_check_in_retry),
+                    BackgroundListenMode.REMINDER_CHECK_IN
                 )
             null -> Unit
         }
@@ -787,6 +817,44 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             normalized.contains("ignore") ||
                 normalized.contains("leave it") -> {
                 handleNotificationIgnoreAction()
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun handleBackgroundReminderCheckIn(normalized: String): Boolean {
+        return when {
+            isAffirmativeCommand(normalized) ||
+                normalized.contains("check back") ||
+                normalized.contains("remind me again") ||
+                normalized.contains("another reminder") ||
+                normalized.contains("ten minutes") ||
+                normalized.contains("later") -> {
+                val title = pendingReminderTitle ?: getString(R.string.learning_reminder_title)
+                val text = pendingReminderText ?: getString(R.string.learning_reminder_text)
+                pendingReminderTitle = null
+                pendingReminderText = null
+                DexSafetyCheckInScheduler.scheduleOneTimeCheckIn(
+                    context = this,
+                    delayMinutes = 10,
+                    title = title,
+                    text = text,
+                    voiceCheckIn = true
+                )
+                speakShortStatus(getString(R.string.reminder_check_in_confirmed))
+                true
+            }
+            normalized == "no" ||
+                normalized.startsWith("no ") ||
+                normalized.contains("not now") ||
+                normalized.contains("i'm good") ||
+                normalized.contains("no thanks") ||
+                normalized.contains("stop") ||
+                normalized.contains("dismiss") -> {
+                pendingReminderTitle = null
+                pendingReminderText = null
+                speakShortStatus(getString(R.string.reminder_check_in_declined))
                 true
             }
             else -> false
@@ -1098,6 +1166,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 BackgroundListenMode.NOTIFICATION_COMMAND -> addAll(
                     listOf("read it", "reply", "ignore it")
                 )
+                BackgroundListenMode.REMINDER_CHECK_IN -> addAll(
+                    listOf("remind me again", "check back", "ten minutes", "not now")
+                )
                 BackgroundListenMode.CALLER_MESSAGE -> {
                     lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" }?.let { add(it) }
                 }
@@ -1198,6 +1269,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val ACTION_ANNOUNCE_SMS = "com.konvictartz.dex.action.ANNOUNCE_SMS"
         const val ACTION_ANNOUNCE_NOTIFICATION = "com.konvictartz.dex.action.ANNOUNCE_NOTIFICATION"
         const val ACTION_SAFETY_CHECK_IN = "com.konvictartz.dex.action.SAFETY_CHECK_IN"
+        const val ACTION_REMINDER_CHECK_IN = "com.konvictartz.dex.action.REMINDER_CHECK_IN"
         const val ACTION_CALL_ANSWER = "com.konvictartz.dex.action.CALL_ANSWER"
         const val ACTION_CALL_DECLINE = "com.konvictartz.dex.action.CALL_DECLINE"
         const val ACTION_CALL_TAKE_MESSAGE = "com.konvictartz.dex.action.CALL_TAKE_MESSAGE"
