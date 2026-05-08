@@ -44,6 +44,7 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import android.widget.TextView
 import android.animation.ArgbEvaluator
+import android.animation.Animator
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
@@ -273,6 +274,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
     private var dexCompanionBubbleOverride: String? = null
     private var dexCompanionFloatAnimator: AnimatorSet? = null
+    private var dexCompanionEventAnimator: AnimatorSet? = null
     private var dexCompanionBlinkScheduled = false
     private var dexCompanionDragDownRawX = 0f
     private var dexCompanionDragDownRawY = 0f
@@ -3354,6 +3356,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexCompanionState = state
         dexCompanionBubbleOverride = bubbleOverride
         applyDexCompanionUi()
+        if (state != DEX_COMPANION_STATE_IDLE) {
+            playDexCompanionEventAnimation(state)
+        }
         mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
         if (revertAfterMs != null) {
             mainHandler.postDelayed(dexCompanionStateResetRunnable, revertAfterMs)
@@ -3610,12 +3615,89 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun playDexCompanionEventAnimation(state: String) {
+        dexCompanionEventAnimator?.cancel()
+        binding.dexCompanionFace.scaleX = companionFaceScale(state)
+        binding.dexCompanionFace.scaleY = companionFaceScale(state)
+        binding.dexCompanionBubble.scaleX = 1f
+        binding.dexCompanionBubble.scaleY = 1f
+        binding.dexCompanionHalo.alpha = if (binding.dexCompanionHalo.visibility == View.VISIBLE) 1f else 0f
+
+        val role = currentDexCompanionPersonality.lowercase(Locale.US)
+        val facePeak = when (role) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> 1.14f
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> 1.04f
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> 1.06f
+            else -> 1.08f
+        }
+        val bubblePeak = when (role) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> 1.1f
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> 1.03f
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> 1.04f
+            else -> 1.05f
+        }
+        val duration = when (role) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> 260L
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> 360L
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> 320L
+            else -> 300L
+        }
+
+        val facePulseX = ObjectAnimator.ofFloat(binding.dexCompanionFace, View.SCALE_X, 1f, facePeak, 1f).apply {
+            this.duration = duration.toLong()
+        }
+        val facePulseY = ObjectAnimator.ofFloat(binding.dexCompanionFace, View.SCALE_Y, 1f, facePeak, 1f).apply {
+            this.duration = duration.toLong()
+        }
+        val bubblePulseX = ObjectAnimator.ofFloat(binding.dexCompanionBubble, View.SCALE_X, 1f, bubblePeak, 1f).apply {
+            this.duration = duration.toLong()
+        }
+        val bubblePulseY = ObjectAnimator.ofFloat(binding.dexCompanionBubble, View.SCALE_Y, 1f, bubblePeak, 1f).apply {
+            this.duration = duration.toLong()
+        }
+        val labelLift = ObjectAnimator.ofFloat(
+            binding.dexCompanionLabel,
+            View.TRANSLATION_Y,
+            0f,
+            -dpToPx(if (role == DEX_COMPANION_PERSONALITY_BESTIE) 3 else 2).toFloat(),
+            0f
+        ).apply {
+            this.duration = duration.toLong()
+        }
+
+        val animators = mutableListOf<Animator>(facePulseX, facePulseY, bubblePulseX, bubblePulseY, labelLift)
+        if (role == DEX_COMPANION_PERSONALITY_GUARDIAN && state == DEX_COMPANION_STATE_ALERT && binding.dexCompanionHalo.visibility == View.VISIBLE) {
+            animators += ObjectAnimator.ofFloat(binding.dexCompanionHalo, View.ALPHA, 0.3f, 1f, 0.55f).apply {
+                this.duration = (duration + 120L)
+            }
+        }
+        if (role == DEX_COMPANION_PERSONALITY_STUDY_BUDDY && currentDexCompanionAccessory == DEX_COMPANION_ACCESSORY_HEADPHONES) {
+            animators += ObjectAnimator.ofFloat(
+                binding.dexCompanionHeadphonesBand,
+                View.TRANSLATION_Y,
+                0f,
+                -dpToPx(1).toFloat(),
+                0f
+            ).apply { this.duration = duration.toLong() }
+        }
+
+        dexCompanionEventAnimator = AnimatorSet().apply {
+            playTogether(animators)
+            start()
+        }
+    }
+
     private fun stopDexCompanionAnimation() {
         dexCompanionFloatAnimator?.cancel()
         dexCompanionFloatAnimator = null
+        dexCompanionEventAnimator?.cancel()
+        dexCompanionEventAnimator = null
         binding.dexCompanionFace.translationY = 0f
         binding.dexCompanionBubble.translationY = 0f
         binding.dexCompanionLabel.translationX = 0f
+        binding.dexCompanionLabel.translationY = 0f
+        binding.dexCompanionBubble.scaleX = 1f
+        binding.dexCompanionBubble.scaleY = 1f
         binding.dexCompanionEyeLeft.scaleY = 1f
         binding.dexCompanionEyeRight.scaleY = 1f
     }
