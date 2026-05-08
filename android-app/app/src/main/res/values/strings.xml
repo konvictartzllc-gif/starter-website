@@ -60,6 +60,8 @@
     <string name="dashboard_metric_chat">Chat history</string>
     <string name="dashboard_metric_lessons">Lessons</string>
     <string name="dashboard_metric_quiz">Quiz progress</string>
+    <string name="dashboard_section_status_live">Live</string>
+    <string name="dashboard_section_status_loading">Updating now</string>
     <string name="chat_history_count">Chat messages: %1$d</string>
     <string name="lesson_history_count">Lessons completed: %1$d</string>
     <string name="quiz_score_summary">Quiz average: %1$s</string>

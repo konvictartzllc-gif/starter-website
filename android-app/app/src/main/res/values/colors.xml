@@ -26,5 +26,7 @@
     <color name="dex_affiliate_stroke">#4A7965</color>
     <color name="dex_admin_panel">#241A1A</color>
     <color name="dex_admin_stroke">#8A5B51</color>
+    <color name="dex_status_loading">#8EDCFF</color>
+    <color name="dex_status_live">#90A0B3</color>
     <color name="dex_text_secondary">#B7C2D0</color>
 </resources>

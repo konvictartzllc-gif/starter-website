@@ -1169,7 +1169,23 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun beginSectionRefresh(label: TextView) {
+        label.text = getString(R.string.dashboard_section_status_loading)
+        label.setTextColor(getColorCompat(R.color.dex_status_loading))
+        label.alpha = 1f
+        startLoadingPulse(label)
+    }
+
+    private fun completeSectionRefresh(label: TextView) {
+        label.clearAnimation()
+        label.animate().cancel()
+        label.alpha = 0.84f
+        label.text = getString(R.string.dashboard_section_status_live)
+        label.setTextColor(getColorCompat(R.color.dex_status_live))
+    }
+
     private fun showDashboardLoadingStates() {
+        beginSectionRefresh(binding.userDashboardStatus)
         binding.userDashboardChatCount.text = getString(R.string.dashboard_loading_value)
         binding.userDashboardLessonCount.text = getString(R.string.dashboard_loading_value)
         binding.userDashboardQuizScore.text = getString(R.string.dashboard_loading_value)
@@ -1181,6 +1197,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.learningQuizPreview
         )
         if (currentUserRole == "affiliate") {
+            beginSectionRefresh(binding.affiliateDashboardStatus)
             binding.affiliatePromoCode.text = getString(R.string.affiliate_dashboard_loading)
             binding.affiliateEarnings.text = getString(R.string.dashboard_loading_value)
             binding.affiliateSignups.text = getString(R.string.dashboard_loading_value)
@@ -1193,18 +1210,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             )
         }
         if (currentUserRole == "admin") {
+            beginSectionRefresh(binding.adminDashboardStatus)
             binding.adminStatsValue.text = getString(R.string.admin_dashboard_loading)
             startLoadingPulse(binding.adminStatsValue)
         }
     }
 
     private fun showBillingLoadingState() {
+        beginSectionRefresh(binding.billingStatusTag)
         binding.billingStatusText.text = getString(R.string.billing_status_loading)
         binding.billingDetailText.text = getString(R.string.billing_detail_loading)
         startLoadingPulse(binding.billingStatusText, binding.billingDetailText)
     }
 
     private fun showLearningLoadingState() {
+        beginSectionRefresh(binding.learningCenterStatus)
         binding.learningProfileSummary.text = getString(R.string.learning_profile_loading)
         binding.learningReminderSummary.text = getString(R.string.learning_reminder_loading)
         startLoadingPulse(binding.learningProfileSummary, binding.learningReminderSummary)
@@ -1371,66 +1391,122 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val serverUrl = currentServerUrl()
         showDashboardLoadingStates()
         lifecycleScope.launch {
-            getJsonArray("$serverUrl/dex/history", token).onSuccess { history ->
-                binding.userDashboardChatCount.text = getString(R.string.chat_history_count, history.length())
-                pulseDashboardValues(binding.userDashboardChatCount)
+            var userDashboardPending = 2
+            fun finishUserDashboardRefresh() {
+                userDashboardPending -= 1
+                if (userDashboardPending <= 0) completeSectionRefresh(binding.userDashboardStatus)
             }
-            getJson("$serverUrl/dex/learning/history", token).onSuccess { response ->
-                val lessons = response.optJSONArray("lessons")?.length() ?: 0
-                val average = response.optJSONObject("progress")?.optInt("averageScore")
-                val streak = response.optJSONObject("progress")?.optInt("streak") ?: 0
-                val nextLesson = response.optJSONObject("nextLesson")
-                binding.userDashboardLessonCount.text = getString(R.string.lesson_history_count, lessons)
-                binding.userDashboardQuizScore.text = getString(
-                    R.string.quiz_score_summary,
-                    if (average == null || average == 0 && (response.optJSONObject("progress")?.has("averageScore") != true)) {
-                        getString(R.string.quiz_score_empty)
-                    } else {
-                        "$average%"
-                    }
-                )
-                binding.learningQuizPreview.text = buildString {
-                    if (streak > 0) {
-                        append("Streak: $streak day")
-                        if (streak != 1) append("s")
-                    }
-                    nextLesson?.optString("topic")?.takeIf { it.isNotBlank() }?.let { topic ->
-                        if (isNotEmpty()) append("  ")
-                        append("Next lesson: $topic")
-                    }
+            getJsonArray("$serverUrl/dex/history", token)
+                .onSuccess { history ->
+                    binding.userDashboardChatCount.text = getString(R.string.chat_history_count, history.length())
+                    pulseDashboardValues(binding.userDashboardChatCount)
+                    finishUserDashboardRefresh()
                 }
-                pulseDashboardValues(
-                    binding.userDashboardLessonCount,
-                    binding.userDashboardQuizScore,
-                    binding.learningQuizPreview
-                )
-            }
-            if (currentUserRole == "affiliate") {
-                getJson("$serverUrl/affiliate/dashboard", token).onSuccess { response ->
-                    binding.affiliatePromoCode.text = getString(R.string.affiliate_promo_code, response.optString("promoCode").ifBlank { "-" })
-                    val earningsValue = response.optDouble("earnings", 0.0) / 100.0
-                    binding.affiliateEarnings.text = getString(R.string.affiliate_earnings, String.format(Locale.US, "%.2f", earningsValue))
-                    binding.affiliateSignups.text = getString(R.string.affiliate_signups, response.optInt("signups"))
-                    binding.affiliatePaidSubs.text = getString(R.string.affiliate_paid_subs, response.optInt("paidSubs"))
-                    pulseDashboardValues(
-                        binding.affiliatePromoCode,
-                        binding.affiliateEarnings,
-                        binding.affiliateSignups,
-                        binding.affiliatePaidSubs
+                .onFailure {
+                    binding.userDashboardChatCount.text = getString(R.string.chat_history_count, 0)
+                    pulseDashboardValues(binding.userDashboardChatCount)
+                    finishUserDashboardRefresh()
+                }
+            getJson("$serverUrl/dex/learning/history", token)
+                .onSuccess { response ->
+                    val lessons = response.optJSONArray("lessons")?.length() ?: 0
+                    val average = response.optJSONObject("progress")?.optInt("averageScore")
+                    val streak = response.optJSONObject("progress")?.optInt("streak") ?: 0
+                    val nextLesson = response.optJSONObject("nextLesson")
+                    binding.userDashboardLessonCount.text = getString(R.string.lesson_history_count, lessons)
+                    binding.userDashboardQuizScore.text = getString(
+                        R.string.quiz_score_summary,
+                        if (average == null || average == 0 && (response.optJSONObject("progress")?.has("averageScore") != true)) {
+                            getString(R.string.quiz_score_empty)
+                        } else {
+                            "$average%"
+                        }
                     )
+                    binding.learningQuizPreview.text = buildString {
+                        if (streak > 0) {
+                            append("Streak: $streak day")
+                            if (streak != 1) append("s")
+                        }
+                        nextLesson?.optString("topic")?.takeIf { it.isNotBlank() }?.let { topic ->
+                            if (isNotEmpty()) append("  ")
+                            append("Next lesson: $topic")
+                        }
+                    }
+                    pulseDashboardValues(
+                        binding.userDashboardLessonCount,
+                        binding.userDashboardQuizScore,
+                        binding.learningQuizPreview
+                    )
+                    finishUserDashboardRefresh()
                 }
+                .onFailure {
+                    binding.userDashboardLessonCount.text = getString(R.string.lesson_history_count, 0)
+                    binding.userDashboardQuizScore.text = getString(
+                        R.string.quiz_score_summary,
+                        getString(R.string.quiz_score_empty)
+                    )
+                    binding.learningQuizPreview.text = ""
+                    pulseDashboardValues(
+                        binding.userDashboardLessonCount,
+                        binding.userDashboardQuizScore,
+                        binding.learningQuizPreview
+                    )
+                    finishUserDashboardRefresh()
+                }
+            if (currentUserRole == "affiliate") {
+                getJson("$serverUrl/affiliate/dashboard", token)
+                    .onSuccess { response ->
+                        binding.affiliatePromoCode.text = getString(R.string.affiliate_promo_code, response.optString("promoCode").ifBlank { "-" })
+                        val earningsValue = response.optDouble("earnings", 0.0) / 100.0
+                        binding.affiliateEarnings.text = getString(R.string.affiliate_earnings, String.format(Locale.US, "%.2f", earningsValue))
+                        binding.affiliateSignups.text = getString(R.string.affiliate_signups, response.optInt("signups"))
+                        binding.affiliatePaidSubs.text = getString(R.string.affiliate_paid_subs, response.optInt("paidSubs"))
+                        pulseDashboardValues(
+                            binding.affiliatePromoCode,
+                            binding.affiliateEarnings,
+                            binding.affiliateSignups,
+                            binding.affiliatePaidSubs
+                        )
+                        completeSectionRefresh(binding.affiliateDashboardStatus)
+                    }
+                    .onFailure {
+                        binding.affiliatePromoCode.text = getString(R.string.affiliate_promo_code, "-")
+                        binding.affiliateEarnings.text = getString(R.string.affiliate_earnings, "0.00")
+                        binding.affiliateSignups.text = getString(R.string.affiliate_signups, 0)
+                        binding.affiliatePaidSubs.text = getString(R.string.affiliate_paid_subs, 0)
+                        pulseDashboardValues(
+                            binding.affiliatePromoCode,
+                            binding.affiliateEarnings,
+                            binding.affiliateSignups,
+                            binding.affiliatePaidSubs
+                        )
+                        completeSectionRefresh(binding.affiliateDashboardStatus)
+                    }
             }
             if (currentUserRole == "admin") {
-                getJson("$serverUrl/admin/stats", token).onSuccess { response ->
-                    binding.adminStatsValue.text = getString(
-                        R.string.admin_stats_summary,
-                        response.optInt("totalUsers"),
-                        response.optInt("affiliateCount"),
-                        response.optInt("activeToday"),
-                        response.optInt("learningLessons")
-                    )
-                    pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
-                }
+                getJson("$serverUrl/admin/stats", token)
+                    .onSuccess { response ->
+                        binding.adminStatsValue.text = getString(
+                            R.string.admin_stats_summary,
+                            response.optInt("totalUsers"),
+                            response.optInt("affiliateCount"),
+                            response.optInt("activeToday"),
+                            response.optInt("learningLessons")
+                        )
+                        pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
+                        completeSectionRefresh(binding.adminDashboardStatus)
+                    }
+                    .onFailure {
+                        binding.adminStatsValue.text = getString(
+                            R.string.admin_stats_summary,
+                            0,
+                            0,
+                            0,
+                            0
+                        )
+                        pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
+                        completeSectionRefresh(binding.adminDashboardStatus)
+                    }
             }
         }
     }
@@ -2040,8 +2116,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 currentTrialDaysLeft = if (response.has("trialDaysLeft")) response.optInt("trialDaysLeft") else null
                 hasBillingCustomer = !response.optString("stripe_customer_id").isNullOrBlank()
                 updateBillingUi()
+                completeSectionRefresh(binding.billingStatusTag)
             }.onFailure {
                 updateBillingUi()
+                completeSectionRefresh(binding.billingStatusTag)
             }
         }
     }
@@ -2601,11 +2679,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 } else {
                     DexLearningReminderScheduler.cancelReminder(this@MainActivity)
                 }
+                completeSectionRefresh(binding.learningCenterStatus)
             }.onFailure {
                 // Keep reminder sync quiet if preferences are unavailable.
                 binding.learningProfileSummary.text = getString(R.string.learning_profile_missing)
                 binding.learningReminderSummary.text = getString(R.string.learning_reminder_off)
                 pulseDashboardValues(binding.learningProfileSummary, binding.learningReminderSummary)
+                completeSectionRefresh(binding.learningCenterStatus)
             }
         }
     }

@@ -472,6 +472,21 @@
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
 
+                <TextView
+                    android:id="@+id/userDashboardStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/dashboard_chip_surface"
+                    android:paddingStart="10dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="6dp"
+                    android:text="@string/dashboard_section_status_live"
+                    android:textColor="@color/dex_status_live"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -618,6 +633,21 @@
                     android:text="@string/learning_center_summary"
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/learningCenterStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/dashboard_chip_surface"
+                    android:paddingStart="10dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="6dp"
+                    android:text="@string/dashboard_section_status_live"
+                    android:textColor="@color/dex_status_live"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -1332,6 +1362,21 @@
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/billingStatusTag"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/dashboard_chip_surface"
+                    android:paddingStart="10dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="6dp"
+                    android:text="@string/dashboard_section_status_live"
+                    android:textColor="@color/dex_status_live"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
                     android:id="@+id/billingStatusText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -1426,6 +1471,21 @@
                     android:text="@string/affiliate_dashboard_summary"
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/affiliateDashboardStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/dashboard_chip_surface"
+                    android:paddingStart="10dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="6dp"
+                    android:text="@string/dashboard_section_status_live"
+                    android:textColor="@color/dex_status_live"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -1638,6 +1698,21 @@
                     android:text="@string/admin_dashboard_summary"
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/adminDashboardStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/dashboard_chip_surface"
+                    android:paddingStart="10dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="6dp"
+                    android:text="@string/dashboard_section_status_live"
+                    android:textColor="@color/dex_status_live"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
