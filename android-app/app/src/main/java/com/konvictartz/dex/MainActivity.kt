@@ -3268,7 +3268,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val popup = PopupMenu(this, anchor, Gravity.END)
         popup.menu.add(0, 1, 0, getString(R.string.dex_companion_quick_action_customize))
         popup.menu.add(0, 2, 1, getString(R.string.dex_companion_quick_action_mood))
-        popup.menu.add(0, 3, 2, getString(R.string.dex_companion_quick_action_hide))
+        popup.menu.add(0, 3, 2, getString(R.string.dex_companion_quick_action_personality))
+        popup.menu.add(0, 4, 3, getString(R.string.dex_companion_quick_action_hide))
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> {
@@ -3280,6 +3281,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     true
                 }
                 3 -> {
+                    cycleDexCompanionPersonality()
+                    true
+                }
+                4 -> {
                     hideDexCompanionForNow()
                     true
                 }
@@ -3317,6 +3322,33 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DEX_COMPANION_STATE_EXCITED,
             bubbleOverride = getString(R.string.dex_companion_mood_switched, moodLabel),
             revertAfterMs = 2600L
+        )
+        persistHomeLook()
+        binding.contentScrollView.post {
+            binding.contentScrollView.smoothScrollTo(0, binding.themeCard.top - dpToPx(16))
+        }
+    }
+
+    private fun cycleDexCompanionPersonality() {
+        currentDexCompanionPersonality = when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+            DEX_COMPANION_PERSONALITY_COACH -> DEX_COMPANION_PERSONALITY_BESTIE
+            DEX_COMPANION_PERSONALITY_BESTIE -> DEX_COMPANION_PERSONALITY_GUARDIAN
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> DEX_COMPANION_PERSONALITY_STUDY_BUDDY
+            else -> DEX_COMPANION_PERSONALITY_COACH
+        }
+        applyDexCompanionPersonalityPreset()
+        updateDexCompanionControls()
+        applyDexCompanionUi()
+        val personalityLabel = when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> getString(R.string.dex_companion_personality_bestie)
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> getString(R.string.dex_companion_personality_guardian)
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> getString(R.string.dex_companion_personality_study_buddy)
+            else -> getString(R.string.dex_companion_personality_coach)
+        }
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = getString(R.string.dex_companion_personality_switched, personalityLabel),
+            revertAfterMs = 2800L
         )
         persistHomeLook()
         binding.contentScrollView.post {
