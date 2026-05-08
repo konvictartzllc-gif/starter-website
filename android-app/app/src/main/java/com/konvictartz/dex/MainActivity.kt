@@ -2651,8 +2651,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun previewEmergencyPlan() {
         val personName = resolveEmergencyPersonName()
-        val birthday = binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty()
-            .ifBlank { getString(R.string.safety_birthday_unknown) }
+        val birthday = resolveEmergencyBirthday()
         val contact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
         val contactAlerts = if (binding.safetyNotifyTrustedContactSwitch.isChecked) {
             getString(R.string.safety_preview_enabled)
@@ -2686,6 +2685,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (savedName.isNotBlank()) return savedName
         if (currentUserName.isNotBlank()) return currentUserName.trim()
         return getString(R.string.dex_user_fallback_name)
+    }
+
+    private fun resolveEmergencyBirthday(): String {
+        val typedBirthday = if (::binding.isInitialized) {
+            binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty()
+        } else {
+            ""
+        }
+        if (typedBirthday.isNotBlank()) return typedBirthday
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_EMERGENCY_PROFILE_BIRTHDAY, null)
+            .orEmpty()
+            .trim()
+            .ifBlank { getString(R.string.safety_birthday_unknown) }
     }
 
     private fun buildEmergencySpokenReply(baseReply: String? = null): String {
@@ -8125,6 +8138,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return true
         }
 
+        handleSafetyProfileLookupIntent(message)?.let { reply ->
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return true
+        }
+
         if (handleMediaIntent(message)) return true
 
         if (handleAppLaunchIntent(message)) return true
@@ -8197,6 +8217,45 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         return false
+    }
+
+    private fun handleSafetyProfileLookupIntent(message: String): String? {
+        val normalized = message.trim().lowercase(Locale.US)
+        if (normalized.isBlank()) return null
+
+        val assistedPersonName = resolveEmergencyPersonName()
+        val birthday = resolveEmergencyBirthday()
+        val assistedNameLower = assistedPersonName.lowercase(Locale.US)
+
+        val asksWho =
+            normalized.contains("who are you assisting") ||
+                normalized.contains("who are you helping") ||
+                normalized.contains("who is dex assisting") ||
+                normalized.contains("who is dex helping") ||
+                normalized.contains("who do you assist") ||
+                normalized.contains("who do you help")
+        if (asksWho) {
+            return getString(R.string.safety_lookup_assisted_person, assistedPersonName, birthday)
+        }
+
+        val asksBirthday =
+            normalized.contains("what birthday do you have saved") ||
+                normalized.contains("what birthday is saved") ||
+                normalized.contains("what is the saved birthday") ||
+                normalized.contains("what's the saved birthday") ||
+                normalized.contains("when is the birthday") ||
+                normalized.contains("what is the birthday") ||
+                normalized.contains("what's the birthday") ||
+                normalized.contains("birthday do you have saved")
+        if (!asksBirthday) return null
+
+        return if (normalized.contains(assistedNameLower)) {
+            getString(R.string.safety_lookup_birthday, assistedPersonName, birthday)
+        } else if (normalized.contains("for ") || normalized.contains("'s birthday")) {
+            getString(R.string.safety_lookup_birthday_mismatch, assistedPersonName, birthday)
+        } else {
+            getString(R.string.safety_lookup_birthday, assistedPersonName, birthday)
+        }
     }
 
     private fun consumePendingIncomingSms(normalized: String): Boolean? {
@@ -9464,8 +9523,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         lastStatus?.let { lastEmergencySmsStatus = it }
         lastTrigger?.let { lastEmergencyTriggerReason = it }
         val assistedPersonName = resolveEmergencyPersonName()
-        val birthday = binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty()
-            .ifBlank { getString(R.string.safety_birthday_unknown) }
+        val birthday = resolveEmergencyBirthday()
         val savedContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
         val normalizedTarget = normalizeSmsPhoneNumber(savedContact).ifBlank { getString(R.string.safety_contact_none) }
         val alertsEnabled = if (binding.safetyNotifyTrustedContactSwitch.isChecked) {
