@@ -342,6 +342,9 @@
     <string name="dex_games_unlock_tier_star">Star tier</string>
     <string name="dex_games_unlock_tier_legend">Legend tier</string>
     <string name="dex_games_unlock_reward">Unlock reward: Dex just opened %1$s energy for your play profile.</string>
+    <string name="dex_games_unlock_bubble_spark">Spark tier looks good on us.</string>
+    <string name="dex_games_unlock_bubble_star">Star tier unlocked. That was clean.</string>
+    <string name="dex_games_unlock_bubble_legend">Legend tier. Okay, now you are showing off.</string>
     <string name="dex_games_answer_hint">Your answer</string>
     <string name="dex_game_submit">Submit</string>
     <string name="dex_game_share_answer">Share answer</string>
