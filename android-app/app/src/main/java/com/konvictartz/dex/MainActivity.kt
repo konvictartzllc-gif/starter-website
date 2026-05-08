@@ -292,6 +292,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexCompanionDragStartY = 0f
     private var dexCompanionDraggedDuringTouch = false
     private var dexCompanionLastTapAt = 0L
+    private var dexCompanionLongPressTriggered = false
     private var pendingDecorationPickTarget: DecorationPickTarget? = null
     private var currentTrialDaysLeft: Int? = null
     private var hasBillingCustomer = false
@@ -349,6 +350,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val dexCompanionSingleTapRunnable = Runnable {
         dexCompanionLastTapAt = 0L
         handleDexCompanionTap()
+    }
+
+    private val dexCompanionLongPressRunnable = Runnable {
+        if (!dexCompanionDraggedDuringTouch) {
+            dexCompanionLongPressTriggered = true
+            dexCompanionLastTapAt = 0L
+            handleDexCompanionLongPress()
+        }
     }
 
     private val permissionLauncher =
@@ -526,6 +535,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         stopListeningForCallCommand()
         updateCallActionVisibility(false)
         mainHandler.removeCallbacks(dexCompanionSingleTapRunnable)
+        mainHandler.removeCallbacks(dexCompanionLongPressRunnable)
         mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
         stopDexCompanionAnimation()
         maintainBackgroundService()
@@ -543,6 +553,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
         mainHandler.removeCallbacks(dexCompanionBlinkRunnable)
         mainHandler.removeCallbacks(dexCompanionSingleTapRunnable)
+        mainHandler.removeCallbacks(dexCompanionLongPressRunnable)
         mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
         stopDexCompanionAnimation()
         wakeWordEngine?.stop()
@@ -1088,6 +1099,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     dexCompanionDragStartX = currentDexCompanionOffsetX
                     dexCompanionDragStartY = currentDexCompanionOffsetY
                     dexCompanionDraggedDuringTouch = false
+                    dexCompanionLongPressTriggered = false
+                    mainHandler.removeCallbacks(dexCompanionLongPressRunnable)
+                    mainHandler.postDelayed(dexCompanionLongPressRunnable, DEX_COMPANION_LONG_PRESS_MS)
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -1095,6 +1109,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     val deltaY = event.rawY - dexCompanionDragDownRawY
                     if (!dexCompanionDraggedDuringTouch && (kotlin.math.abs(deltaX) > dpToPx(6) || kotlin.math.abs(deltaY) > dpToPx(6))) {
                         dexCompanionDraggedDuringTouch = true
+                        mainHandler.removeCallbacks(dexCompanionLongPressRunnable)
                     }
                     if (dexCompanionDraggedDuringTouch) {
                         currentDexCompanionOffsetX = dexCompanionDragStartX + deltaX
@@ -1104,9 +1119,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
+                    mainHandler.removeCallbacks(dexCompanionLongPressRunnable)
                     if (dexCompanionDraggedDuringTouch) {
                         applyDexCompanionDragPosition()
                         persistHomeLook()
+                    } else if (dexCompanionLongPressTriggered) {
+                        dexCompanionLongPressTriggered = false
                     } else {
                         val now = SystemClock.elapsedRealtime()
                         if (now - dexCompanionLastTapAt <= DEX_COMPANION_DOUBLE_TAP_WINDOW_MS) {
@@ -1122,11 +1140,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
+                    mainHandler.removeCallbacks(dexCompanionLongPressRunnable)
                     if (dexCompanionDraggedDuringTouch) {
                         applyDexCompanionDragPosition()
                         persistHomeLook()
                     }
                     dexCompanionDraggedDuringTouch = false
+                    dexCompanionLongPressTriggered = false
                     true
                 }
                 else -> false
@@ -3242,6 +3262,25 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.contentScrollView.post {
             binding.contentScrollView.smoothScrollTo(0, binding.themeCard.top - dpToPx(16))
         }
+    }
+
+    private fun handleDexCompanionLongPress() {
+        if (binding.dexCompanionCard.visibility != View.VISIBLE) return
+        val message = when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> "Full style mode. Lets make this cute."
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> "Opening full setup."
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> "Opening focus setup."
+            else -> "Opening full companion setup."
+        }
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = message,
+            revertAfterMs = 2800L
+        )
+        binding.contentScrollView.post {
+            binding.contentScrollView.smoothScrollTo(0, binding.themeCard.top - dpToPx(16))
+        }
+        binding.dexCompanionNameInput.requestFocus()
     }
 
     private fun dexCompanionTapLine(): String {
@@ -8889,6 +8928,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_PERSONALITY_GUARDIAN = "guardian"
         private const val DEX_COMPANION_PERSONALITY_STUDY_BUDDY = "study_buddy"
         private const val DEX_COMPANION_DOUBLE_TAP_WINDOW_MS = 260L
+        private const val DEX_COMPANION_LONG_PRESS_MS = 420L
         private const val DEX_COMPANION_STATE_IDLE = "idle"
         private const val DEX_COMPANION_STATE_SLEEPING = "sleeping"
         private const val DEX_COMPANION_STATE_LISTENING = "listening"
