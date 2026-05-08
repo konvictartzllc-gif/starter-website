@@ -194,6 +194,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingSmsRecipient: ContactMatch? = null
     private var pendingSmsBodyDraft: String? = null
     private var pendingReminderSmsTriggerAt: LocalDateTime? = null
+    private var pendingReminderCallTargetName: String? = null
     private var pendingIncomingSmsSender: String? = null
     private var pendingIncomingSmsValue: String? = null
     private var pendingIncomingSmsBody: String? = null
@@ -957,6 +958,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingSmsRecipient = null
         pendingSmsBodyDraft = null
         pendingReminderSmsTriggerAt = null
+        pendingReminderCallTargetName = null
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
         pendingIncomingSmsBody = null
@@ -3562,6 +3564,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingSmsRecipient = null
         pendingSmsBodyDraft = null
         pendingReminderSmsTriggerAt = null
+        pendingReminderCallTargetName = null
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
         pendingIncomingSmsBody = null
@@ -3883,6 +3886,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (actionTaken) return true
         }
 
+        consumePendingReminderCallTime(message)?.let { actionTaken ->
+            if (actionTaken) return true
+        }
+
         consumePendingSmsBody(message)?.let { actionTaken ->
             if (actionTaken) return true
         }
@@ -4085,6 +4092,39 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun consumePendingReminderCallTime(message: String): Boolean? {
+        val targetName = pendingReminderCallTargetName ?: return null
+        val trimmed = message.trim()
+        if (trimmed.isBlank()) return false
+        val normalized = trimmed.lowercase(Locale.US)
+        return when (normalized) {
+            "cancel", "cancel it", "never mind", "stop" -> {
+                pendingReminderCallTargetName = null
+                val reply = getString(R.string.pending_action_canceled)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                true
+            }
+            else -> {
+                if (!hasExplicitReminderTime(trimmed)) {
+                    val reply = getString(R.string.call_reminder_time_prompt, targetName)
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    true
+                } else {
+                    pendingReminderCallTargetName = null
+                    val reply = scheduleCallReminder(targetName, inferDateTimeFromCommand(trimmed))
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    true
+                }
+            }
+        }
+    }
+
     private fun handleCallReminderIntent(message: String): String? {
         val resolvedMessage = resolveAliasesInSentence(message.trim())
         val normalized = resolvedMessage.lowercase(Locale.US)
@@ -4098,12 +4138,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val rawTarget = extractReminderCallTarget(resolvedMessage)
         if (rawTarget.isBlank()) return null
 
-        val reminderAt = inferDateTimeFromCommand(resolvedMessage)
         val reminderTarget =
             findExactPhoneContactByName(resolveContactAlias(rawTarget))?.displayName
                 ?: findPhoneContactByName(resolveContactAlias(rawTarget))?.displayName
                 ?: rawTarget
+        if (!hasExplicitReminderTime(resolvedMessage)) {
+            pendingReminderCallTargetName = reminderTarget
+            return getString(R.string.call_reminder_time_prompt, reminderTarget)
+        }
 
+        val reminderAt = inferDateTimeFromCommand(resolvedMessage)
+        return scheduleCallReminder(reminderTarget, reminderAt)
+    }
+
+    private fun scheduleCallReminder(reminderTarget: String, reminderAt: LocalDateTime): String {
         val title = getString(R.string.call_reminder_title, reminderTarget)
         val text = getString(R.string.call_reminder_text, reminderTarget)
         val triggerAtMillis = reminderAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -4533,6 +4581,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             pendingContactAction == null &&
             pendingSmsRecipient == null &&
             pendingReminderSmsTriggerAt == null &&
+            pendingReminderCallTargetName == null &&
             pendingSmsBodyDraft.isNullOrBlank() &&
             !listeningForQuizAnswer &&
             activeQuizSession == null &&
@@ -5208,6 +5257,39 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             appointmentStartIso = start.atZone(ZoneId.systemDefault()).toOffsetDateTime().toString(),
             appointmentEndIso = end.atZone(ZoneId.systemDefault()).toOffsetDateTime().toString(),
         )
+    }
+
+    private fun hasExplicitReminderTime(message: String): Boolean {
+        val normalized = message.lowercase(Locale.US)
+            .replace("a.m.", "am")
+            .replace("p.m.", "pm")
+            .replace("a.m", "am")
+            .replace("p.m", "pm")
+        return Regex("\\bin\\s+\\d{1,3}\\s+minutes?\\b", RegexOption.IGNORE_CASE).containsMatchIn(normalized) ||
+            Regex("\\bin\\s+\\d{1,2}\\s+hours?\\b", RegexOption.IGNORE_CASE).containsMatchIn(normalized) ||
+            Regex("(?:\\bat\\s+)?\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b", RegexOption.IGNORE_CASE).containsMatchIn(normalized) ||
+            Regex("\\bat\\s+\\d{1,2}(?::\\d{2})?\\b", RegexOption.IGNORE_CASE).containsMatchIn(normalized) ||
+            listOf(
+                "today",
+                "tomorrow",
+                "tonight",
+                "this morning",
+                "this afternoon",
+                "this evening",
+                "next week",
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+                "noon",
+                "midnight",
+                "morning",
+                "afternoon",
+                "evening"
+            ).any { normalized.contains(it) }
     }
 
     private fun inferDateTimeFromCommand(message: String): LocalDateTime {

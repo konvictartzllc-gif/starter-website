@@ -309,6 +309,7 @@
     <string name="appointment_created">%1$s is on your Dex calendar now.</string>
     <string name="appointment_create_failed">I could not create that appointment.</string>
     <string name="call_reminder_set">Okay. I will remind you to call %1$s at %2$s.</string>
+    <string name="call_reminder_time_prompt">When should I remind you to call %1$s?</string>
     <string name="call_reminder_title">Call %1$s</string>
     <string name="call_reminder_text">Reminder to call %1$s.</string>
     <string name="call_reminder_check_in_prompt">It is time to call %1$s. Do you want me to call now, or remind you again in ten minutes?</string>
