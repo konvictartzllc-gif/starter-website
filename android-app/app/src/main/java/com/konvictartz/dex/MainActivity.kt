@@ -200,6 +200,7 @@ private enum class DexMiniGameType {
     NONE,
     GUESS_NUMBER,
     RIDDLE,
+    TRIVIA,
     WOULD_YOU_RATHER,
 }
 
@@ -211,6 +212,12 @@ private data class DexRiddle(
 private data class DexWouldYouRather(
     val prompt: String,
     val followUp: String,
+)
+
+private data class DexTrivia(
+    val prompt: String,
+    val answers: List<String>,
+    val reveal: String,
 )
 
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
@@ -334,6 +341,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexGuessTarget = 0
     private var dexGuessAttempts = 0
     private var currentRiddleIndex = -1
+    private var currentTriviaIndex = -1
     private var currentWouldYouRatherIndex = -1
 
     private val resetWakeWindowRunnable = Runnable {
@@ -948,6 +956,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         binding.startRiddleButton.setOnClickListener {
             startRiddleGame()
+        }
+
+        binding.startTriviaButton.setOnClickListener {
+            startTriviaGame()
         }
 
         binding.startWouldYouRatherButton.setOnClickListener {
@@ -2153,7 +2165,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         listOf(
             binding.learningLessonOutputStrip,
             binding.safetyProfileMessageStrip,
-            binding.activityLogStrip
+            binding.activityLogValue.parent as View
         ).forEach { strip ->
             strip.backgroundTintList = ColorStateList.valueOf(primaryTone)
         }
@@ -2961,6 +2973,25 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun startTriviaGame(announce: Boolean = false) {
+        activeDexMiniGame = DexMiniGameType.TRIVIA
+        currentTriviaIndex = (currentTriviaIndex + 1).mod(DEX_TRIVIA_QUESTIONS.size)
+        val trivia = DEX_TRIVIA_QUESTIONS[currentTriviaIndex]
+        binding.dexGameInput.setText("")
+        binding.dexGamePrompt.text = trivia.prompt
+        binding.dexGameStatus.text = getString(R.string.dex_game_trivia_status)
+        binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_submit)
+        binding.nextDexGameRoundButton.text = getString(R.string.dex_game_next_trivia)
+        setDexCompanionState(
+            DEX_COMPANION_STATE_THINKING,
+            bubbleOverride = getString(R.string.dex_game_trivia_bubble),
+            revertAfterMs = 2600L
+        )
+        if (announce) {
+            announceDexMiniGameReply(trivia.prompt)
+        }
+    }
+
     private fun startWouldYouRatherGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.WOULD_YOU_RATHER
         currentWouldYouRatherIndex = (currentWouldYouRatherIndex + 1).mod(DEX_WOULD_YOU_RATHERS.size)
@@ -2999,6 +3030,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         when (activeDexMiniGame) {
             DexMiniGameType.GUESS_NUMBER -> handleGuessNumberAnswer(answer, announce)
             DexMiniGameType.RIDDLE -> handleRiddleAnswer(answer, announce)
+            DexMiniGameType.TRIVIA -> handleTriviaAnswer(answer, announce)
             DexMiniGameType.WOULD_YOU_RATHER -> handleWouldYouRatherAnswer(answer, announce)
             DexMiniGameType.NONE -> Unit
         }
@@ -3008,6 +3040,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         when (activeDexMiniGame) {
             DexMiniGameType.GUESS_NUMBER -> startGuessNumberGame(announce)
             DexMiniGameType.RIDDLE -> startRiddleGame(announce)
+            DexMiniGameType.TRIVIA -> startTriviaGame(announce)
             DexMiniGameType.WOULD_YOU_RATHER -> startWouldYouRatherGame(announce)
             DexMiniGameType.NONE -> {
                 val reply = getString(R.string.dex_game_pick_one_first)
@@ -3050,6 +3083,29 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             getString(R.string.dex_game_riddle_correct, riddle.answer)
         } else {
             getString(R.string.dex_game_riddle_try_again)
+        }
+        binding.dexGameStatus.text = reply
+        if (isCorrect) {
+            binding.dexGameInput.setText("")
+        }
+        setDexCompanionState(
+            if (isCorrect) DEX_COMPANION_STATE_EXCITED else DEX_COMPANION_STATE_THINKING,
+            bubbleOverride = reply,
+            revertAfterMs = 2800L
+        )
+        if (announce) announceDexMiniGameReply(reply)
+    }
+
+    private fun handleTriviaAnswer(answer: String, announce: Boolean = false) {
+        val trivia = DEX_TRIVIA_QUESTIONS.getOrNull(currentTriviaIndex) ?: return
+        val normalized = answer.lowercase(Locale.US).trim()
+        val isCorrect = trivia.answers.any { accepted ->
+            normalized.contains(accepted.lowercase(Locale.US))
+        }
+        val reply = if (isCorrect) {
+            getString(R.string.dex_game_trivia_correct, trivia.reveal)
+        } else {
+            getString(R.string.dex_game_trivia_try_again)
         }
         binding.dexGameStatus.text = reply
         if (isCorrect) {
@@ -5780,6 +5836,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         phrases += "play a game"
         phrases += "guess my number"
         phrases += "tell me a riddle"
+        phrases += "play trivia"
+        phrases += "ask me trivia"
         phrases += "would you rather"
         phrases += "next round"
         phrases += "new round"
@@ -6081,6 +6139,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized == "riddle me"
         ) {
             startRiddleGame(announce = true)
+            return true
+        }
+
+        if (
+            normalized.contains("play trivia") ||
+            normalized.contains("start trivia") ||
+            normalized.contains("ask me trivia") ||
+            normalized.contains("give me trivia")
+        ) {
+            startTriviaGame(announce = true)
             return true
         }
 
@@ -9352,6 +9420,28 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DexRiddle("What gets wetter the more it dries?", "towel"),
             DexRiddle("What has hands but can not clap?", "clock"),
             DexRiddle("What has a face and two hands but no arms or legs?", "clock"),
+        )
+        private val DEX_TRIVIA_QUESTIONS = listOf(
+            DexTrivia(
+                "Trivia time. What planet is known as the Red Planet?",
+                listOf("mars"),
+                "Mars is the Red Planet."
+            ),
+            DexTrivia(
+                "What is the largest ocean on Earth?",
+                listOf("pacific", "pacific ocean"),
+                "The Pacific Ocean is the largest."
+            ),
+            DexTrivia(
+                "How many sides does a hexagon have?",
+                listOf("6", "six"),
+                "A hexagon has six sides."
+            ),
+            DexTrivia(
+                "What animal is known for carrying its home on its back?",
+                listOf("snail", "a snail"),
+                "A snail carries its shell like a home."
+            ),
         )
         private val DEX_WOULD_YOU_RATHERS = listOf(
             DexWouldYouRather(

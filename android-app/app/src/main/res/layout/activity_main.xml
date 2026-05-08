@@ -1564,7 +1564,6 @@
                         android:textStyle="bold" />
 
                     <LinearLayout
-                        android:id="@+id/activityLogStrip"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
@@ -1656,6 +1655,14 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:text="@string/dex_games_would_you_rather" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/startTriviaButton"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/dex_games_trivia" />
 
                 <LinearLayout
                     android:layout_width="match_parent"

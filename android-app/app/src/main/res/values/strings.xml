@@ -323,6 +323,7 @@
     <string name="dex_games_guess_number">Guess my number</string>
     <string name="dex_games_riddle">Riddle me</string>
     <string name="dex_games_would_you_rather">Would you rather</string>
+    <string name="dex_games_trivia">Trivia</string>
     <string name="dex_games_prompt_tag">Game prompt</string>
     <string name="dex_games_status_tag">Dex says</string>
     <string name="dex_games_prompt_default">Pick a game and Dex will set the round.</string>
@@ -332,6 +333,7 @@
     <string name="dex_game_share_answer">Share answer</string>
     <string name="dex_game_new_round">New round</string>
     <string name="dex_game_next_riddle">Next riddle</string>
+    <string name="dex_game_next_trivia">Next trivia</string>
     <string name="dex_game_next_round">Next round</string>
     <string name="dex_game_pick_one_first">Pick a Dex game first.</string>
     <string name="dex_game_answer_needed">Give Dex an answer first.</string>
@@ -346,6 +348,10 @@
     <string name="dex_game_riddle_bubble">Okay, brain mode.</string>
     <string name="dex_game_riddle_correct">Nice. That is right: %1$s.</string>
     <string name="dex_game_riddle_try_again">Not quite. Take another shot or start a new riddle.</string>
+    <string name="dex_game_trivia_status">Dex has a trivia question ready. Say or type your answer.</string>
+    <string name="dex_game_trivia_bubble">Okay, trivia brain on.</string>
+    <string name="dex_game_trivia_correct">You got it. %1$s</string>
+    <string name="dex_game_trivia_try_again">Not quite. Try again or ask for the next trivia question.</string>
     <string name="dex_game_wyr_status">Tell Dex which one you would pick and why if you want.</string>
     <string name="dex_game_wyr_bubble">This one should be fun.</string>
     <string name="dex_game_wyr_bubble_reply">I like that answer.</string>
