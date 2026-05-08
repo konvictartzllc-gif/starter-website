@@ -171,6 +171,13 @@ private data class DirectCallRequest(
     val phoneNumber: String,
 )
 
+private data class SavedCallMessage(
+    val callerLabel: String,
+    val phoneNumber: String?,
+    val message: String,
+    val timeLabel: String,
+)
+
 private data class DashboardSection(
     val title: String,
     val body: String,
@@ -878,6 +885,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         binding.declineCallButton.setOnClickListener {
             declineRingingCall()
+        }
+        binding.callMessageActionButton.setOnClickListener {
+            showSavedCallerMessageActions()
         }
 
         binding.phonePermissionSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -6183,6 +6193,59 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.callMessageLogValue.text =
             if (messages.isEmpty()) getString(R.string.call_message_log_empty)
             else messages.joinToString("\n")
+        binding.callMessageActionButton.isEnabled = readLatestPersistentCallMessage(this) != null
+    }
+
+    private fun showSavedCallerMessageActions() {
+        val latest = readLatestPersistentCallMessage(this)
+        if (latest == null) {
+            binding.callMonitorStatus.text = getString(R.string.call_message_log_empty)
+            return
+        }
+        val actionTarget = resolveSavedCallMessageTarget(latest)
+        if (actionTarget == null) {
+            val reply = getString(R.string.call_message_action_unavailable)
+            binding.callMonitorStatus.text = reply
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return
+        }
+
+        PopupMenu(this, binding.callMessageActionButton).apply {
+            menu.add(0, 1, 0, getString(R.string.call_message_action_call_back))
+            menu.add(0, 2, 1, getString(R.string.call_message_action_text_back))
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> {
+                        placeVoiceRequestedCall(DirectCallRequest(actionTarget.displayName, actionTarget.value))
+                        true
+                    }
+                    2 -> {
+                        sendSmsDirect(
+                            PendingAction(
+                                kind = PendingActionKind.SMS_DRAFT,
+                                summary = getString(R.string.call_message_draft_summary, actionTarget.displayName),
+                                detail = getString(R.string.call_message_draft_detail, actionTarget.displayName),
+                                targetName = actionTarget.displayName,
+                                targetValue = actionTarget.value,
+                                body = getString(R.string.call_message_text_back_body, actionTarget.displayName)
+                            )
+                        )
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }.show()
+    }
+
+    private fun resolveSavedCallMessageTarget(message: SavedCallMessage): ContactMatch? {
+        val directNumber = message.phoneNumber?.trim()?.takeIf { it.isNotBlank() }
+        if (directNumber != null) {
+            return ContactMatch(message.callerLabel, directNumber)
+        }
+        return findBestPhoneContactMatch(message.callerLabel, requireExact = false)
     }
 
     private fun updatePermissions(key: String, enabled: Boolean) {
@@ -10720,19 +10783,34 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }.getOrElse { emptyList() }
         }
 
-        fun appendPersistentCallMessageLog(context: Context, caller: String, message: String) {
+        fun appendPersistentCallMessageLog(context: Context, caller: String, phoneNumber: String?, message: String) {
             val safeCaller = caller.trim().ifBlank { context.getString(R.string.unknown_number_label) }
             val safeMessage = message.trim()
             if (safeMessage.isBlank()) return
             val time = LocalTime.now().format(DateTimeFormatter.ofPattern("h:mm a", Locale.US))
-            val entry = "[$time] " + context.getString(R.string.call_message_log_entry, safeCaller, safeMessage)
-            val entries = ArrayDeque(readPersistentCallMessageLog(context))
-            entries.addFirst(entry)
+            val entries = ArrayDeque(readPersistentCallMessageRecords(context))
+            entries.addFirst(
+                SavedCallMessage(
+                    callerLabel = safeCaller,
+                    phoneNumber = phoneNumber?.trim()?.takeIf { it.isNotBlank() },
+                    message = safeMessage,
+                    timeLabel = time
+                )
+            )
             while (entries.size > 6) {
                 entries.removeLast()
             }
             val payload = JSONArray().apply {
-                entries.forEach { put(it) }
+                entries.forEach { entry ->
+                    put(
+                        JSONObject().apply {
+                            put("caller", entry.callerLabel)
+                            put("phoneNumber", entry.phoneNumber ?: "")
+                            put("message", entry.message)
+                            put("time", entry.timeLabel)
+                        }
+                    )
+                }
             }
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit()
@@ -10741,6 +10819,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         fun readPersistentCallMessageLog(context: Context): List<String> {
+            return readPersistentCallMessageRecords(context).map {
+                "[${it.timeLabel}] " + context.getString(R.string.call_message_log_entry, it.callerLabel, it.message)
+            }
+        }
+
+        private fun readLatestPersistentCallMessage(context: Context): SavedCallMessage? =
+            readPersistentCallMessageRecords(context).firstOrNull()
+
+        private fun readPersistentCallMessageRecords(context: Context): List<SavedCallMessage> {
             val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getString(KEY_CALL_MESSAGE_LOG, null)
                 .orEmpty()
@@ -10749,8 +10836,38 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 val entries = JSONArray(raw)
                 buildList {
                     for (index in 0 until entries.length()) {
-                        val entry = entries.optString(index).trim()
-                        if (entry.isNotBlank()) add(entry)
+                        val item = entries.opt(index)
+                        when (item) {
+                            is JSONObject -> {
+                                val caller = item.optString("caller").trim()
+                                    .ifBlank { context.getString(R.string.unknown_number_label) }
+                                val message = item.optString("message").trim()
+                                val time = item.optString("time").trim()
+                                if (message.isNotBlank() && time.isNotBlank()) {
+                                    add(
+                                        SavedCallMessage(
+                                            callerLabel = caller,
+                                            phoneNumber = item.optString("phoneNumber").trim().ifBlank { null },
+                                            message = message,
+                                            timeLabel = time
+                                        )
+                                    )
+                                }
+                            }
+                            is String -> {
+                                val legacy = item.trim()
+                                if (legacy.isNotBlank()) {
+                                    add(
+                                        SavedCallMessage(
+                                            callerLabel = context.getString(R.string.unknown_number_label),
+                                            phoneNumber = null,
+                                            message = legacy,
+                                            timeLabel = "--"
+                                        )
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }.getOrElse { emptyList() }
