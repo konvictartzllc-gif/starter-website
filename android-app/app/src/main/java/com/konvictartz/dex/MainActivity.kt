@@ -45,6 +45,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.button.MaterialButton
 import com.konvictartz.dex.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1260,6 +1261,39 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         view.visibility = View.VISIBLE
     }
 
+    private fun applyActionButtonState(
+        button: MaterialButton,
+        enabled: Boolean,
+        backgroundColor: Int,
+        textColor: Int = android.graphics.Color.WHITE
+    ) {
+        button.isEnabled = enabled
+        button.alpha = if (enabled) 1f else 0.58f
+        button.backgroundTintList = ColorStateList.valueOf(backgroundColor)
+        button.setTextColor(textColor)
+    }
+
+    private fun refreshInteractionStates() {
+        val roleKey = currentUserRole.lowercase(Locale.US)
+        val roleSignal = sectionSignalColor(roleKey)
+        val muted = getColorCompat(R.color.dex_button_muted)
+        val healthy = getColorCompat(R.color.dex_button_healthy)
+        val warn = getColorCompat(R.color.dex_button_warn)
+        val accent = getColorCompat(R.color.dex_accent)
+
+        applyActionButtonState(binding.testVoiceButton, ttsReady, if (ttsReady) accent else muted, android.graphics.Color.BLACK)
+        applyActionButtonState(binding.setupVoiceButton, true, muted)
+        applyActionButtonState(binding.setupWakeWordButton, true, muted)
+        applyActionButtonState(binding.wakeModeButton, true, if (wakeModeEnabled) roleSignal else accent, android.graphics.Color.BLACK)
+        applyActionButtonState(binding.requestAndroidPermissionsButton, binding.requestAndroidPermissionsButton.isEnabled, muted)
+        applyActionButtonState(binding.answerCallButton, binding.answerCallButton.isEnabled, healthy)
+        applyActionButtonState(binding.declineCallButton, binding.declineCallButton.isEnabled, warn)
+        applyActionButtonState(binding.approveActionButton, binding.approveActionButton.isEnabled, healthy)
+        applyActionButtonState(binding.cancelActionButton, binding.cancelActionButton.isEnabled, warn)
+        applyActionButtonState(binding.subscribeNowButton, binding.subscribeNowButton.visibility == View.VISIBLE, accent, android.graphics.Color.BLACK)
+        applyActionButtonState(binding.manageBillingButton, binding.manageBillingButton.visibility == View.VISIBLE, muted)
+    }
+
     private fun beginSectionRefresh(label: TextView, card: MaterialCardView, roleKey: String) {
         label.text = getString(R.string.dashboard_section_status_loading)
         label.setTextColor(sectionSignalColor(roleKey))
@@ -2312,6 +2346,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.subscribeNowButton.visibility = if (access == "paid" || access == "unlimited") View.GONE else View.VISIBLE
         binding.manageBillingButton.visibility = if (hasBillingCustomer || access == "paid") View.VISIBLE else View.GONE
         pulseDashboardValues(binding.billingStatusText, binding.billingDetailText)
+        refreshInteractionStates()
     }
 
     private fun openStripeCheckout() {
@@ -2580,6 +2615,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         binding.voiceStatus.text = "$baseStatus\n$wakeStatus"
         binding.testVoiceButton.isEnabled = ttsReady
+        refreshInteractionStates()
     }
 
     private fun updateWakeUi() {
@@ -2588,6 +2624,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!wakeModeEnabled) {
             binding.conversationStatus.text = getString(R.string.wake_mode_off)
         }
+        refreshInteractionStates()
     }
 
     private fun updatePendingActionUi() {
@@ -2597,6 +2634,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.pendingActionSummary.text = action.summary
             binding.pendingActionDetail.text = action.detail
         }
+        refreshInteractionStates()
     }
 
     private fun currentServerUrl(): String {
@@ -3191,6 +3229,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             else getString(R.string.android_permissions_missing)
         if (!ready) autoWakeStarted = false
         refreshSafetyDiagnostics()
+        refreshInteractionStates()
     }
 
     private fun autoStartWakeModeIfReady() {
@@ -3211,6 +3250,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.callMonitorStatus.text = getString(R.string.call_monitor_waiting)
         }
         maintainBackgroundService()
+        binding.answerCallButton.isEnabled = lastCallState == TelephonyManager.CALL_STATE_RINGING
+        binding.declineCallButton.isEnabled = lastCallState == TelephonyManager.CALL_STATE_RINGING
+        refreshInteractionStates()
     }
 
     private fun clearStaleBackgroundState() {
@@ -7083,6 +7125,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.calendarPermissionSwitch.isEnabled = enabled
         binding.notificationsPermissionSwitch.isEnabled = enabled
         binding.requestAndroidPermissionsButton.isEnabled = !loading
+        refreshInteractionStates()
     }
 
     private suspend fun postJson(url: String, payload: JSONObject, token: String?): Result<JSONObject> {
