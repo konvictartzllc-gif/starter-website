@@ -226,6 +226,10 @@
     <string name="dex_shop_offer_line">Shop: %1$s\nPaid play: %2$s</string>
     <string name="dex_shop_title">Dex shop</string>
     <string name="dex_shop_balance">Balance: %1$d Dex coins</string>
+    <string name="dex_shop_section_title">Choose a section</string>
+    <string name="dex_shop_section_looks">Looks</string>
+    <string name="dex_shop_section_accessories">Accessories</string>
+    <string name="dex_shop_section_play">Play</string>
     <string name="dex_shop_owned_suffix">owned</string>
     <string name="dex_shop_equip_suffix">tap to equip</string>
     <string name="dex_shop_buy_suffix">%1$dc to unlock</string>

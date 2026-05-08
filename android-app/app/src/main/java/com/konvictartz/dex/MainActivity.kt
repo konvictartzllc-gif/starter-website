@@ -3304,13 +3304,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     )
 
     private fun openDexShopDialog() {
-        val entries = buildDexShopEntries()
-        val labels = entries.map { "${it.label}\n${it.detail}" }.toTypedArray()
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.dex_shop_title))
+            .setTitle(getString(R.string.dex_shop_section_title))
             .setMessage(getString(R.string.dex_shop_balance, dexCoins))
-            .setItems(labels) { _, which ->
-                entries.getOrNull(which)?.onSelect?.invoke()
+            .setItems(
+                arrayOf(
+                    getString(R.string.dex_shop_section_looks),
+                    getString(R.string.dex_shop_section_accessories),
+                    getString(R.string.dex_shop_section_play)
+                )
+            ) { _, which ->
+                when (which) {
+                    0 -> openDexShopSectionDialog(getString(R.string.dex_shop_section_looks), buildDexShopLooksEntries())
+                    1 -> openDexShopSectionDialog(getString(R.string.dex_shop_section_accessories), buildDexShopAccessoryEntries())
+                    else -> openDexShopSectionDialog(getString(R.string.dex_shop_section_play), buildDexShopPlayEntries())
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -3321,7 +3329,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
-    private fun buildDexShopEntries(): List<DexShopEntry> {
+    private fun openDexShopSectionDialog(title: String, entries: List<DexShopEntry>) {
+        val labels = entries.map { "${it.label}\n${it.detail}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(getString(R.string.dex_shop_balance, dexCoins))
+            .setItems(labels) { _, which ->
+                entries.getOrNull(which)?.onSelect?.invoke()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun buildDexShopLooksEntries(): List<DexShopEntry> {
         val entries = mutableListOf<DexShopEntry>()
         entries += cosmeticShopEntry(
             label = dexSkinLabel(DEX_COMPANION_SKIN_SUNSET),
@@ -3336,27 +3356,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             cost = dexSkinCost(DEX_COMPANION_SKIN_VIOLET)
         ) {
             currentDexCompanionSkin = DEX_COMPANION_SKIN_VIOLET
-        }
-        entries += cosmeticShopEntry(
-            label = dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HEADPHONES),
-            key = accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HEADPHONES),
-            cost = dexAccessoryCost(DEX_COMPANION_ACCESSORY_HEADPHONES)
-        ) {
-            currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_HEADPHONES
-        }
-        entries += cosmeticShopEntry(
-            label = dexAccessoryLabel(DEX_COMPANION_ACCESSORY_GLASSES),
-            key = accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_GLASSES),
-            cost = dexAccessoryCost(DEX_COMPANION_ACCESSORY_GLASSES)
-        ) {
-            currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_GLASSES
-        }
-        entries += cosmeticShopEntry(
-            label = dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HALO),
-            key = accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HALO),
-            cost = dexAccessoryCost(DEX_COMPANION_ACCESSORY_HALO)
-        ) {
-            currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_HALO
         }
         entries += cosmeticShopEntry(
             label = dexFaceStyleLabel(DEX_COMPANION_FACE_PIXEL),
@@ -3379,11 +3378,38 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         ) {
             currentDexCompanionBubbleStyle = DEX_COMPANION_BUBBLE_BOLD
         }
-        entries += gameShopEntry(DexMiniGameType.TRIVIA) { startTriviaGame() }
-        entries += gameShopEntry(DexMiniGameType.MEMORY) { startMemoryGame() }
-        entries += gameShopEntry(DexMiniGameType.WOULD_YOU_RATHER) { startWouldYouRatherGame() }
         return entries
     }
+
+    private fun buildDexShopAccessoryEntries(): List<DexShopEntry> = listOf(
+        cosmeticShopEntry(
+            label = dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HEADPHONES),
+            key = accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HEADPHONES),
+            cost = dexAccessoryCost(DEX_COMPANION_ACCESSORY_HEADPHONES)
+        ) {
+            currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_HEADPHONES
+        },
+        cosmeticShopEntry(
+            label = dexAccessoryLabel(DEX_COMPANION_ACCESSORY_GLASSES),
+            key = accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_GLASSES),
+            cost = dexAccessoryCost(DEX_COMPANION_ACCESSORY_GLASSES)
+        ) {
+            currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_GLASSES
+        },
+        cosmeticShopEntry(
+            label = dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HALO),
+            key = accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HALO),
+            cost = dexAccessoryCost(DEX_COMPANION_ACCESSORY_HALO)
+        ) {
+            currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_HALO
+        }
+    )
+
+    private fun buildDexShopPlayEntries(): List<DexShopEntry> = listOf(
+        gameShopEntry(DexMiniGameType.TRIVIA) { startTriviaGame() },
+        gameShopEntry(DexMiniGameType.MEMORY) { startMemoryGame() },
+        gameShopEntry(DexMiniGameType.WOULD_YOU_RATHER) { startWouldYouRatherGame() }
+    )
 
     private fun cosmeticShopEntry(
         label: String,
