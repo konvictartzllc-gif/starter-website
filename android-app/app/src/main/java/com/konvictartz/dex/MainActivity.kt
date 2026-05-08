@@ -1167,6 +1167,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> getColorCompat(R.color.dex_border_soft)
             }
         )
+        applyRoleDashboardMood(roleKey)
         binding.adminBackendValue.text = currentServerUrl()
     }
 
@@ -1185,6 +1186,77 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun getColorCompat(colorRes: Int): Int = ContextCompat.getColor(this, colorRes)
+
+    private fun applyRoleDashboardMood(roleKey: String) {
+        val defaultPanel = getColorCompat(R.color.dex_panel)
+        val defaultStroke = getColorCompat(R.color.dex_border)
+        val allRoleCards = listOf(
+            binding.dashboardCard,
+            binding.userDashboardCard,
+            binding.learningCenterCard,
+            binding.safetyProfileCard,
+            binding.lifeSectionsCard,
+            binding.billingCard,
+            binding.affiliateDashboardCard,
+            binding.adminDashboardCard,
+            binding.themeCard,
+            binding.serverCard,
+            binding.permissionsCard,
+            binding.backgroundAccessCard,
+            binding.callMonitorCard,
+            binding.voiceCard,
+            binding.conversationCard
+        )
+        allRoleCards.forEach { card ->
+            card.setCardBackgroundColor(defaultPanel)
+            card.strokeColor = defaultStroke
+        }
+
+        val roleCards = when (roleKey) {
+            "admin" -> listOf(
+                binding.dashboardCard,
+                binding.adminDashboardCard,
+                binding.serverCard,
+                binding.permissionsCard,
+                binding.backgroundAccessCard,
+                binding.callMonitorCard,
+                binding.voiceCard,
+                binding.conversationCard,
+                binding.safetyProfileCard,
+                binding.themeCard
+            )
+            "affiliate" -> listOf(
+                binding.dashboardCard,
+                binding.userDashboardCard,
+                binding.learningCenterCard,
+                binding.affiliateDashboardCard
+            )
+            else -> listOf(
+                binding.dashboardCard,
+                binding.userDashboardCard,
+                binding.learningCenterCard,
+                binding.safetyProfileCard,
+                binding.lifeSectionsCard,
+                binding.billingCard,
+                binding.voiceCard,
+                binding.conversationCard
+            )
+        }
+        val panelColor = when (roleKey) {
+            "admin" -> getColorCompat(R.color.dex_admin_panel)
+            "affiliate" -> getColorCompat(R.color.dex_affiliate_panel)
+            else -> getColorCompat(R.color.dex_user_panel)
+        }
+        val strokeColor = when (roleKey) {
+            "admin" -> getColorCompat(R.color.dex_admin_stroke)
+            "affiliate" -> getColorCompat(R.color.dex_affiliate_stroke)
+            else -> getColorCompat(R.color.dex_user_stroke)
+        }
+        roleCards.forEach { card ->
+            card.setCardBackgroundColor(panelColor)
+            card.strokeColor = strokeColor
+        }
+    }
 
     private fun fetchDashboardData() {
         val token = authToken ?: return
@@ -2109,6 +2181,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             ).forEach { card ->
                 card.setCardBackgroundColor(panelColor)
             }
+            applyRoleDashboardMood(currentUserRole.lowercase(Locale.US))
 
             listOf(
                 binding.authActionButton,
