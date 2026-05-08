@@ -291,6 +291,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexCompanionDragStartX = 0f
     private var dexCompanionDragStartY = 0f
     private var dexCompanionDraggedDuringTouch = false
+    private var dexCompanionLastTapAt = 0L
     private var pendingDecorationPickTarget: DecorationPickTarget? = null
     private var currentTrialDaysLeft: Int? = null
     private var hasBillingCustomer = false
@@ -343,6 +344,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexCompanionBubbleOverride = null
         dexCompanionState = deriveDexCompanionState()
         applyDexCompanionUi()
+    }
+
+    private val dexCompanionSingleTapRunnable = Runnable {
+        dexCompanionLastTapAt = 0L
+        handleDexCompanionTap()
     }
 
     private val permissionLauncher =
@@ -519,6 +525,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         stopCallMonitoring()
         stopListeningForCallCommand()
         updateCallActionVisibility(false)
+        mainHandler.removeCallbacks(dexCompanionSingleTapRunnable)
         mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
         stopDexCompanionAnimation()
         maintainBackgroundService()
@@ -535,6 +542,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         mainHandler.removeCallbacks(resetWakeWindowRunnable)
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
         mainHandler.removeCallbacks(dexCompanionBlinkRunnable)
+        mainHandler.removeCallbacks(dexCompanionSingleTapRunnable)
         mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
         stopDexCompanionAnimation()
         wakeWordEngine?.stop()
@@ -1100,7 +1108,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         applyDexCompanionDragPosition()
                         persistHomeLook()
                     } else {
-                        handleDexCompanionTap()
+                        val now = SystemClock.elapsedRealtime()
+                        if (now - dexCompanionLastTapAt <= DEX_COMPANION_DOUBLE_TAP_WINDOW_MS) {
+                            mainHandler.removeCallbacks(dexCompanionSingleTapRunnable)
+                            dexCompanionLastTapAt = 0L
+                            handleDexCompanionDoubleTap()
+                        } else {
+                            dexCompanionLastTapAt = now
+                            mainHandler.postDelayed(dexCompanionSingleTapRunnable, DEX_COMPANION_DOUBLE_TAP_WINDOW_MS)
+                        }
                     }
                     dexCompanionDraggedDuringTouch = false
                     true
@@ -3201,6 +3217,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.contentScrollView.post {
                 binding.contentScrollView.smoothScrollTo(0, binding.themeCard.top - dpToPx(16))
             }
+        }
+    }
+
+    private fun handleDexCompanionDoubleTap() {
+        if (binding.dexCompanionCard.visibility != View.VISIBLE) return
+        currentDexCompanionMood = when (currentDexCompanionMood.lowercase(Locale.US)) {
+            DEX_COMPANION_MOOD_CALM -> DEX_COMPANION_MOOD_PLAYFUL
+            DEX_COMPANION_MOOD_PLAYFUL -> DEX_COMPANION_MOOD_FOCUS
+            else -> DEX_COMPANION_MOOD_CALM
+        }
+        updateDexCompanionControls()
+        val moodLabel = when (currentDexCompanionMood.lowercase(Locale.US)) {
+            DEX_COMPANION_MOOD_PLAYFUL -> "playful"
+            DEX_COMPANION_MOOD_FOCUS -> "focus"
+            else -> "calm"
+        }
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = "Switched to $moodLabel mode.",
+            revertAfterMs = 2600L
+        )
+        persistHomeLook()
+        binding.contentScrollView.post {
+            binding.contentScrollView.smoothScrollTo(0, binding.themeCard.top - dpToPx(16))
         }
     }
 
@@ -8848,6 +8888,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_PERSONALITY_BESTIE = "bestie"
         private const val DEX_COMPANION_PERSONALITY_GUARDIAN = "guardian"
         private const val DEX_COMPANION_PERSONALITY_STUDY_BUDDY = "study_buddy"
+        private const val DEX_COMPANION_DOUBLE_TAP_WINDOW_MS = 260L
         private const val DEX_COMPANION_STATE_IDLE = "idle"
         private const val DEX_COMPANION_STATE_SLEEPING = "sleeping"
         private const val DEX_COMPANION_STATE_LISTENING = "listening"
