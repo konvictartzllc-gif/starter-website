@@ -3266,6 +3266,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
+    private fun refreshDexCompanionRewardsPanel(unlockCelebration: Boolean = false) {
+        updateDexCompanionControls()
+        applyDexCompanionUi()
+        if (!unlockCelebration || binding.dexCompanionRewardsValue.visibility != View.VISIBLE) return
+        binding.dexCompanionRewardsValue.animate().cancel()
+        binding.dexCompanionRewardsValue.scaleX = 1f
+        binding.dexCompanionRewardsValue.scaleY = 1f
+        binding.dexCompanionRewardsValue.alpha = 1f
+        val pulseUpX = ObjectAnimator.ofFloat(binding.dexCompanionRewardsValue, View.SCALE_X, 1f, 1.04f)
+        val pulseUpY = ObjectAnimator.ofFloat(binding.dexCompanionRewardsValue, View.SCALE_Y, 1f, 1.04f)
+        val pulseFade = ObjectAnimator.ofFloat(binding.dexCompanionRewardsValue, View.ALPHA, 1f, 0.94f, 1f)
+        val pulseDownX = ObjectAnimator.ofFloat(binding.dexCompanionRewardsValue, View.SCALE_X, 1.04f, 1f)
+        val pulseDownY = ObjectAnimator.ofFloat(binding.dexCompanionRewardsValue, View.SCALE_Y, 1.04f, 1f)
+        AnimatorSet().apply {
+            playTogether(pulseUpX, pulseUpY, pulseFade)
+            duration = 190L
+            play(pulseDownX).with(pulseDownY).after(pulseUpX)
+            start()
+        }
+    }
+
     private fun dexGamesProfileLine(): String {
         val favorite = favoriteDexMiniGameLabel()
         return if (favorite.isNullOrBlank()) {
@@ -3536,6 +3557,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else null
         val reply = listOfNotNull(baseReply, reward?.reply).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
+        refreshDexCompanionRewardsPanel(unlockCelebration = reward?.bubble != null)
         binding.dexGameInput.setText("")
         setDexCompanionState(
             if (guess == dexGuessTarget) DEX_COMPANION_STATE_EXCITED else DEX_COMPANION_STATE_TALKING,
@@ -3563,6 +3585,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         val reply = listOfNotNull(baseReply, reward?.reply).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
+        refreshDexCompanionRewardsPanel(unlockCelebration = reward?.bubble != null)
         if (isCorrect) {
             binding.dexGameInput.setText("")
         }
@@ -3594,6 +3617,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         val reply = listOfNotNull(baseReply, reward?.reply).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
+        refreshDexCompanionRewardsPanel(unlockCelebration = reward?.bubble != null)
         if (isCorrect) {
             binding.dexGameInput.setText("")
         }
@@ -3636,6 +3660,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         val reply = listOfNotNull(baseReply, reward?.reply).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
+        refreshDexCompanionRewardsPanel(unlockCelebration = reward?.bubble != null)
         if (isCorrect) {
             binding.dexGameInput.setText("")
         }
@@ -3655,6 +3680,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val reward = recordDexChallengeCompletion(DexMiniGameType.WOULD_YOU_RATHER)
         val reply = listOfNotNull(baseReply, reward?.reply).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
+        refreshDexCompanionRewardsPanel(unlockCelebration = reward?.bubble != null)
         binding.dexGameInput.setText("")
         setDexCompanionState(
             DEX_COMPANION_STATE_TALKING,
