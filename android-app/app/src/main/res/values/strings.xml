@@ -180,6 +180,11 @@
     <string name="dex_companion_skin_mint">Mint</string>
     <string name="dex_companion_skin_sunset">Sunset</string>
     <string name="dex_companion_skin_violet">Violet</string>
+    <string name="dex_companion_accessory_label">Accessory</string>
+    <string name="dex_companion_accessory_none">None</string>
+    <string name="dex_companion_accessory_headphones">Headphones</string>
+    <string name="dex_companion_accessory_glasses">Glasses</string>
+    <string name="dex_companion_accessory_halo">Halo</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>

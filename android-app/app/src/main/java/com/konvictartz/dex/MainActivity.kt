@@ -262,6 +262,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionFaceStyle: String = DEX_COMPANION_FACE_CLASSIC
     private var currentDexCompanionBubbleStyle: String = DEX_COMPANION_BUBBLE_SOFT
     private var currentDexCompanionSkin: String = DEX_COMPANION_SKIN_SKY
+    private var currentDexCompanionAccessory: String = DEX_COMPANION_ACCESSORY_NONE
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
     private var dexCompanionBubbleOverride: String? = null
     private var dexCompanionFloatAnimator: AnimatorSet? = null
@@ -1001,6 +1002,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             applyDexCompanionUi()
             persistHomeLook()
         }
+        binding.dexCompanionAccessoryToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentDexCompanionAccessory = when (checkedId) {
+                R.id.dexCompanionAccessoryHeadphonesButton -> DEX_COMPANION_ACCESSORY_HEADPHONES
+                R.id.dexCompanionAccessoryGlassesButton -> DEX_COMPANION_ACCESSORY_GLASSES
+                R.id.dexCompanionAccessoryHaloButton -> DEX_COMPANION_ACCESSORY_HALO
+                else -> DEX_COMPANION_ACCESSORY_NONE
+            }
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
 
         renderAuthMode()
         updateCallActionVisibility(false)
@@ -1064,6 +1076,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentDexCompanionSkin = prefs.getString(KEY_DEX_COMPANION_SKIN, DEX_COMPANION_SKIN_SKY)
             .orEmpty()
             .ifBlank { DEX_COMPANION_SKIN_SKY }
+        currentDexCompanionAccessory = prefs.getString(KEY_DEX_COMPANION_ACCESSORY, DEX_COMPANION_ACCESSORY_NONE)
+            .orEmpty()
+            .ifBlank { DEX_COMPANION_ACCESSORY_NONE }
         updateAdvancedStyleUi(currentThemePreset == "custom")
         updateDexCompanionControls()
         loadDashboardSections()
@@ -2965,6 +2980,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_DEX_COMPANION_FACE_STYLE, currentDexCompanionFaceStyle)
             .putString(KEY_DEX_COMPANION_BUBBLE_STYLE, currentDexCompanionBubbleStyle)
             .putString(KEY_DEX_COMPANION_SKIN, currentDexCompanionSkin)
+            .putString(KEY_DEX_COMPANION_ACCESSORY, currentDexCompanionAccessory)
             .commit()
     }
 
@@ -3020,6 +3036,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 DEX_COMPANION_SKIN_SUNSET -> R.id.dexCompanionSkinSunsetButton
                 DEX_COMPANION_SKIN_VIOLET -> R.id.dexCompanionSkinVioletButton
                 else -> R.id.dexCompanionSkinSkyButton
+            }
+        )
+        binding.dexCompanionAccessoryToggle.check(
+            when (currentDexCompanionAccessory.lowercase(Locale.US)) {
+                DEX_COMPANION_ACCESSORY_HEADPHONES -> R.id.dexCompanionAccessoryHeadphonesButton
+                DEX_COMPANION_ACCESSORY_GLASSES -> R.id.dexCompanionAccessoryGlassesButton
+                DEX_COMPANION_ACCESSORY_HALO -> R.id.dexCompanionAccessoryHaloButton
+                else -> R.id.dexCompanionAccessoryNoneButton
             }
         )
     }
@@ -3110,6 +3134,25 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionFace.scaleY = companionFaceScale(activeState)
         binding.dexCompanionCard.alpha = if (activeState == DEX_COMPANION_STATE_PENDING) 1f else 0.98f
         binding.dexCompanionLabel.alpha = if (isPixelFace) 0.88f else 1f
+        val accessoryTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.34f)
+        binding.dexCompanionHalo.backgroundTintList = ColorStateList.valueOf(accessoryTint)
+        listOf(
+            binding.dexCompanionHeadphonesBand,
+            binding.dexCompanionHeadphonesLeft,
+            binding.dexCompanionHeadphonesRight,
+            binding.dexCompanionGlassesBridge
+        ).forEach { it.backgroundTintList = ColorStateList.valueOf(accessoryTint) }
+        listOf(binding.dexCompanionGlassesLeft, binding.dexCompanionGlassesRight).forEach {
+            it.backgroundTintList = ColorStateList.valueOf(accessoryTint)
+        }
+        binding.dexCompanionHalo.visibility =
+            if (currentDexCompanionAccessory.lowercase(Locale.US) == DEX_COMPANION_ACCESSORY_HALO) View.VISIBLE else View.GONE
+        val showHeadphones = currentDexCompanionAccessory.lowercase(Locale.US) == DEX_COMPANION_ACCESSORY_HEADPHONES
+        binding.dexCompanionHeadphonesBand.visibility = if (showHeadphones) View.VISIBLE else View.GONE
+        binding.dexCompanionHeadphonesLeft.visibility = if (showHeadphones) View.VISIBLE else View.GONE
+        binding.dexCompanionHeadphonesRight.visibility = if (showHeadphones) View.VISIBLE else View.GONE
+        binding.dexCompanionGlassesRow.visibility =
+            if (currentDexCompanionAccessory.lowercase(Locale.US) == DEX_COMPANION_ACCESSORY_GLASSES) View.VISIBLE else View.GONE
 
         (binding.dexCompanionCard.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
             val sideGravity = if (currentDexCompanionSide.lowercase(Locale.US) == DEX_COMPANION_SIDE_LEFT) {
@@ -8098,6 +8141,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_FACE_STYLE = "dex_companion_face_style"
         const val KEY_DEX_COMPANION_BUBBLE_STYLE = "dex_companion_bubble_style"
         const val KEY_DEX_COMPANION_SKIN = "dex_companion_skin"
+        const val KEY_DEX_COMPANION_ACCESSORY = "dex_companion_accessory"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"
@@ -8140,6 +8184,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_SKIN_MINT = "mint"
         private const val DEX_COMPANION_SKIN_SUNSET = "sunset"
         private const val DEX_COMPANION_SKIN_VIOLET = "violet"
+        private const val DEX_COMPANION_ACCESSORY_NONE = "none"
+        private const val DEX_COMPANION_ACCESSORY_HEADPHONES = "headphones"
+        private const val DEX_COMPANION_ACCESSORY_GLASSES = "glasses"
+        private const val DEX_COMPANION_ACCESSORY_HALO = "halo"
         private const val DEX_COMPANION_STATE_IDLE = "idle"
         private const val DEX_COMPANION_STATE_LISTENING = "listening"
         private const val DEX_COMPANION_STATE_EXCITED = "excited"
