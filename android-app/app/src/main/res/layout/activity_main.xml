@@ -390,7 +390,7 @@
                     android:layout_height="wrap_content"
                     android:text="@string/dashboard_title"
                     android:textColor="@color/dex_text_secondary"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
 
                 <LinearLayout
@@ -400,7 +400,7 @@
                     android:layout_marginTop="12dp"
                     android:background="@drawable/dashboard_hero_surface"
                     android:orientation="vertical"
-                    android:padding="18dp">
+                    android:padding="16dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -413,8 +413,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/dashboard_overline"
-                            android:textColor="@color/dex_accent"
-                            android:textSize="12sp"
+                            android:textColor="@color/dex_text_secondary"
+                            android:textSize="11sp"
                             android:textStyle="bold" />
 
                         <Space
@@ -426,7 +426,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:gravity="bottom"
-                            android:orientation="horizontal">
+                            android:orientation="horizontal"
+                            android:visibility="gone">
 
                             <View
                                 android:id="@+id/dashboardSignalTall"
@@ -454,24 +455,24 @@
                         android:id="@+id/dashboardWelcome"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="8dp"
                         android:textColor="@android:color/white"
-                        android:textSize="24sp"
+                        android:textSize="22sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/dashboardSummary"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="6dp"
                         android:text="@string/dashboard_professional_summary"
                         android:textColor="@color/dex_text_secondary"
-                        android:textSize="14sp" />
+                        android:textSize="13sp" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
+                        android:layout_marginTop="12dp"
                         android:orientation="horizontal">
 
                         <TextView
@@ -484,7 +485,7 @@
                             android:paddingEnd="12dp"
                             android:paddingBottom="8dp"
                             android:textColor="@android:color/white"
-                            android:textSize="13sp"
+                            android:textSize="12sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -498,7 +499,7 @@
                             android:paddingEnd="12dp"
                             android:paddingBottom="8dp"
                             android:textColor="@android:color/white"
-                            android:textSize="13sp"
+                            android:textSize="12sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -506,11 +507,10 @@
                         android:id="@+id/dashboardCreativeFooter"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="12dp"
                         android:text="@string/dashboard_creative_footer"
                         android:textColor="@color/dex_text_secondary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
+                        android:textSize="11sp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
