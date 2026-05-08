@@ -70,6 +70,8 @@
     <string name="dashboard_activity_empty_affiliate">No streak or next lesson yet. Set your learning profile, then tap Get daily lesson so your growth workspace has real momentum to show.</string>
     <string name="dashboard_hint_user">Next move: tap Get daily lesson and let Dex start building your rhythm.</string>
     <string name="dashboard_hint_affiliate">Next move: set your learning profile, then tap Get daily lesson to wake up this growth track.</string>
+    <string name="dashboard_active_hint_lessons">Ready: your activity is live. Ask Dex for another lesson or quiz whenever you want to keep going.</string>
+    <string name="dashboard_active_hint_streak">Ready: your learning rhythm is showing up here. Keep the streak moving with another lesson when you are ready.</string>
     <string name="dashboard_loading_value">Refreshing...</string>
     <string name="dashboard_loading_detail">Pulling your latest Dex activity.</string>
     <string name="affiliate_dashboard_loading">Refreshing affiliate performance.</string>
@@ -91,6 +93,7 @@
     <string name="affiliate_promo_code_empty">Promo code: first growth setup is still getting ready</string>
     <string name="affiliate_withdraw_note_empty">Your growth dashboard is ready. Use the learning tools above while Dex prepares your code, earnings, and payout path here.</string>
     <string name="affiliate_hint_empty">Next move: keep using the learning tools while Dex gets your first affiliate setup into place.</string>
+    <string name="affiliate_hint_active">Ready: your affiliate dashboard is live. Share your code and keep the learning tools moving alongside it.</string>
     <string name="admin_dashboard_title">Admin portal</string>
     <string name="admin_dashboard_section_tag">Live systems</string>
     <string name="admin_dashboard_summary">Manage backend access, affiliate codes, and platform health from here.</string>
@@ -105,6 +108,7 @@
     <string name="admin_stats_summary">Users: %1$d | Affiliates: %2$d | Active today: %3$d | Lessons: %4$d</string>
     <string name="admin_stats_empty">Platform snapshot is waiting on live backend data. If it stays quiet, check the backend controls just below.</string>
     <string name="admin_hint_empty">Next move: if this stays quiet, check the backend controls below and confirm the admin server is reachable.</string>
+    <string name="admin_hint_active">Healthy: live platform data is coming through. Use the controls below whenever you need to step in.</string>
     <string name="home_style_title">Home style</string>
     <string name="home_style_summary">Pick a look for Dex, then change the home text if you want it to feel more personal.</string>
     <string name="home_style_quick_tip">Choose a style first. Open advanced colors only if you want a more custom look.</string>
@@ -160,6 +164,8 @@
     <string name="learning_profile_missing_affiliate">Set your learning profile, then tap Get daily lesson or Build quiz so your affiliate workspace can start showing progress here.</string>
     <string name="learning_hint_user">Next move: fill in your learning profile, then tap Get daily lesson or Build quiz.</string>
     <string name="learning_hint_affiliate">Next move: set your learning profile, then tap Get daily lesson or Build quiz so this workspace can start showing progress.</string>
+    <string name="learning_hint_active_ready">Ready: your learning profile is set. Tap Get daily lesson or Build quiz whenever you want the next step.</string>
+    <string name="learning_hint_active_reminder">Ready: your learning profile and daily reminder are in place. Dex will keep nudging this routine forward.</string>
     <string name="learning_reminder_off">Daily learning reminder is off.</string>
     <string name="learning_reminder_on">Daily reminder is set for %1$s.</string>
     <string name="learning_profile_loading">Refreshing your learning profile.</string>
@@ -242,6 +248,10 @@
     <string name="billing_hint_unknown_user">Next move: give billing a moment, then use Subscribe now if your plan still has not appeared.</string>
     <string name="billing_hint_unknown_affiliate">Next move: give billing a moment to settle, then use the actions here if your access still looks off.</string>
     <string name="billing_hint_unknown_admin">Next move: wait for the billing check, then use the actions here if this admin account still needs attention.</string>
+    <string name="billing_hint_trial">Ready: your trial is active. Subscribe anytime if you want to lock in uninterrupted access.</string>
+    <string name="billing_hint_paid">Healthy: your paid Dex access is active. Use Manage billing whenever you need account changes.</string>
+    <string name="billing_hint_unlimited">Healthy: this account already has unlimited access, so no billing action is needed right now.</string>
+    <string name="billing_hint_expired">Next move: use Subscribe now to restore full Dex access.</string>
     <string name="billing_status_loading">Refreshing billing status</string>
     <string name="billing_detail_trial">%1$d day(s) left in your Dex trial. Subscribe now so your access rolls over without interruption.</string>
     <string name="billing_detail_paid">Your Dex subscription is active. Manage payment method or billing details anytime.</string>

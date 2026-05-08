@@ -1229,6 +1229,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         else -> getString(R.string.billing_hint_unknown_user)
     }
 
+    private fun billingActiveHintCopy(access: String): String? = when (access.lowercase(Locale.US)) {
+        "trial" -> getString(R.string.billing_hint_trial)
+        "paid" -> getString(R.string.billing_hint_paid)
+        "unlimited" -> getString(R.string.billing_hint_unlimited)
+        "expired" -> getString(R.string.billing_hint_expired)
+        else -> null
+    }
+
     private fun setHintBand(view: TextView, message: String?) {
         val text = message?.trim().orEmpty()
         view.text = text
@@ -1513,7 +1521,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         binding.learningQuizPreview.text = dashboardActivityEmptyCopy()
                     }
                     val showUserHint = lessons == 0 && streak == 0 && nextLesson?.optString("topic").isNullOrBlank()
-                    setHintBand(binding.userDashboardHint, if (showUserHint) dashboardHintCopy() else null)
+                    val activeUserHint =
+                        if (streak > 0) getString(R.string.dashboard_active_hint_streak)
+                        else if (lessons > 0 || !nextLesson?.optString("topic").isNullOrBlank()) getString(R.string.dashboard_active_hint_lessons)
+                        else null
+                    setHintBand(binding.userDashboardHint, if (showUserHint) dashboardHintCopy() else activeUserHint)
                     pulseDashboardValues(
                         binding.userDashboardLessonCount,
                         binding.userDashboardQuizScore,
@@ -1550,7 +1562,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                                 response.optInt("signups") == 0 &&
                                 response.optInt("paidSubs") == 0 &&
                                 response.optDouble("earnings", 0.0) == 0.0
-                        setHintBand(binding.affiliateDashboardHint, if (showAffiliateHint) getString(R.string.affiliate_hint_empty) else null)
+                        setHintBand(
+                            binding.affiliateDashboardHint,
+                            if (showAffiliateHint) getString(R.string.affiliate_hint_empty)
+                            else getString(R.string.affiliate_hint_active)
+                        )
                         pulseDashboardValues(
                             binding.affiliatePromoCode,
                             binding.affiliateEarnings,
@@ -1598,7 +1614,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                                 response.optInt("affiliateCount") == 0 &&
                                 response.optInt("activeToday") == 0 &&
                                 response.optInt("learningLessons") == 0
-                        setHintBand(binding.adminDashboardHint, if (showAdminHint) getString(R.string.admin_hint_empty) else null)
+                        setHintBand(
+                            binding.adminDashboardHint,
+                            if (showAdminHint) getString(R.string.admin_hint_empty)
+                            else getString(R.string.admin_hint_active)
+                        )
                         pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
                         completeSectionRefresh(
                             binding.adminDashboardStatus,
@@ -2257,7 +2277,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             "unlimited" -> getString(R.string.billing_detail_unlimited)
             else -> billingUnknownDetailCopy()
         }
-        setHintBand(binding.billingHint, if (access == "unknown") billingHintCopy() else null)
+        setHintBand(
+            binding.billingHint,
+            if (access == "unknown") billingHintCopy() else billingActiveHintCopy(access)
+        )
         binding.subscribeNowButton.visibility = if (access == "paid" || access == "unlimited") View.GONE else View.VISIBLE
         binding.manageBillingButton.visibility = if (hasBillingCustomer || access == "paid") View.VISIBLE else View.GONE
         pulseDashboardValues(binding.billingStatusText, binding.billingDetailText)
@@ -2780,7 +2803,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     }
                 setHintBand(
                     binding.learningCenterHint,
-                    if (preferences.optString("learning_target_language").isBlank()) learningHintCopy() else null
+                    if (preferences.optString("learning_target_language").isBlank()) {
+                        learningHintCopy()
+                    } else if (enabled && time.isNotBlank()) {
+                        getString(R.string.learning_hint_active_reminder)
+                    } else {
+                        getString(R.string.learning_hint_active_ready)
+                    }
                 )
                 binding.learningReminderSummary.text =
                     if (enabled && time.isNotBlank()) getString(R.string.learning_reminder_on, time)
