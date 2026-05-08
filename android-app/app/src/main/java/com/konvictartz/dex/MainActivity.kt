@@ -127,6 +127,14 @@ private enum class ReminderContactDisambiguationMode {
     TEXT,
 }
 
+private enum class DexCompanionContext {
+    GENERAL,
+    TEXT,
+    CALL,
+    LESSON,
+    SAFETY,
+}
+
 private data class PendingAction(
     val kind: PendingActionKind,
     val summary: String,
@@ -3378,43 +3386,158 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun companionBaseLineForState(state: String): String {
+        val context = deriveDexCompanionContext()
         return when (currentDexCompanionPersonality.lowercase(Locale.US)) {
             DEX_COMPANION_PERSONALITY_BESTIE -> when (state) {
-                DEX_COMPANION_STATE_LISTENING -> "Tell me."
-                DEX_COMPANION_STATE_EXCITED -> "Okay, lets go."
-                DEX_COMPANION_STATE_TALKING -> "I am with you."
-                DEX_COMPANION_STATE_PENDING -> "I have it ready."
-                DEX_COMPANION_STATE_ALERT -> "Hey, this needs you."
+                DEX_COMPANION_STATE_LISTENING -> when (context) {
+                    DexCompanionContext.TEXT -> "Tell me the message."
+                    DexCompanionContext.CALL -> "Okay, what do you want to do with the call?"
+                    DexCompanionContext.LESSON -> "Tell me what you want to learn."
+                    DexCompanionContext.SAFETY -> "Talk to me. I am here."
+                    else -> "Tell me."
+                }
+                DEX_COMPANION_STATE_EXCITED -> when (context) {
+                    DexCompanionContext.LESSON -> "Nice, lets learn."
+                    DexCompanionContext.TEXT -> "Okay, lets send it."
+                    else -> "Okay, lets go."
+                }
+                DEX_COMPANION_STATE_TALKING -> when (context) {
+                    DexCompanionContext.LESSON -> "I am breaking it down with you."
+                    DexCompanionContext.SAFETY -> "I am staying with you."
+                    else -> "I am with you."
+                }
+                DEX_COMPANION_STATE_PENDING -> when (context) {
+                    DexCompanionContext.TEXT -> "Your text is ready."
+                    DexCompanionContext.CALL -> "Call plan is ready."
+                    DexCompanionContext.LESSON -> "Your next step is ready."
+                    else -> "I have it ready."
+                }
+                DEX_COMPANION_STATE_ALERT -> when (context) {
+                    DexCompanionContext.CALL -> "Hey, someone is calling."
+                    DexCompanionContext.SAFETY -> "Hey, stay with me."
+                    else -> "Hey, this needs you."
+                }
                 else -> "I am right here."
             }
             DEX_COMPANION_PERSONALITY_GUARDIAN -> when (state) {
-                DEX_COMPANION_STATE_LISTENING -> "I am listening carefully."
-                DEX_COMPANION_STATE_EXCITED -> "We are moving now."
-                DEX_COMPANION_STATE_TALKING -> "Stay with me."
-                DEX_COMPANION_STATE_PENDING -> "This is prepared."
-                DEX_COMPANION_STATE_ALERT -> "Attention needed."
+                DEX_COMPANION_STATE_LISTENING -> when (context) {
+                    DexCompanionContext.SAFETY -> "I am listening carefully."
+                    DexCompanionContext.CALL -> "State the call action."
+                    DexCompanionContext.TEXT -> "State the reply."
+                    else -> "I am listening carefully."
+                }
+                DEX_COMPANION_STATE_EXCITED -> when (context) {
+                    DexCompanionContext.CALL -> "We are acting now."
+                    DexCompanionContext.SAFETY -> "Support is in motion."
+                    else -> "We are moving now."
+                }
+                DEX_COMPANION_STATE_TALKING -> when (context) {
+                    DexCompanionContext.LESSON -> "Stay with the steps."
+                    DexCompanionContext.SAFETY -> "Stay with me."
+                    else -> "Stay with me."
+                }
+                DEX_COMPANION_STATE_PENDING -> when (context) {
+                    DexCompanionContext.TEXT -> "Reply prepared."
+                    DexCompanionContext.CALL -> "Call action prepared."
+                    DexCompanionContext.SAFETY -> "Support action prepared."
+                    else -> "This is prepared."
+                }
+                DEX_COMPANION_STATE_ALERT -> when (context) {
+                    DexCompanionContext.CALL -> "Incoming call. Attention needed."
+                    DexCompanionContext.SAFETY -> "Safety response needed."
+                    else -> "Attention needed."
+                }
                 else -> "I am here with you."
             }
             DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> when (state) {
-                DEX_COMPANION_STATE_LISTENING -> "Go ahead."
-                DEX_COMPANION_STATE_EXCITED -> "Nice, lets work."
-                DEX_COMPANION_STATE_TALKING -> "Working through it."
-                DEX_COMPANION_STATE_PENDING -> "This is ready to review."
-                DEX_COMPANION_STATE_ALERT -> "Quick check."
+                DEX_COMPANION_STATE_LISTENING -> when (context) {
+                    DexCompanionContext.LESSON -> "Go ahead, I am tracking it."
+                    DexCompanionContext.TEXT -> "Go ahead with the reply."
+                    else -> "Go ahead."
+                }
+                DEX_COMPANION_STATE_EXCITED -> when (context) {
+                    DexCompanionContext.LESSON -> "Nice, lets work."
+                    else -> "Nice, lets work."
+                }
+                DEX_COMPANION_STATE_TALKING -> when (context) {
+                    DexCompanionContext.LESSON -> "Working through it."
+                    DexCompanionContext.TEXT -> "Drafting it clearly."
+                    else -> "Working through it."
+                }
+                DEX_COMPANION_STATE_PENDING -> when (context) {
+                    DexCompanionContext.LESSON -> "This is ready to review."
+                    DexCompanionContext.TEXT -> "Reply is ready to review."
+                    else -> "This is ready to review."
+                }
+                DEX_COMPANION_STATE_ALERT -> when (context) {
+                    DexCompanionContext.CALL -> "Quick call check."
+                    DexCompanionContext.SAFETY -> "Quick support check."
+                    else -> "Quick check."
+                }
                 else -> "Ready when you are."
             }
             else -> when (state) {
-                DEX_COMPANION_STATE_LISTENING -> "I am listening."
-                DEX_COMPANION_STATE_EXCITED -> "Okay, lets do it."
-                DEX_COMPANION_STATE_TALKING -> "Talking it through."
-                DEX_COMPANION_STATE_PENDING -> "I have this ready."
-                DEX_COMPANION_STATE_ALERT -> "Something needs you."
+                DEX_COMPANION_STATE_LISTENING -> when (context) {
+                    DexCompanionContext.CALL -> "I am listening for the call command."
+                    DexCompanionContext.TEXT -> "I am listening for the reply."
+                    DexCompanionContext.LESSON -> "I am listening for the next step."
+                    DexCompanionContext.SAFETY -> "I am listening carefully."
+                    else -> "I am listening."
+                }
+                DEX_COMPANION_STATE_EXCITED -> when (context) {
+                    DexCompanionContext.LESSON -> "Okay, lets learn."
+                    DexCompanionContext.TEXT -> "Okay, lets send it."
+                    else -> "Okay, lets do it."
+                }
+                DEX_COMPANION_STATE_TALKING -> when (context) {
+                    DexCompanionContext.LESSON -> "Teaching this step by step."
+                    DexCompanionContext.SAFETY -> "Talking it through with care."
+                    else -> "Talking it through."
+                }
+                DEX_COMPANION_STATE_PENDING -> when (context) {
+                    DexCompanionContext.TEXT -> "I have the text ready."
+                    DexCompanionContext.CALL -> "I have the call ready."
+                    DexCompanionContext.LESSON -> "I have the lesson ready."
+                    DexCompanionContext.SAFETY -> "I have support ready."
+                    else -> "I have this ready."
+                }
+                DEX_COMPANION_STATE_ALERT -> when (context) {
+                    DexCompanionContext.CALL -> "Incoming call."
+                    DexCompanionContext.SAFETY -> "Safety support is needed."
+                    else -> "Something needs you."
+                }
                 else -> when (currentDexCompanionMood.lowercase(Locale.US)) {
                     DEX_COMPANION_MOOD_PLAYFUL -> getString(R.string.dex_companion_bubble_playful)
                     DEX_COMPANION_MOOD_FOCUS -> getString(R.string.dex_companion_bubble_focus)
                     else -> getString(R.string.dex_companion_bubble_calm)
                 }
             }
+        }
+    }
+
+    private fun deriveDexCompanionContext(): DexCompanionContext {
+        val now = SystemClock.elapsedRealtime()
+        return when {
+            lastEmergencyTriggerReason.isNotBlank() && now - lastLocalEmergencySmsSentAt < 5 * 60_000L -> DexCompanionContext.SAFETY
+            activeQuizSession != null || listeningForQuizAnswer ||
+                binding.conversationStatus.text?.contains("lesson", ignoreCase = true) == true ||
+                binding.conversationStatus.text?.contains("quiz", ignoreCase = true) == true -> DexCompanionContext.LESSON
+            lastCallState == TelephonyManager.CALL_STATE_RINGING ||
+                isListeningForCallCommand ||
+                pendingReminderCallTriggerAt != null ||
+                pendingReminderCallTargetName != null -> DexCompanionContext.CALL
+            pendingIncomingSmsSender != null ||
+                pendingIncomingSmsValue != null ||
+                pendingIncomingSmsBody != null ||
+                pendingIncomingSmsReplyChoice ||
+                pendingNotificationText != null ||
+                pendingNotificationReplyChoice ||
+                pendingReminderSmsTriggerAt != null ||
+                pendingReminderSmsTarget != null ||
+                pendingReminderSmsBody != null ||
+                pendingSmsRecipient != null ||
+                pendingAction?.kind == PendingActionKind.SMS_DRAFT -> DexCompanionContext.TEXT
+            else -> DexCompanionContext.GENERAL
         }
     }
 
