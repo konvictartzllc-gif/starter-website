@@ -34,6 +34,7 @@ import android.telephony.SmsManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -50,6 +51,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.android.material.textfield.TextInputLayout
 import com.konvictartz.dex.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1258,6 +1260,66 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return dp * resources.displayMetrics.density
     }
 
+    private fun roleInputAccentColor(roleKey: String): Int = when (roleKey) {
+        "admin" -> getColorCompat(R.color.dex_admin_signal)
+        "affiliate" -> getColorCompat(R.color.dex_affiliate_signal)
+        else -> getColorCompat(R.color.dex_user_signal)
+    }
+
+    private fun roleInputFillColor(roleKey: String): Int = when (roleKey) {
+        "admin" -> ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_admin_panel), 208)
+        "affiliate" -> ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_affiliate_panel), 208)
+        else -> ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_user_panel), 208)
+    }
+
+    private fun collectTextInputLayouts(view: View): List<TextInputLayout> {
+        val found = mutableListOf<TextInputLayout>()
+        fun walk(node: View) {
+            when (node) {
+                is TextInputLayout -> found += node
+                is ViewGroup -> for (index in 0 until node.childCount) {
+                    walk(node.getChildAt(index))
+                }
+            }
+        }
+        walk(view)
+        return found
+    }
+
+    private fun applyRoleInputMood(roleKey: String) {
+        val accent = roleInputAccentColor(roleKey)
+        val fill = roleInputFillColor(roleKey)
+        val strokeIdle = ColorUtils.setAlphaComponent(sectionEdgeColor(roleKey, active = false), 190)
+        val strokeDisabled = ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_border), 120)
+        val hint = getColorCompat(R.color.dex_text_secondary)
+        val hintFocused = ColorUtils.blendARGB(accent, android.graphics.Color.WHITE, 0.18f)
+        val strokeStates = arrayOf(
+            intArrayOf(android.R.attr.state_enabled, android.R.attr.state_focused),
+            intArrayOf(android.R.attr.state_enabled),
+            intArrayOf()
+        )
+        val strokeColors = intArrayOf(accent, strokeIdle, strokeDisabled)
+        val hintStates = arrayOf(
+            intArrayOf(android.R.attr.state_enabled, android.R.attr.state_focused),
+            intArrayOf(android.R.attr.state_enabled),
+            intArrayOf()
+        )
+        val hintColors = intArrayOf(hintFocused, hint, ColorUtils.setAlphaComponent(hint, 132))
+        val strokeList = ColorStateList(strokeStates, strokeColors)
+        val hintList = ColorStateList(hintStates, hintColors)
+
+        collectTextInputLayouts(binding.root).forEach { input ->
+            input.setBoxStrokeColorStateList(strokeList)
+            input.defaultHintTextColor = hintList
+            input.hintTextColor = hintList
+            input.setBoxBackgroundColorStateList(ColorStateList.valueOf(fill))
+            input.setStartIconTintList(hintList)
+            input.setEndIconTintList(hintList)
+            input.editText?.setTextColor(android.graphics.Color.WHITE)
+            input.editText?.setHintTextColor(hint)
+        }
+    }
+
     private fun strokeWidthDp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt().coerceAtLeast(1)
 
@@ -1727,6 +1789,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             card.translationZ = roleCardElevationPx(roleKey, active = false)
         }
         applyRoleOutputStripMood(roleKey)
+        applyRoleInputMood(roleKey)
     }
 
     private fun applyRoleOutputStripMood(roleKey: String) {
