@@ -653,7 +653,7 @@
     <string name="test_emergency_sms_body">Dex emergency SMS test for %1$s. If you received this, the trusted-contact text path for the assisted person is working on this phone.</string>
     <string name="test_emergency_sms_sent">Dex sent a test emergency text request to your trusted contact.</string>
     <string name="test_emergency_sms_missing_contact">Add a trusted contact phone number before testing emergency SMS.</string>
-    <string name="safety_diagnostics_template">Saved contact: %1$s\nNormalized SMS target: %2$s\nTrusted-contact alerts: %3$s\nSMS permission: %4$s\nLast emergency trigger: %5$s\nLast SMS status: %6$s</string>
+    <string name="safety_diagnostics_template">Assisted person: %1$s\nBirthday: %2$s\nSaved contact: %3$s\nNormalized SMS target: %4$s\nTrusted-contact alerts: %5$s\nSMS permission: %6$s\nLast emergency trigger: %7$s\nLast SMS status: %8$s</string>
     <string name="diagnostic_enabled">enabled</string>
     <string name="diagnostic_disabled">disabled</string>
     <string name="diagnostic_granted">granted</string>

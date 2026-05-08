@@ -9463,6 +9463,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun refreshSafetyDiagnostics(lastStatus: String? = null, lastTrigger: String? = null) {
         lastStatus?.let { lastEmergencySmsStatus = it }
         lastTrigger?.let { lastEmergencyTriggerReason = it }
+        val assistedPersonName = resolveEmergencyPersonName()
+        val birthday = binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty()
+            .ifBlank { getString(R.string.safety_birthday_unknown) }
         val savedContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
         val normalizedTarget = normalizeSmsPhoneNumber(savedContact).ifBlank { getString(R.string.safety_contact_none) }
         val alertsEnabled = if (binding.safetyNotifyTrustedContactSwitch.isChecked) {
@@ -9479,6 +9482,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val status = lastEmergencySmsStatus.ifBlank { getString(R.string.diagnostic_none) }
         binding.safetyDiagnosticsValue.text = getString(
             R.string.safety_diagnostics_template,
+            assistedPersonName,
+            birthday,
             savedContact.ifBlank { getString(R.string.safety_contact_none) },
             normalizedTarget,
             alertsEnabled,
