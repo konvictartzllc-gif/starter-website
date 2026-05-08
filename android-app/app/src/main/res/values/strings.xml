@@ -223,7 +223,7 @@
     <string name="dex_companion_rewards_owned_line">Unlocked premium looks: %1$d</string>
     <string name="dex_shop_offer_item">%1$s %2$dc</string>
     <string name="dex_shop_offer_owned_out">All featured looks owned</string>
-    <string name="dex_shop_offer_line">Shop: %1$s\nPaid play: %2$s</string>
+    <string name="dex_shop_offer_line">Daily special: %1$s\nShop: %2$s\nPaid play: %3$s</string>
     <string name="dex_shop_title">Dex shop</string>
     <string name="dex_shop_balance">Balance: %1$d Dex coins</string>
     <string name="dex_shop_section_title">Choose a section</string>
@@ -233,6 +233,7 @@
     <string name="dex_shop_section_looks_message">Fresh looks for Dex. Featured: %1$s.</string>
     <string name="dex_shop_section_accessories_message">Little extras that change Dex’s vibe fast. Featured: %1$s.</string>
     <string name="dex_shop_section_play_message">Spend a few coins and jump straight into a paid round. Featured: %1$s.</string>
+    <string name="dex_shop_daily_special">Today only: %1$s for %2$dc.</string>
     <string name="dex_shop_owned_suffix">owned</string>
     <string name="dex_shop_equip_suffix">tap to equip</string>
     <string name="dex_shop_buy_suffix">%1$dc to unlock</string>

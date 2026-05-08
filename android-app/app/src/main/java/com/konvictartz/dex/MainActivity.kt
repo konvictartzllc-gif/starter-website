@@ -3220,6 +3220,43 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun dexCoinsLine(): String = getString(R.string.dex_coins_line, dexCoins)
 
+    private fun dexDailySpecialKeys(): List<String> = listOf(
+        skinCosmeticKey(DEX_COMPANION_SKIN_SUNSET),
+        skinCosmeticKey(DEX_COMPANION_SKIN_VIOLET),
+        accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HALO),
+        faceStyleCosmeticKey(DEX_COMPANION_FACE_PIXEL),
+        bubbleStyleCosmeticKey(DEX_COMPANION_BUBBLE_GLOW),
+        "game:${DexMiniGameType.MEMORY.name}",
+        "game:${DexMiniGameType.TRIVIA.name}"
+    )
+
+    private fun discountedDexCost(key: String, baseCost: Int): Int {
+        if (baseCost <= 0) return 0
+        val specialKey = dexDailySpecialKeys()[LocalDate.now().dayOfYear % dexDailySpecialKeys().size]
+        return if (key == specialKey) max(1, baseCost - 1) else baseCost
+    }
+
+    private fun todaysDexShopSpecialLine(): String {
+        val specialKey = dexDailySpecialKeys()[LocalDate.now().dayOfYear % dexDailySpecialKeys().size]
+        val (label, cost) = when (specialKey) {
+            skinCosmeticKey(DEX_COMPANION_SKIN_SUNSET) ->
+                dexSkinLabel(DEX_COMPANION_SKIN_SUNSET) to discountedDexCost(specialKey, dexSkinCost(DEX_COMPANION_SKIN_SUNSET))
+            skinCosmeticKey(DEX_COMPANION_SKIN_VIOLET) ->
+                dexSkinLabel(DEX_COMPANION_SKIN_VIOLET) to discountedDexCost(specialKey, dexSkinCost(DEX_COMPANION_SKIN_VIOLET))
+            accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HALO) ->
+                dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HALO) to discountedDexCost(specialKey, dexAccessoryCost(DEX_COMPANION_ACCESSORY_HALO))
+            faceStyleCosmeticKey(DEX_COMPANION_FACE_PIXEL) ->
+                dexFaceStyleLabel(DEX_COMPANION_FACE_PIXEL) to discountedDexCost(specialKey, dexFaceStyleCost(DEX_COMPANION_FACE_PIXEL))
+            bubbleStyleCosmeticKey(DEX_COMPANION_BUBBLE_GLOW) ->
+                dexBubbleStyleLabel(DEX_COMPANION_BUBBLE_GLOW) to discountedDexCost(specialKey, dexBubbleStyleCost(DEX_COMPANION_BUBBLE_GLOW))
+            "game:${DexMiniGameType.MEMORY.name}" ->
+                dexMiniGameLabel(DexMiniGameType.MEMORY) to discountedDexCost(specialKey, dexMiniGameCost(DexMiniGameType.MEMORY))
+            else ->
+                dexMiniGameLabel(DexMiniGameType.TRIVIA) to discountedDexCost(specialKey, dexMiniGameCost(DexMiniGameType.TRIVIA))
+        }
+        return getString(R.string.dex_shop_daily_special, label, cost)
+    }
+
     private fun dexShopOfferLine(): String {
         val cosmeticOffers = listOf(
             Triple(skinCosmeticKey(DEX_COMPANION_SKIN_SUNSET), dexSkinLabel(DEX_COMPANION_SKIN_SUNSET), dexSkinCost(DEX_COMPANION_SKIN_SUNSET)),
@@ -3227,7 +3264,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             Triple(faceStyleCosmeticKey(DEX_COMPANION_FACE_PIXEL), dexFaceStyleLabel(DEX_COMPANION_FACE_PIXEL), dexFaceStyleCost(DEX_COMPANION_FACE_PIXEL))
         ).filterNot { ownedDexCosmetics.contains(it.first) }
             .take(2)
-            .joinToString(" | ") { (_, label, cost) -> getString(R.string.dex_shop_offer_item, label, cost) }
+            .joinToString(" | ") { (key, label, cost) -> getString(R.string.dex_shop_offer_item, label, discountedDexCost(key, cost)) }
             .ifBlank { getString(R.string.dex_shop_offer_owned_out) }
 
         val gameOffers = listOf(
@@ -3235,30 +3272,31 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DexMiniGameType.MEMORY,
             DexMiniGameType.WOULD_YOU_RATHER
         ).joinToString(" | ") { type ->
-            getString(R.string.dex_shop_offer_item, dexMiniGameLabel(type), dexMiniGameCost(type))
+            getString(R.string.dex_shop_offer_item, dexMiniGameLabel(type), discountedDexCost("game:${type.name}", dexMiniGameCost(type)))
         }
 
-        return getString(R.string.dex_shop_offer_line, cosmeticOffers, gameOffers)
+        return getString(R.string.dex_shop_offer_line, todaysDexShopSpecialLine(), cosmeticOffers, gameOffers)
     }
 
     private fun ensureDexCosmeticOwned(key: String, label: String, cost: Int): Boolean {
+        val finalCost = discountedDexCost(key, cost)
         if (cost <= 0 || ownedDexCosmetics.contains(key)) return true
-        if (dexCoins < cost) {
+        if (dexCoins < finalCost) {
             binding.homeStyleMessage.text =
-                getString(R.string.dex_cosmetic_need_coins, label, cost, dexCoins)
+                getString(R.string.dex_cosmetic_need_coins, label, finalCost, dexCoins)
             setDexCompanionState(
                 DEX_COMPANION_STATE_PENDING,
-                bubbleOverride = getString(R.string.dex_cosmetic_need_coins_bubble, cost),
+                bubbleOverride = getString(R.string.dex_cosmetic_need_coins_bubble, finalCost),
                 revertAfterMs = 2200L
             )
             return false
         }
-        dexCoins -= cost
+        dexCoins -= finalCost
         ownedDexCosmetics.add(key)
         saveDexGameStats()
         persistHomeLook()
         binding.homeStyleMessage.text =
-            getString(R.string.dex_cosmetic_unlocked, label, cost, dexCoins)
+            getString(R.string.dex_cosmetic_unlocked, label, finalCost, dexCoins)
         setDexCompanionState(
             DEX_COMPANION_STATE_EXCITED,
             bubbleOverride = getString(R.string.dex_cosmetic_unlocked_bubble, label),
@@ -3275,7 +3313,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun maybeChargeDexGameEntry(type: DexMiniGameType, announce: Boolean): Boolean {
-        val cost = dexMiniGameCost(type)
+        val cost = discountedDexCost("game:${type.name}", dexMiniGameCost(type))
         if (cost <= 0) return true
         val label = dexMiniGameLabel(type)
         if (dexCoins < cost) {
@@ -3358,7 +3396,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             Triple(bubbleStyleCosmeticKey(DEX_COMPANION_BUBBLE_GLOW), dexBubbleStyleLabel(DEX_COMPANION_BUBBLE_GLOW), dexBubbleStyleCost(DEX_COMPANION_BUBBLE_GLOW))
         )
         val featured = candidates.firstOrNull { !ownedDexCosmetics.contains(it.first) } ?: candidates.first()
-        return "${featured.second} ${featured.third}c"
+        return "${featured.second} ${discountedDexCost(featured.first, featured.third)}c"
     }
 
     private fun featuredAccessoriesShopItem(): String {
@@ -3368,7 +3406,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             Triple(accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HEADPHONES), dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HEADPHONES), dexAccessoryCost(DEX_COMPANION_ACCESSORY_HEADPHONES))
         )
         val featured = candidates.firstOrNull { !ownedDexCosmetics.contains(it.first) } ?: candidates.first()
-        return "${featured.second} ${featured.third}c"
+        return "${featured.second} ${discountedDexCost(featured.first, featured.third)}c"
     }
 
     private fun featuredPlayShopItem(): String {
@@ -3379,7 +3417,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
         val favorite = favoriteDexMiniGame()
         val featured = candidates.firstOrNull { it != favorite } ?: candidates.first()
-        return "${dexMiniGameLabel(featured)} ${dexMiniGameCost(featured)}c"
+        return "${dexMiniGameLabel(featured)} ${discountedDexCost("game:${featured.name}", dexMiniGameCost(featured))}c"
     }
 
     private fun openDexShopSectionDialog(title: String, message: String, entries: List<DexShopEntry>) {
@@ -3471,10 +3509,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         equip: () -> Unit,
     ): DexShopEntry {
         val owned = ownedDexCosmetics.contains(key)
+        val finalCost = discountedDexCost(key, cost)
         val detail = if (owned) {
             getString(R.string.dex_shop_equip_suffix)
         } else {
-            getString(R.string.dex_shop_buy_suffix, cost)
+            getString(R.string.dex_shop_buy_suffix, finalCost)
         }
         return DexShopEntry(label, detail) {
             if (!ensureDexCosmeticOwned(key, label, cost)) return@DexShopEntry
@@ -3489,7 +3528,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun gameShopEntry(type: DexMiniGameType, start: () -> Unit): DexShopEntry {
         val label = dexMiniGameLabel(type)
-        val cost = dexMiniGameCost(type)
+        val cost = discountedDexCost("game:${type.name}", dexMiniGameCost(type))
         return DexShopEntry(label, getString(R.string.dex_shop_play_suffix, cost)) {
             start()
         }
