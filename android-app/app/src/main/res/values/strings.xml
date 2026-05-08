@@ -737,6 +737,8 @@
     <string name="call_message_draft_detail">Approve this and Android will open a text draft asking %1$s to send their message.</string>
     <string name="call_message_sms_body">I am tied up right now. Please text me the message you wanted to leave and I will get back to you as soon as I can.</string>
     <string name="call_message_answer_prompt">This is Dex. Who is calling, and what message would you like to leave?</string>
+    <string name="call_message_answer_retry">I did not catch enough of that. Please say your name and your message one more time.</string>
+    <string name="call_message_answer_give_up">I still could not catch the message clearly. Please text the message, and I will pass it along. Goodbye.</string>
     <string name="call_message_saved">I saved the message from %1$s.</string>
     <string name="answer_call">Answer</string>
     <string name="take_message_call">Take message</string>
