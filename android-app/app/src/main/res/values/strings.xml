@@ -367,8 +367,8 @@
     <string name="safety_check_in_text">Hey, Dex is checking in on you. Take a breath, drink some water if you can, and open Dex if you want support.</string>
     <string name="safety_check_in_channel_name">Dex safety check-ins</string>
     <string name="safety_check_in_channel_description">Supportive follow-up reminders after hard moments.</string>
-    <string name="safety_emergency_preview_with_contact">If %1$s talks about self-harm or harm to another person, Dex will slow down, respond with support, and use the saved emergency plan. Trusted contact: %2$s. Contact alerts: %3$s. Follow-up check-ins: %4$s.</string>
-    <string name="safety_emergency_preview_without_contact">If %1$s talks about self-harm or harm to another person, Dex will slow down, respond with support, and guide them toward urgent help. Trusted contact: not set. Contact alerts: %2$s. Follow-up check-ins: %3$s.</string>
+    <string name="safety_emergency_preview_with_contact">Emergency plan preview. Dex is assisting %1$s. Birthday: %2$s. Trusted contact: %3$s. Contact alerts: %4$s. Follow-up check-ins: %5$s. If %1$s talks about self-harm or harm to another person, Dex will slow down, respond with support, and use the saved emergency plan.</string>
+    <string name="safety_emergency_preview_without_contact">Emergency plan preview. Dex is assisting %1$s. Birthday: %2$s. Trusted contact: not set. Contact alerts: %3$s. Follow-up check-ins: %4$s. If %1$s talks about self-harm or harm to another person, Dex will slow down, respond with support, and guide them toward urgent help.</string>
     <string name="safety_preview_enabled">enabled</string>
     <string name="safety_preview_disabled">disabled</string>
     <string name="life_sections_title">Life sections</string>

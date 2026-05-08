@@ -2651,6 +2651,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun previewEmergencyPlan() {
         val personName = resolveEmergencyPersonName()
+        val birthday = binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty()
+            .ifBlank { getString(R.string.safety_birthday_unknown) }
         val contact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
         val contactAlerts = if (binding.safetyNotifyTrustedContactSwitch.isChecked) {
             getString(R.string.safety_preview_enabled)
@@ -2663,9 +2665,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             getString(R.string.safety_preview_disabled)
         }
         val reply = if (contact.isNotBlank()) {
-            getString(R.string.safety_emergency_preview_with_contact, personName, contact, contactAlerts, followUps)
+            getString(R.string.safety_emergency_preview_with_contact, personName, birthday, contact, contactAlerts, followUps)
         } else {
-            getString(R.string.safety_emergency_preview_without_contact, personName, contactAlerts, followUps)
+            getString(R.string.safety_emergency_preview_without_contact, personName, birthday, contactAlerts, followUps)
         }
         binding.safetyProfileMessage.text = reply
         binding.lastReplyValue.text = reply
