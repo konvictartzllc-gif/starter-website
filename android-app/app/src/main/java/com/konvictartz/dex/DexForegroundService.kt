@@ -74,6 +74,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var pendingReminderCallTarget: String? = null
     private var pendingReminderTextTarget: String? = null
     private var pendingReminderTextBody: String? = null
+    private var backgroundRecognizerRecoveryAttempts = 0
     private var wakeWordEngine: DexWakeWordEngine? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -183,13 +184,17 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     val mode = activeListenMode
                     activeListenMode = null
                     if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                        backgroundRecognizerRecoveryAttempts = 0
                         repromptBackgroundListenMode(mode)
+                    } else {
+                        recoverBackgroundRecognizer(mode)
                     }
                 }
 
                 override fun onResults(results: Bundle?) {
                     val mode = activeListenMode
                     activeListenMode = null
+                    backgroundRecognizerRecoveryAttempts = 0
                     val transcripts = results
                         ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         .orEmpty()
@@ -197,6 +202,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 }
             })
         }
+    }
+
+    private fun recreateSpeechRecognizer() {
+        runCatching { speechRecognizer?.destroy() }
+        speechRecognizer = null
+        setupSpeechRecognizer()
     }
 
     override fun onInit(status: Int) {
@@ -1354,7 +1365,23 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             recognizer.startListening(intent)
         }.onFailure {
             activeListenMode = null
+            recoverBackgroundRecognizer(mode)
         }
+    }
+
+    private fun recoverBackgroundRecognizer(mode: BackgroundListenMode?) {
+        if (mode == null) return
+        if (!shouldKeepServiceAlive()) return
+        if (backgroundRecognizerRecoveryAttempts >= MAX_BACKGROUND_RECOGNIZER_RECOVERY_ATTEMPTS) {
+            backgroundRecognizerRecoveryAttempts = 0
+            repromptBackgroundListenMode(mode)
+            return
+        }
+        backgroundRecognizerRecoveryAttempts += 1
+        mainHandler.postDelayed({
+            recreateSpeechRecognizer()
+            startBackgroundListening(mode)
+        }, BACKGROUND_RECOGNIZER_RECOVERY_DELAY_MS)
     }
 
     @Suppress("DEPRECATION")
@@ -1440,5 +1467,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val KEY_REMOTE_REPLY_TEXT = "dex_remote_reply_text"
         private const val DEX_TTS_BACKGROUND_RATE = 0.88f
         private const val DEX_TTS_PITCH = 0.95f
+        private const val BACKGROUND_RECOGNIZER_RECOVERY_DELAY_MS = 900L
+        private const val MAX_BACKGROUND_RECOGNIZER_RECOVERY_ATTEMPTS = 2
     }
 }
