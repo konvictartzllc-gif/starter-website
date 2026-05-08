@@ -3978,6 +3978,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return true
         }
 
+        handleTextReminderIntent(message)?.let { reply ->
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return true
+        }
+
         handleCallReminderIntent(message)?.let { reply ->
             binding.conversationStatus.text = reply
             binding.lastReplyValue.text = reply
@@ -4107,6 +4114,46 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         val spokenDateTime = formatReminderDateTime(reminderAt)
         return getString(R.string.call_reminder_set, reminderTarget, spokenDateTime)
+    }
+
+    private fun handleTextReminderIntent(message: String): String? {
+        val resolvedMessage = resolveAliasesInSentence(message.trim())
+        val normalized = resolvedMessage.lowercase(Locale.US)
+        val reminderIntent =
+            normalized.contains("remind me") ||
+                normalized.contains("set a reminder") ||
+                normalized.contains("create a reminder") ||
+                normalized.contains("make a reminder")
+        if (!reminderIntent || !(normalized.contains("text ") || normalized.contains("message "))) return null
+
+        val match = listOf(
+            Regex(".*(?:text|message)\\s+(.+?)\\s+(?:saying|that|message|tell)\\s+(.+)$", RegexOption.IGNORE_CASE),
+            Regex(".*(?:text|message)\\s+(.+?)\\s+(.+)$", RegexOption.IGNORE_CASE)
+        ).firstNotNullOfOrNull { it.find(resolvedMessage) } ?: return null
+
+        val rawTarget = match.groupValues[1].trim()
+        val reminderBody = match.groupValues[2].trim().trimEnd('.', '!', '?')
+        if (rawTarget.isBlank() || reminderBody.isBlank()) return null
+
+        val reminderAt = inferDateTimeFromCommand(resolvedMessage)
+        val targetContact =
+            findExactPhoneContactByName(resolveContactAlias(rawTarget))
+                ?: findPhoneContactByName(resolveContactAlias(rawTarget))
+                ?: return null
+
+        val title = getString(R.string.text_reminder_title, targetContact.displayName)
+        val text = getString(R.string.text_reminder_text, targetContact.displayName, reminderBody)
+        val triggerAtMillis = reminderAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        DexSafetyCheckInScheduler.scheduleOneTimeCheckInAt(
+            context = this,
+            triggerAtMillis = triggerAtMillis,
+            title = title,
+            text = text,
+            voiceCheckIn = true
+        )
+
+        val spokenDateTime = formatReminderDateTime(reminderAt)
+        return getString(R.string.text_reminder_set, targetContact.displayName, spokenDateTime)
     }
 
     private fun extractReminderCallTarget(message: String): String {

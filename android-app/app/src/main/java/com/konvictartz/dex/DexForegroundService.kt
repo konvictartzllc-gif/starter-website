@@ -72,6 +72,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var pendingReminderTitle: String? = null
     private var pendingReminderText: String? = null
     private var pendingReminderCallTarget: String? = null
+    private var pendingReminderTextTarget: String? = null
+    private var pendingReminderTextBody: String? = null
     private var wakeWordEngine: DexWakeWordEngine? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -528,11 +530,17 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         pendingReminderTitle = title
         pendingReminderText = text
         pendingReminderCallTarget = extractReminderCallTarget(title, text)
+        val reminderTextDetails = extractReminderTextDetails(title, text)
+        pendingReminderTextTarget = reminderTextDetails?.first
+        pendingReminderTextBody = reminderTextDetails?.second
         mainHandler.postDelayed({
             speakAndThenListen(
-                pendingReminderCallTarget?.let {
-                    getString(R.string.call_reminder_check_in_prompt, it)
-                } ?: getString(R.string.reminder_check_in_prompt, title, text),
+                when {
+                    pendingReminderCallTarget != null -> getString(R.string.call_reminder_check_in_prompt, pendingReminderCallTarget)
+                    pendingReminderTextTarget != null && pendingReminderTextBody != null ->
+                        getString(R.string.text_reminder_check_in_prompt, pendingReminderTextTarget, pendingReminderTextBody)
+                    else -> getString(R.string.reminder_check_in_prompt, title, text)
+                },
                 BackgroundListenMode.REMINDER_CHECK_IN
             )
         }, 700L)
@@ -722,6 +730,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 speakAndThenListen(
                     if (pendingReminderCallTarget != null) {
                         getString(R.string.call_reminder_check_in_retry)
+                    } else if (pendingReminderTextTarget != null && pendingReminderTextBody != null) {
+                        getString(R.string.text_reminder_check_in_retry)
                     } else {
                         getString(R.string.reminder_check_in_retry)
                     },
@@ -833,6 +843,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleBackgroundReminderCheckIn(normalized: String): Boolean {
         val reminderCallTarget = pendingReminderCallTarget
+        val reminderTextTarget = pendingReminderTextTarget
+        val reminderTextBody = pendingReminderTextBody
         return when {
             reminderCallTarget != null &&
                 (isAffirmativeCommand(normalized) ||
@@ -843,12 +855,21 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 placeReminderCall(reminderCallTarget)
                 true
             }
+            reminderTextTarget != null && !reminderTextBody.isNullOrBlank() &&
+                (isAffirmativeCommand(normalized) ||
+                    normalized.contains("text now") ||
+                    normalized.contains("send it") ||
+                    normalized.contains("send the text")) -> {
+                clearPendingReminderContext()
+                sendReminderText(reminderTextTarget, reminderTextBody)
+                true
+            }
             normalized.contains("check back") ||
                 normalized.contains("remind me again") ||
                 normalized.contains("another reminder") ||
                 normalized.contains("ten minutes") ||
                 normalized.contains("later") ||
-                (reminderCallTarget == null && isAffirmativeCommand(normalized)) -> {
+                (reminderCallTarget == null && reminderTextTarget == null && isAffirmativeCommand(normalized)) -> {
                 val title = pendingReminderTitle ?: getString(R.string.learning_reminder_title)
                 val text = pendingReminderText ?: getString(R.string.learning_reminder_text)
                 clearPendingReminderContext()
@@ -889,10 +910,22 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         return null
     }
 
+    private fun extractReminderTextDetails(title: String, text: String): Pair<String, String>? {
+        Regex("^Text\\s+(.+)$", RegexOption.IGNORE_CASE).find(title.trim())?.let { titleMatch ->
+            val target = titleMatch.groupValues.getOrNull(1)?.trim().orEmpty()
+            val textMatch = Regex("^Reminder to text\\s+(.+?):\\s+(.+?)\\.?$", RegexOption.IGNORE_CASE).find(text.trim())
+            val body = textMatch?.groupValues?.getOrNull(2)?.trim().orEmpty()
+            if (target.isNotBlank() && body.isNotBlank()) return target to body
+        }
+        return null
+    }
+
     private fun clearPendingReminderContext() {
         pendingReminderTitle = null
         pendingReminderText = null
         pendingReminderCallTarget = null
+        pendingReminderTextTarget = null
+        pendingReminderTextBody = null
     }
 
     private fun placeReminderCall(target: String) {
@@ -915,6 +948,15 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         } catch (_: Exception) {
             speakShortStatus(getString(R.string.action_open_failed))
         }
+    }
+
+    private fun sendReminderText(target: String, body: String) {
+        val phoneNumber = findPhoneNumberByContactName(target)
+        if (phoneNumber.isNullOrBlank()) {
+            speakShortStatus(getString(R.string.contact_not_found_phone, target))
+            return
+        }
+        sendPhoneSms(phoneNumber, body, target)
     }
 
     private fun isAffirmativeCommand(normalized: String): Boolean {
