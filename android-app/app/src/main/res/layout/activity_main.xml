@@ -303,13 +303,49 @@
                     android:orientation="vertical"
                     android:padding="18dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/dashboard_overline"
-                        android:textColor="@color/dex_accent"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dashboard_overline"
+                            android:textColor="@color/dex_accent"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <Space
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1" />
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="bottom"
+                            android:orientation="horizontal">
+
+                            <View
+                                android:layout_width="10dp"
+                                android:layout_height="20dp"
+                                android:background="@drawable/dashboard_signal_bar_tall" />
+
+                            <View
+                                android:layout_width="10dp"
+                                android:layout_height="16dp"
+                                android:layout_marginStart="4dp"
+                                android:background="@drawable/dashboard_signal_bar_mid" />
+
+                            <View
+                                android:layout_width="10dp"
+                                android:layout_height="12dp"
+                                android:layout_marginStart="4dp"
+                                android:background="@drawable/dashboard_signal_bar_short" />
+                        </LinearLayout>
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/dashboardWelcome"
@@ -362,6 +398,15 @@
                             android:textSize="13sp"
                             android:textStyle="bold" />
                     </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="@string/dashboard_creative_footer"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

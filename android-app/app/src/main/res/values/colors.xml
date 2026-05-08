@@ -5,7 +5,14 @@
     <color name="dex_panel_strong">#131A24</color>
     <color name="dex_panel_elevated">#222B3A</color>
     <color name="dex_border">#2C3645</color>
+    <color name="dex_border_soft">#4D6A89</color>
     <color name="dex_accent">#6ED0FF</color>
     <color name="dex_accent_soft">#18384A</color>
+    <color name="dex_hero_wash_start">#24466E</color>
+    <color name="dex_hero_wash_end">#14273A</color>
+    <color name="dex_hero_band">#111A25</color>
+    <color name="dex_metric_highlight">#2A4D69</color>
+    <color name="dex_chip_start">#204A62</color>
+    <color name="dex_chip_end">#162A39</color>
     <color name="dex_text_secondary">#B7C2D0</color>
 </resources>

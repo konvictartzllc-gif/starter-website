@@ -31,6 +31,7 @@
     <string name="dashboard_title">Your dashboard</string>
     <string name="dashboard_overline">Workspace overview</string>
     <string name="dashboard_professional_summary">Keep your account, voice tools, safety controls, and learning activity in one organized place.</string>
+    <string name="dashboard_creative_footer">Voice, learning, safety, and planning all tuned into one home base.</string>
     <string name="dashboard_summary_user">Your everyday Dex space for conversations, learning, and support.</string>
     <string name="dashboard_summary_affiliate">Your affiliate workspace for learning progress, referrals, and business visibility.</string>
     <string name="dashboard_summary_admin">Your admin workspace for operations, safety handling, and platform controls.</string>
