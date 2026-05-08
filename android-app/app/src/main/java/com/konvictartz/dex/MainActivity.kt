@@ -355,6 +355,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexTriviaPlays = 0
     private var dexMemoryPlays = 0
     private var dexWouldYouRatherPlays = 0
+    private var dexGamesChallengeCompletedDate = ""
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -1311,6 +1312,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexTriviaPlays = prefs.getInt(KEY_DEX_GAMES_TRIVIA_PLAYS, 0)
         dexMemoryPlays = prefs.getInt(KEY_DEX_GAMES_MEMORY_PLAYS, 0)
         dexWouldYouRatherPlays = prefs.getInt(KEY_DEX_GAMES_WYR_PLAYS, 0)
+        dexGamesChallengeCompletedDate = prefs.getString(KEY_DEX_GAMES_CHALLENGE_DONE_DATE, "").orEmpty()
         updateAdvancedStyleUi(currentThemePreset == "custom")
         updateDexCompanionControls()
         loadDashboardSections()
@@ -2991,6 +2993,47 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun dexMiniGameLabel(type: DexMiniGameType): String = when (type) {
+        DexMiniGameType.GUESS_NUMBER -> getString(R.string.dex_games_guess_number)
+        DexMiniGameType.RIDDLE -> getString(R.string.dex_games_riddle)
+        DexMiniGameType.TRIVIA -> getString(R.string.dex_games_trivia)
+        DexMiniGameType.MEMORY -> getString(R.string.dex_games_memory)
+        DexMiniGameType.WOULD_YOU_RATHER -> getString(R.string.dex_games_would_you_rather)
+        DexMiniGameType.NONE -> getString(R.string.dex_games_title)
+    }
+
+    private fun todaysDexChallengeGame(): DexMiniGameType {
+        val rotation = listOf(
+            DexMiniGameType.GUESS_NUMBER,
+            DexMiniGameType.RIDDLE,
+            DexMiniGameType.TRIVIA,
+            DexMiniGameType.MEMORY,
+            DexMiniGameType.WOULD_YOU_RATHER
+        )
+        val favoriteOffset = when (favoriteDexMiniGame()) {
+            DexMiniGameType.RIDDLE -> 1
+            DexMiniGameType.TRIVIA -> 2
+            DexMiniGameType.MEMORY -> 3
+            DexMiniGameType.WOULD_YOU_RATHER -> 4
+            else -> 0
+        }
+        val index = (LocalDate.now().dayOfYear + favoriteOffset) % rotation.size
+        return rotation[index]
+    }
+
+    private fun isTodayDexChallengeComplete(): Boolean {
+        return dexGamesChallengeCompletedDate == LocalDate.now().toString()
+    }
+
+    private fun dexGamesChallengeLine(): String {
+        val challengeLabel = dexMiniGameLabel(todaysDexChallengeGame())
+        return if (isTodayDexChallengeComplete()) {
+            getString(R.string.dex_games_challenge_done, challengeLabel)
+        } else {
+            getString(R.string.dex_games_challenge_open, challengeLabel)
+        }
+    }
+
     private fun dexGamesProfileLine(): String {
         val favorite = favoriteDexMiniGameLabel()
         return if (favorite.isNullOrBlank()) {
@@ -3001,7 +3044,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun dexGamesStatusSummary(base: String): String {
-        return "$base\n${dexGamesScoreLine()}\n${dexGamesProfileLine()}"
+        return "$base\n${dexGamesScoreLine()}\n${dexGamesProfileLine()}\n${dexGamesChallengeLine()}"
     }
 
     private fun saveDexGameStats() {
@@ -3016,6 +3059,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putInt(KEY_DEX_GAMES_TRIVIA_PLAYS, dexTriviaPlays)
             .putInt(KEY_DEX_GAMES_MEMORY_PLAYS, dexMemoryPlays)
             .putInt(KEY_DEX_GAMES_WYR_PLAYS, dexWouldYouRatherPlays)
+            .putString(KEY_DEX_GAMES_CHALLENGE_DONE_DATE, dexGamesChallengeCompletedDate)
             .apply()
     }
 
@@ -3028,6 +3072,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DexMiniGameType.WOULD_YOU_RATHER -> dexWouldYouRatherPlays += 1
             DexMiniGameType.NONE -> Unit
         }
+        saveDexGameStats()
+    }
+
+    private fun recordDexChallengeCompletion(type: DexMiniGameType) {
+        if (type != todaysDexChallengeGame() || isTodayDexChallengeComplete()) return
+        dexGamesChallengeCompletedDate = LocalDate.now().toString()
         saveDexGameStats()
     }
 
@@ -3212,7 +3262,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             guess > dexGuessTarget -> getString(R.string.dex_game_guess_high, dexGuessAttempts)
             else -> getString(R.string.dex_game_guess_correct, dexGuessAttempts)
         }
-        if (guess == dexGuessTarget) recordDexGameResult(correct = true)
+        if (guess == dexGuessTarget) {
+            recordDexGameResult(correct = true)
+            recordDexChallengeCompletion(DexMiniGameType.GUESS_NUMBER)
+        }
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         binding.dexGameInput.setText("")
         setDexCompanionState(
@@ -3232,7 +3285,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else {
             getString(R.string.dex_game_riddle_try_again)
         }
-        if (isCorrect) recordDexGameResult(correct = true) else breakDexGameStreak()
+        if (isCorrect) {
+            recordDexGameResult(correct = true)
+            recordDexChallengeCompletion(DexMiniGameType.RIDDLE)
+        } else breakDexGameStreak()
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         if (isCorrect) {
             binding.dexGameInput.setText("")
@@ -3256,7 +3312,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else {
             getString(R.string.dex_game_trivia_try_again)
         }
-        if (isCorrect) recordDexGameResult(correct = true) else breakDexGameStreak()
+        if (isCorrect) {
+            recordDexGameResult(correct = true)
+            recordDexChallengeCompletion(DexMiniGameType.TRIVIA)
+        } else breakDexGameStreak()
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         if (isCorrect) {
             binding.dexGameInput.setText("")
@@ -3291,7 +3350,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else {
             getString(R.string.dex_game_memory_try_again, currentMemorySequence.joinToString(", "))
         }
-        if (isCorrect) recordDexGameResult(correct = true) else breakDexGameStreak()
+        if (isCorrect) {
+            recordDexGameResult(correct = true)
+            recordDexChallengeCompletion(DexMiniGameType.MEMORY)
+        } else breakDexGameStreak()
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         if (isCorrect) {
             binding.dexGameInput.setText("")
@@ -3309,6 +3371,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val trimmed = answer.trim()
         val reply = getString(R.string.dex_game_wyr_reply, trimmed, round.followUp)
         recordDexGameResult(correct = true, countsAsScoredRound = false)
+        recordDexChallengeCompletion(DexMiniGameType.WOULD_YOU_RATHER)
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         binding.dexGameInput.setText("")
         setDexCompanionState(
@@ -3332,6 +3395,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DexMiniGameType.MEMORY -> startMemoryGame(announce)
             DexMiniGameType.WOULD_YOU_RATHER -> startWouldYouRatherGame(announce)
             DexMiniGameType.GUESS_NUMBER, DexMiniGameType.NONE, null -> startGuessNumberGame(announce)
+        }
+    }
+
+    private fun startTodaysDexChallenge(announce: Boolean = false) {
+        when (todaysDexChallengeGame()) {
+            DexMiniGameType.RIDDLE -> startRiddleGame(announce)
+            DexMiniGameType.TRIVIA -> startTriviaGame(announce)
+            DexMiniGameType.MEMORY -> startMemoryGame(announce)
+            DexMiniGameType.WOULD_YOU_RATHER -> startWouldYouRatherGame(announce)
+            DexMiniGameType.GUESS_NUMBER, DexMiniGameType.NONE -> startGuessNumberGame(announce)
         }
     }
 
@@ -6040,6 +6113,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         phrases += "next round"
         phrases += "new round"
         phrases += "stop game"
+        phrases += "today's challenge"
+        phrases += "todays challenge"
+        phrases += "play today's challenge"
         return phrases.toList()
     }
 
@@ -6374,6 +6450,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized == "let's play a game"
         ) {
             startFavoriteDexMiniGame(announce = true)
+            return true
+        }
+
+        if (
+            normalized == "today's challenge" ||
+            normalized == "todays challenge" ||
+            normalized == "what is today's challenge" ||
+            normalized == "what's today's challenge" ||
+            normalized == "play today's challenge" ||
+            normalized == "play todays challenge"
+        ) {
+            if (normalized.startsWith("play ")) {
+                startTodaysDexChallenge(announce = true)
+            } else {
+                val reply = dexGamesChallengeLine()
+                binding.dexGameStatus.text = dexGamesStatusSummary(reply)
+                announceDexMiniGameReply(reply)
+            }
             return true
         }
 
@@ -9570,6 +9664,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_GAMES_TRIVIA_PLAYS = "dex_games_trivia_plays"
         const val KEY_DEX_GAMES_MEMORY_PLAYS = "dex_games_memory_plays"
         const val KEY_DEX_GAMES_WYR_PLAYS = "dex_games_wyr_plays"
+        const val KEY_DEX_GAMES_CHALLENGE_DONE_DATE = "dex_games_challenge_done_date"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"

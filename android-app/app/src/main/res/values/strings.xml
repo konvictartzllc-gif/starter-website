@@ -332,6 +332,8 @@
     <string name="dex_games_score_line">Score %1$d/%2$d | Streak %3$d | Best %4$d</string>
     <string name="dex_games_profile_line_default">Dex is still learning your play style.</string>
     <string name="dex_games_profile_line_favorite">Play profile: you keep coming back to %1$s.</string>
+    <string name="dex_games_challenge_open">Daily challenge: complete one round of %1$s today.</string>
+    <string name="dex_games_challenge_done">Daily challenge complete: you already cleared %1$s today.</string>
     <string name="dex_games_answer_hint">Your answer</string>
     <string name="dex_game_submit">Submit</string>
     <string name="dex_game_share_answer">Share answer</string>
