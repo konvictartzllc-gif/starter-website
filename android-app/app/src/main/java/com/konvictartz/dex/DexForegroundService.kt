@@ -23,7 +23,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.telephony.SmsManager
 import android.telecom.TelecomManager
-import android.telephony.PhoneStateListener
+import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -54,7 +54,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var telephonyManager: TelephonyManager? = null
     private var telecomManager: TelecomManager? = null
     private var audioManager: AudioManager? = null
-    private var phoneStateListener: PhoneStateListener? = null
+    private var callStateCallback: DexCallStateCallback? = null
+    @Suppress("DEPRECATION")
+    private var legacyPhoneStateListener: LegacyCallStateListener? = null
     private var textToSpeech: TextToSpeech? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private var ttsReady = false
@@ -68,6 +70,21 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var awaitingSmsReplyChoice = false
     private var wakeWordEngine: DexWakeWordEngine? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    private inner class DexCallStateCallback : TelephonyCallback(), TelephonyCallback.CallStateListener {
+        override fun onCallStateChanged(state: Int) {
+            handleCallStateChanged(state, null)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private inner class LegacyCallStateListener : android.telephony.PhoneStateListener() {
+        override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+            super.onCallStateChanged(state, phoneNumber)
+            handleCallStateChanged(state, phoneNumber)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -83,6 +100,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 mainHandler.post { startPendingBackgroundListening() }
             }
 
+            @Deprecated("Deprecated in Java")
             override fun onError(utteranceId: String?) {
                 mainHandler.post { startPendingBackgroundListening() }
             }
@@ -277,28 +295,47 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     @SuppressLint("MissingPermission")
-    @Suppress("DEPRECATION")
     private fun startCallMonitoring() {
-        if (phoneStateListener != null) return
         val manager = telephonyManager ?: return
-        val listener = object : PhoneStateListener() {
-            override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-                super.onCallStateChanged(state, phoneNumber)
-                handleCallStateChanged(state, phoneNumber)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (callStateCallback != null) return
+            val callback = DexCallStateCallback()
+            callStateCallback = callback
+            manager.registerTelephonyCallback(ContextCompat.getMainExecutor(this), callback)
+        } else {
+            startLegacyCallMonitoring(manager)
         }
-        phoneStateListener = listener
-        manager.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
     }
 
-    @Suppress("DEPRECATION")
     private fun stopCallMonitoring() {
         val manager = telephonyManager ?: return
-        phoneStateListener?.let { manager.listen(it, PhoneStateListener.LISTEN_NONE) }
-        phoneStateListener = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            callStateCallback?.let { callback ->
+                manager.unregisterTelephonyCallback(callback)
+            }
+            callStateCallback = null
+        } else {
+            stopLegacyCallMonitoring(manager)
+        }
         lastCallState = TelephonyManager.CALL_STATE_IDLE
         lastCaller = "Unknown caller"
         currentCallWasAnswered = false
+    }
+
+    @Suppress("DEPRECATION")
+    private fun startLegacyCallMonitoring(manager: TelephonyManager) {
+        if (legacyPhoneStateListener != null) return
+        val listener = LegacyCallStateListener()
+        legacyPhoneStateListener = listener
+        manager.listen(listener, android.telephony.PhoneStateListener.LISTEN_CALL_STATE)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun stopLegacyCallMonitoring(manager: TelephonyManager) {
+        legacyPhoneStateListener?.let { listener ->
+            manager.listen(listener, android.telephony.PhoneStateListener.LISTEN_NONE)
+        }
+        legacyPhoneStateListener = null
     }
 
     private fun handleCallStateChanged(state: Int, phoneNumber: String?) {
