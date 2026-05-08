@@ -45,6 +45,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.button.MaterialButton
@@ -1238,6 +1239,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         else -> getColorCompat(R.color.dex_user_stroke)
     }
 
+    private fun sectionEdgeColor(roleKey: String, active: Boolean): Int {
+        val base = when (roleKey) {
+            "admin" -> getColorCompat(if (active) R.color.dex_admin_signal else R.color.dex_admin_stroke)
+            "affiliate" -> getColorCompat(if (active) R.color.dex_affiliate_signal else R.color.dex_affiliate_stroke)
+            else -> getColorCompat(if (active) R.color.dex_user_signal else R.color.dex_user_stroke)
+        }
+        return ColorUtils.setAlphaComponent(base, if (active) 170 else 118)
+    }
+
+    private fun roleCardElevationPx(roleKey: String, active: Boolean): Float {
+        val dp = when (roleKey) {
+            "admin" -> if (active) 5.5f else 3.5f
+            "affiliate" -> if (active) 5f else 3f
+            else -> if (active) 4.5f else 2.5f
+        }
+        return dp * resources.displayMetrics.density
+    }
+
     private fun strokeWidthDp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt().coerceAtLeast(1)
 
@@ -1420,8 +1439,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .scaleY(1f)
             .setDuration(motion.pulseDurationMs)
             .start()
-        card.strokeColor = sectionSignalColor(roleKey)
+        card.strokeColor = sectionEdgeColor(roleKey, active = true)
         card.strokeWidth = strokeWidthDp(2)
+        card.animate().cancel()
+        card.animate()
+            .translationZ(roleCardElevationPx(roleKey, active = true))
+            .setDuration(motion.pulseDurationMs)
+            .start()
         startLoadingPulse(label)
     }
 
@@ -1440,8 +1464,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .alpha(0.84f)
             .setDuration((motion.pulseDurationMs * 0.8f).toLong())
             .start()
-        card.strokeColor = sectionLiveColor(roleKey)
+        card.strokeColor = sectionEdgeColor(roleKey, active = false)
         card.strokeWidth = strokeWidthDp(1)
+        card.animate().cancel()
+        card.animate()
+            .translationZ(roleCardElevationPx(roleKey, active = false))
+            .setDuration((motion.pulseDurationMs * 0.8f).toLong())
+            .start()
     }
 
     private fun showDashboardLoadingStates() {
@@ -1599,6 +1628,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         allRoleCards.forEach { card ->
             card.setCardBackgroundColor(defaultPanel)
             card.strokeColor = defaultStroke
+            card.cardElevation = 0f
+            card.translationZ = 0f
         }
 
         val roleCards = when (roleKey) {
@@ -1643,7 +1674,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         roleCards.forEach { card ->
             card.setCardBackgroundColor(panelColor)
-            card.strokeColor = strokeColor
+            card.strokeColor = sectionEdgeColor(roleKey, active = false)
+            card.cardElevation = roleCardElevationPx(roleKey, active = false)
+            card.translationZ = roleCardElevationPx(roleKey, active = false)
         }
         applyRoleOutputStripMood(roleKey)
     }
