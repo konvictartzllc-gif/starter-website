@@ -187,6 +187,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                         backgroundRecognizerRecoveryAttempts = 0
                         repromptBackgroundListenMode(mode)
                     } else {
+                        logBackgroundRecognizerEvent(
+                            "${mode?.diagnosticLabel() ?: "background listening"} hit ${backgroundSpeechErrorLabel(error)}"
+                        )
                         recoverBackgroundRecognizer(mode)
                     }
                 }
@@ -1365,6 +1368,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             recognizer.startListening(intent)
         }.onFailure {
             activeListenMode = null
+            logBackgroundRecognizerEvent("${mode.diagnosticLabel()} restart failed, trying again")
             recoverBackgroundRecognizer(mode)
         }
     }
@@ -1374,14 +1378,47 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         if (!shouldKeepServiceAlive()) return
         if (backgroundRecognizerRecoveryAttempts >= MAX_BACKGROUND_RECOGNIZER_RECOVERY_ATTEMPTS) {
             backgroundRecognizerRecoveryAttempts = 0
+            logBackgroundRecognizerEvent("${mode.diagnosticLabel()} recovery limit reached")
             repromptBackgroundListenMode(mode)
             return
         }
         backgroundRecognizerRecoveryAttempts += 1
+        val attempt = backgroundRecognizerRecoveryAttempts
         mainHandler.postDelayed({
             recreateSpeechRecognizer()
+            logBackgroundRecognizerEvent(
+                "restarted recognizer for ${mode.diagnosticLabel()} (attempt $attempt of $MAX_BACKGROUND_RECOGNIZER_RECOVERY_ATTEMPTS)"
+            )
             startBackgroundListening(mode)
         }, BACKGROUND_RECOGNIZER_RECOVERY_DELAY_MS)
+    }
+
+    private fun logBackgroundRecognizerEvent(detail: String) {
+        MainActivity.appendPersistentActivityLog(this, "Background voice", detail)
+    }
+
+    private fun backgroundSpeechErrorLabel(error: Int): String {
+        return when (error) {
+            SpeechRecognizer.ERROR_AUDIO -> "audio error"
+            SpeechRecognizer.ERROR_CLIENT -> "client error"
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "permission error"
+            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "network error"
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "busy recognizer"
+            SpeechRecognizer.ERROR_SERVER -> "server error"
+            SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> "too many requests"
+            else -> "speech error $error"
+        }
+    }
+
+    private fun BackgroundListenMode.diagnosticLabel(): String {
+        return when (this) {
+            BackgroundListenMode.CALL_COMMAND -> "call command listening"
+            BackgroundListenMode.SMS_COMMAND -> "sms prompt listening"
+            BackgroundListenMode.SMS_REPLY -> "sms reply listening"
+            BackgroundListenMode.NOTIFICATION_COMMAND -> "notification listening"
+            BackgroundListenMode.CALLER_MESSAGE -> "caller message listening"
+            BackgroundListenMode.REMINDER_CHECK_IN -> "reminder check-in listening"
+        }
     }
 
     @Suppress("DEPRECATION")
