@@ -224,6 +224,12 @@
     <string name="dex_shop_offer_item">%1$s %2$dc</string>
     <string name="dex_shop_offer_owned_out">All featured looks owned</string>
     <string name="dex_shop_offer_line">Shop: %1$s\nPaid play: %2$s</string>
+    <string name="dex_shop_title">Dex shop</string>
+    <string name="dex_shop_balance">Balance: %1$d Dex coins</string>
+    <string name="dex_shop_owned_suffix">owned</string>
+    <string name="dex_shop_equip_suffix">tap to equip</string>
+    <string name="dex_shop_buy_suffix">%1$dc to unlock</string>
+    <string name="dex_shop_play_suffix">%1$dc to play now</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>

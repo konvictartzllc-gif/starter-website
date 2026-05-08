@@ -323,6 +323,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexCompanionBubbleOverride: String? = null
     private var dexCompanionRewardsPreviewLevel: Int? = null
     private var dexCompanionRecentUnlockLevel: Int? = null
+    private var dexCompanionRewardsLastTapAt = 0L
     private var dexCompanionFloatAnimator: AnimatorSet? = null
     private var dexCompanionEventAnimator: AnimatorSet? = null
     private var dexCompanionBlinkScheduled = false
@@ -411,6 +412,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val dexCompanionRecentUnlockResetRunnable = Runnable {
         dexCompanionRecentUnlockLevel = null
         refreshDexCompanionRewardsPanel(unlockCelebration = false)
+    }
+
+    private val dexCompanionRewardsSingleTapRunnable = Runnable {
+        dexCompanionRewardsLastTapAt = 0L
+        cycleDexCompanionRewardsPreview()
     }
 
     private val dexCompanionSingleTapRunnable = Runnable {
@@ -1206,7 +1212,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             persistHomeLook()
         }
         binding.dexCompanionRewardsValue.setOnClickListener {
-            cycleDexCompanionRewardsPreview()
+            val now = SystemClock.elapsedRealtime()
+            if (now - dexCompanionRewardsLastTapAt <= DEX_COMPANION_DOUBLE_TAP_WINDOW_MS) {
+                mainHandler.removeCallbacks(dexCompanionRewardsSingleTapRunnable)
+                dexCompanionRewardsLastTapAt = 0L
+                openDexShopDialog()
+            } else {
+                dexCompanionRewardsLastTapAt = now
+                mainHandler.postDelayed(
+                    dexCompanionRewardsSingleTapRunnable,
+                    DEX_COMPANION_DOUBLE_TAP_WINDOW_MS
+                )
+            }
         }
         binding.dexCompanionRewardsValue.setOnLongClickListener {
             pinDexCompanionRewardsLook()
@@ -3278,6 +3295,125 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             getString(R.string.dex_game_cost_paid, label, cost, dexCoins)
         )
         return true
+    }
+
+    private data class DexShopEntry(
+        val label: String,
+        val detail: String,
+        val onSelect: () -> Unit,
+    )
+
+    private fun openDexShopDialog() {
+        val entries = buildDexShopEntries()
+        val labels = entries.map { "${it.label}\n${it.detail}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.dex_shop_title))
+            .setMessage(getString(R.string.dex_shop_balance, dexCoins))
+            .setItems(labels) { _, which ->
+                entries.getOrNull(which)?.onSelect?.invoke()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = "Shop is open.",
+            revertAfterMs = 1800L
+        )
+    }
+
+    private fun buildDexShopEntries(): List<DexShopEntry> {
+        val entries = mutableListOf<DexShopEntry>()
+        entries += cosmeticShopEntry(
+            label = dexSkinLabel(DEX_COMPANION_SKIN_SUNSET),
+            key = skinCosmeticKey(DEX_COMPANION_SKIN_SUNSET),
+            cost = dexSkinCost(DEX_COMPANION_SKIN_SUNSET)
+        ) {
+            currentDexCompanionSkin = DEX_COMPANION_SKIN_SUNSET
+        }
+        entries += cosmeticShopEntry(
+            label = dexSkinLabel(DEX_COMPANION_SKIN_VIOLET),
+            key = skinCosmeticKey(DEX_COMPANION_SKIN_VIOLET),
+            cost = dexSkinCost(DEX_COMPANION_SKIN_VIOLET)
+        ) {
+            currentDexCompanionSkin = DEX_COMPANION_SKIN_VIOLET
+        }
+        entries += cosmeticShopEntry(
+            label = dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HEADPHONES),
+            key = accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HEADPHONES),
+            cost = dexAccessoryCost(DEX_COMPANION_ACCESSORY_HEADPHONES)
+        ) {
+            currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_HEADPHONES
+        }
+        entries += cosmeticShopEntry(
+            label = dexAccessoryLabel(DEX_COMPANION_ACCESSORY_GLASSES),
+            key = accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_GLASSES),
+            cost = dexAccessoryCost(DEX_COMPANION_ACCESSORY_GLASSES)
+        ) {
+            currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_GLASSES
+        }
+        entries += cosmeticShopEntry(
+            label = dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HALO),
+            key = accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HALO),
+            cost = dexAccessoryCost(DEX_COMPANION_ACCESSORY_HALO)
+        ) {
+            currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_HALO
+        }
+        entries += cosmeticShopEntry(
+            label = dexFaceStyleLabel(DEX_COMPANION_FACE_PIXEL),
+            key = faceStyleCosmeticKey(DEX_COMPANION_FACE_PIXEL),
+            cost = dexFaceStyleCost(DEX_COMPANION_FACE_PIXEL)
+        ) {
+            currentDexCompanionFaceStyle = DEX_COMPANION_FACE_PIXEL
+        }
+        entries += cosmeticShopEntry(
+            label = dexBubbleStyleLabel(DEX_COMPANION_BUBBLE_GLOW),
+            key = bubbleStyleCosmeticKey(DEX_COMPANION_BUBBLE_GLOW),
+            cost = dexBubbleStyleCost(DEX_COMPANION_BUBBLE_GLOW)
+        ) {
+            currentDexCompanionBubbleStyle = DEX_COMPANION_BUBBLE_GLOW
+        }
+        entries += cosmeticShopEntry(
+            label = dexBubbleStyleLabel(DEX_COMPANION_BUBBLE_BOLD),
+            key = bubbleStyleCosmeticKey(DEX_COMPANION_BUBBLE_BOLD),
+            cost = dexBubbleStyleCost(DEX_COMPANION_BUBBLE_BOLD)
+        ) {
+            currentDexCompanionBubbleStyle = DEX_COMPANION_BUBBLE_BOLD
+        }
+        entries += gameShopEntry(DexMiniGameType.TRIVIA) { startTriviaGame() }
+        entries += gameShopEntry(DexMiniGameType.MEMORY) { startMemoryGame() }
+        entries += gameShopEntry(DexMiniGameType.WOULD_YOU_RATHER) { startWouldYouRatherGame() }
+        return entries
+    }
+
+    private fun cosmeticShopEntry(
+        label: String,
+        key: String,
+        cost: Int,
+        equip: () -> Unit,
+    ): DexShopEntry {
+        val owned = ownedDexCosmetics.contains(key)
+        val detail = if (owned) {
+            getString(R.string.dex_shop_equip_suffix)
+        } else {
+            getString(R.string.dex_shop_buy_suffix, cost)
+        }
+        return DexShopEntry(label, detail) {
+            if (!ensureDexCosmeticOwned(key, label, cost)) return@DexShopEntry
+            equip()
+            updateDexCompanionControls()
+            applyDexCompanionUi()
+            persistHomeLook()
+            binding.homeStyleMessage.text =
+                if (owned) "$label equipped." else binding.homeStyleMessage.text
+        }
+    }
+
+    private fun gameShopEntry(type: DexMiniGameType, start: () -> Unit): DexShopEntry {
+        val label = dexMiniGameLabel(type)
+        val cost = dexMiniGameCost(type)
+        return DexShopEntry(label, getString(R.string.dex_shop_play_suffix, cost)) {
+            start()
+        }
     }
 
     private fun dexCompanionShelfBadge(level: Int): String {
