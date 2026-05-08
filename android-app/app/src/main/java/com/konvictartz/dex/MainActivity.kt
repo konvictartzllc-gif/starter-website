@@ -289,6 +289,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     @Suppress("DEPRECATION")
     private inner class LegacyCallStateListener : android.telephony.PhoneStateListener() {
+        @Deprecated("Deprecated in Java")
         override fun onCallStateChanged(state: Int, phoneNumber: String?) {
             super.onCallStateChanged(state, phoneNumber)
             handleCallStateChanged(state, phoneNumber)
@@ -3491,6 +3492,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun processDexCommand(message: String, allowAiFallback: Boolean = true): Boolean {
+        if (handleImmediateEmergencyCommand(message)) return true
         if (handleTaskIntent(message)) return true
         detectContactOnlyIntent(message)?.let { contact ->
             handleDetectedContactTarget(contact)
@@ -3522,6 +3524,42 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.lastReplyValue.text = reply
             speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
         }
+    }
+
+    private fun handleImmediateEmergencyCommand(message: String): Boolean {
+        if (!isHighRiskEmergencyMessage(message)) return false
+
+        pendingContactTarget = null
+        pendingContactAction = null
+        pendingSmsRecipient = null
+        pendingSmsBodyDraft = null
+        pendingIncomingSmsSender = null
+        pendingIncomingSmsValue = null
+        pendingIncomingSmsBody = null
+        pendingIncomingSmsReplyChoice = false
+        pendingNotificationApp = null
+        pendingNotificationTitle = null
+        pendingNotificationText = null
+        pendingNotificationReplyChoice = false
+        if (pendingAction != null) {
+            pendingAction = null
+            updatePendingActionUi()
+        }
+
+        val reply = listOfNotNull(
+            getString(R.string.local_emergency_reply),
+            sendLocalEmergencySmsIfNeeded(null, message, forceEmergency = true)
+        ).joinToString(" ")
+
+        maybeScheduleSafetyCheckIn(null, forceEmergency = true)
+        binding.lastHeardValue.text = message
+        binding.conversationStatus.text = reply
+        binding.lastReplyValue.text = reply
+        conversationActive = true
+        awaitingWakeCommand = false
+        scheduleConversationTimeout()
+        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+        return true
     }
 
     private fun openYoutubeMusic(message: String) {
