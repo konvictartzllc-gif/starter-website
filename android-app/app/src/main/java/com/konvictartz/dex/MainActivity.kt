@@ -51,6 +51,7 @@ import android.animation.ValueAnimator
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.widget.doAfterTextChanged
@@ -3242,6 +3243,65 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun handleDexCompanionDoubleTap() {
         if (binding.dexCompanionCard.visibility != View.VISIBLE) return
+        cycleDexCompanionMood()
+    }
+
+    private fun handleDexCompanionLongPress() {
+        if (binding.dexCompanionCard.visibility != View.VISIBLE) return
+        val message = when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> getString(R.string.dex_companion_quick_menu_bestie)
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> getString(R.string.dex_companion_quick_menu_guardian)
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> getString(R.string.dex_companion_quick_menu_study_buddy)
+            else -> getString(R.string.dex_companion_quick_menu_coach)
+        }
+        setDexCompanionState(
+            DEX_COMPANION_STATE_PENDING,
+            bubbleOverride = message,
+            revertAfterMs = 2800L
+        )
+        binding.dexCompanionCard.post {
+            showDexCompanionQuickMenu(binding.dexCompanionCard)
+        }
+    }
+
+    private fun showDexCompanionQuickMenu(anchor: View) {
+        val popup = PopupMenu(this, anchor, Gravity.END)
+        popup.menu.add(0, 1, 0, getString(R.string.dex_companion_quick_action_customize))
+        popup.menu.add(0, 2, 1, getString(R.string.dex_companion_quick_action_mood))
+        popup.menu.add(0, 3, 2, getString(R.string.dex_companion_quick_action_hide))
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                1 -> {
+                    openDexCompanionCustomization()
+                    true
+                }
+                2 -> {
+                    cycleDexCompanionMood()
+                    true
+                }
+                3 -> {
+                    hideDexCompanionForNow()
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
+    private fun openDexCompanionCustomization() {
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = getString(R.string.dex_companion_customize_opening),
+            revertAfterMs = 2600L
+        )
+        binding.contentScrollView.post {
+            binding.contentScrollView.smoothScrollTo(0, binding.themeCard.top - dpToPx(16))
+        }
+        binding.dexCompanionNameInput.requestFocus()
+    }
+
+    private fun cycleDexCompanionMood() {
         currentDexCompanionMood = when (currentDexCompanionMood.lowercase(Locale.US)) {
             DEX_COMPANION_MOOD_CALM -> DEX_COMPANION_MOOD_PLAYFUL
             DEX_COMPANION_MOOD_PLAYFUL -> DEX_COMPANION_MOOD_FOCUS
@@ -3249,13 +3309,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         updateDexCompanionControls()
         val moodLabel = when (currentDexCompanionMood.lowercase(Locale.US)) {
-            DEX_COMPANION_MOOD_PLAYFUL -> "playful"
-            DEX_COMPANION_MOOD_FOCUS -> "focus"
-            else -> "calm"
+            DEX_COMPANION_MOOD_PLAYFUL -> getString(R.string.dex_companion_mood_playful)
+            DEX_COMPANION_MOOD_FOCUS -> getString(R.string.dex_companion_mood_focus)
+            else -> getString(R.string.dex_companion_mood_calm)
         }
         setDexCompanionState(
             DEX_COMPANION_STATE_EXCITED,
-            bubbleOverride = "Switched to $moodLabel mode.",
+            bubbleOverride = getString(R.string.dex_companion_mood_switched, moodLabel),
             revertAfterMs = 2600L
         )
         persistHomeLook()
@@ -3264,23 +3324,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun handleDexCompanionLongPress() {
-        if (binding.dexCompanionCard.visibility != View.VISIBLE) return
-        val message = when (currentDexCompanionPersonality.lowercase(Locale.US)) {
-            DEX_COMPANION_PERSONALITY_BESTIE -> "Full style mode. Lets make this cute."
-            DEX_COMPANION_PERSONALITY_GUARDIAN -> "Opening full setup."
-            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> "Opening focus setup."
-            else -> "Opening full companion setup."
-        }
-        setDexCompanionState(
-            DEX_COMPANION_STATE_EXCITED,
-            bubbleOverride = message,
-            revertAfterMs = 2800L
-        )
-        binding.contentScrollView.post {
-            binding.contentScrollView.smoothScrollTo(0, binding.themeCard.top - dpToPx(16))
-        }
-        binding.dexCompanionNameInput.requestFocus()
+    private fun hideDexCompanionForNow() {
+        currentDexCompanionVisible = false
+        updateDexCompanionControls()
+        persistHomeLook()
+        binding.homeStyleMessage.text = getString(R.string.dex_companion_hidden_for_now)
+        applyDexCompanionUi()
     }
 
     private fun dexCompanionTapLine(): String {

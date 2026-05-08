@@ -213,6 +213,16 @@
     <string name="dex_companion_status_ready">Ready</string>
     <string name="dex_companion_status_alert">Alert</string>
     <string name="dex_companion_status_pending">Pending</string>
+    <string name="dex_companion_quick_menu_coach">Pick a quick move for me.</string>
+    <string name="dex_companion_quick_menu_bestie">Pick a quick vibe move.</string>
+    <string name="dex_companion_quick_menu_guardian">Choose what you want me to do.</string>
+    <string name="dex_companion_quick_menu_study_buddy">Choose a quick focus change.</string>
+    <string name="dex_companion_quick_action_customize">Customize</string>
+    <string name="dex_companion_quick_action_mood">Change mood</string>
+    <string name="dex_companion_quick_action_hide">Hide for now</string>
+    <string name="dex_companion_customize_opening">Opening my setup.</string>
+    <string name="dex_companion_mood_switched">Switched to %1$s mode.</string>
+    <string name="dex_companion_hidden_for_now">Dex is hidden for now. Turn the companion back on anytime below.</string>
     <string name="home_background_image">Background image</string>
     <string name="home_clear_background">Clear background</string>
     <string name="home_left_sticker">Left sticker</string>
