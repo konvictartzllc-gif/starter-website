@@ -54,10 +54,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:lineSpacingExtra="4dp"
+            android:lineSpacingExtra="3dp"
             android:text="@string/dex_ready_summary"
             android:textColor="@color/dex_text_secondary"
-            android:textSize="16sp" />
+            android:textSize="15sp" />
 
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/inviteCodeCard"
@@ -108,10 +108,10 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="8dp"
                     android:text="@string/invite_code_summary"
                     android:textColor="@color/dex_text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
@@ -141,7 +141,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:background="@drawable/dashboard_metric_surface"
-                    android:minHeight="68dp"
+                    android:minHeight="64dp"
                     android:orientation="vertical"
                     android:padding="12dp">
 
@@ -215,6 +215,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:background="@drawable/dashboard_metric_surface"
+                    android:minHeight="78dp"
                     android:orientation="vertical"
                     android:padding="12dp">
 
@@ -344,7 +345,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:background="@drawable/dashboard_metric_surface"
-                    android:minHeight="72dp"
+                    android:minHeight="68dp"
                     android:orientation="vertical"
                     android:padding="12dp">
 
@@ -362,7 +363,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:textColor="@color/dex_text_secondary"
-                        android:textSize="14sp" />
+                        android:textSize="13sp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

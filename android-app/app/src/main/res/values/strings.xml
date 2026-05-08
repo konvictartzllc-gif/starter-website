@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Dex AI Assistant</string>
     <string name="dex_ready_title">Your Dex account starts here</string>
-    <string name="dex_ready_summary">Log in, create an account, or use an affiliate invite code to unlock your Dex dashboard.</string>
+    <string name="dex_ready_summary">Log in, create an account, or use an affiliate code to unlock your Dex dashboard.</string>
     <string name="dex_home_title">Dex is ready for you</string>
     <string name="dex_home_summary">Your dashboard, voice tools, lessons, plans, and assistant controls are all in one place.</string>
     <string name="dex_home_title_user">Everyday dashboard</string>
@@ -21,7 +21,7 @@
     <string name="auth_message_tag">Account status</string>
     <string name="invite_code_title">Have an affiliate code?</string>
     <string name="invite_code_section_tag">Partner access</string>
-    <string name="invite_code_summary">Paste the code from your admin or affiliate invite here, then Dex will open the signup flow for you.</string>
+    <string name="invite_code_summary">Paste your affiliate code here and Dex will open the right signup path for you.</string>
     <string name="invite_code_hint">Affiliate invite code</string>
     <string name="invite_code_message_tag">Invite status</string>
     <string name="use_invite_code">Use Code</string>
