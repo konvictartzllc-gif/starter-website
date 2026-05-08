@@ -1844,10 +1844,27 @@
                     android:orientation="vertical"
                     android:padding="12dp">
 
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/permissions_account_access_label"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/permissions_account_access_summary"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="12sp" />
+
                     <com.google.android.material.switchmaterial.SwitchMaterial
                         android:id="@+id/phonePermissionSwitch"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
                         android:text="@string/permission_phone" />
 
                     <com.google.android.material.switchmaterial.SwitchMaterial
@@ -1873,11 +1890,28 @@
                     android:orientation="vertical"
                     android:padding="12dp">
 
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/permissions_device_access_label"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/permissions_device_access_summary"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="12sp" />
+
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/requestAndroidPermissionsButton"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
                         android:text="@string/request_android_permissions" />
 
                     <TextView
@@ -1902,6 +1936,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
+                    android:background="@drawable/dashboard_metric_surface"
+                    android:padding="12dp"
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -1947,11 +1983,28 @@
                     android:orientation="vertical"
                     android:padding="12dp">
 
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/background_access_tools_label"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/background_access_tools_summary"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="12sp" />
+
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/openAppSettingsButton"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
                         android:text="@string/open_app_settings" />
 
                     <com.google.android.material.button.MaterialButton

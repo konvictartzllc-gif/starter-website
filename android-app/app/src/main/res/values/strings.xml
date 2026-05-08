@@ -193,6 +193,10 @@
     <string name="permission_calendar">Allow Dex to manage calendar events</string>
     <string name="permission_notifications">Allow Dex to send notifications</string>
     <string name="request_android_permissions">Review and grant Android permissions</string>
+    <string name="permissions_account_access_label">Account access</string>
+    <string name="permissions_account_access_summary">Turn Dex features on for your account before checking Android device access.</string>
+    <string name="permissions_device_access_label">Device access</string>
+    <string name="permissions_device_access_summary">Use this check to see what Android still needs from this phone.</string>
     <string name="android_permissions_missing">Android runtime permissions still need approval on this device.</string>
     <string name="android_permissions_ready">Android runtime permissions are granted for phone state, contacts, call controls, microphone, and notifications. Text-message permission is only needed when Dex sends SMS.</string>
     <string name="permissions_disclosure_title">Before Dex requests Android permissions</string>
@@ -205,6 +209,8 @@
     <string name="open_battery_settings">Open battery settings</string>
     <string name="open_notification_settings">Open notification settings</string>
     <string name="open_notification_access">Open notification access</string>
+    <string name="background_access_tools_label">System tools</string>
+    <string name="background_access_tools_summary">These shortcuts open the Android settings that most often block Dex in the background.</string>
     <string name="background_access_tip">On Samsung, remove Dex from sleeping apps and set Battery to Unrestricted for the best outside-the-app results.</string>
     <string name="background_settings_open_failed">Dex could not open that settings screen.</string>
     <string name="notification_access_label">Dex notification access</string>
