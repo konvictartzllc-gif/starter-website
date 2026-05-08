@@ -2714,16 +2714,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         when (error) {
             SpeechRecognizer.ERROR_NO_MATCH,
             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
-                if (wakeWordEngineActive && (awaitingWakeCommand || conversationActive)) {
+                if (awaitingWakeCommand || conversationActive) {
                     awaitingWakeCommand = false
-                    conversationActive = false
-                    binding.conversationStatus.text = getString(R.string.wake_mode_waiting)
+                    conversationActive = true
+                    scheduleConversationTimeout()
+                    binding.conversationStatus.text = getString(R.string.wake_mode_still_listening)
+                    scheduleWakeListeningRestart(700)
                     return
                 }
                 binding.conversationStatus.text =
                     if (awaitingWakeCommand || conversationActive) getString(R.string.wake_mode_command_ready)
                     else getString(R.string.wake_mode_waiting)
-                scheduleWakeListeningRestart(5500)
+                scheduleWakeListeningRestart(3200)
             }
             else -> binding.conversationStatus.text = getString(R.string.wake_mode_unavailable)
         }
@@ -2732,7 +2734,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun handleWakeRecognitionMatches(matches: List<String>) {
         val cleanedMatches = matches.map { it.trim() }.filter { it.isNotBlank() }
         if (cleanedMatches.isEmpty()) {
-            scheduleWakeListeningRestart(5500)
+            scheduleWakeListeningRestart(3200)
             return
         }
         cleanedMatches.firstOrNull { handleWakeTranscript(it, allowFallback = false) }?.let { return }
@@ -2743,13 +2745,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!wakeModeEnabled) return false
         val normalized = transcript.trim().lowercase(Locale.US)
         if (normalized.isBlank()) {
-            scheduleWakeListeningRestart(5500)
+            scheduleWakeListeningRestart(3200)
             return true
         }
 
         if (isRecentDexSpeechEcho(normalized)) {
-            binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
-            scheduleWakeListeningRestart(1800)
+            binding.conversationStatus.text = getString(R.string.wake_mode_still_listening)
+            scheduleWakeListeningRestart(1000)
             return true
         }
 
@@ -2764,7 +2766,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!awaitingWakeCommand && !conversationActive) {
             if (!containsWakeWord(normalized)) {
                 binding.conversationStatus.text = getString(R.string.wake_mode_waiting)
-                scheduleWakeListeningRestart(5500)
+                scheduleWakeListeningRestart(3200)
                 return false
             }
 
@@ -2791,11 +2793,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val cleanedTranscript = stripWakeWord(normalized)
         if (cleanedTranscript.isBlank()) {
             if (wakeWordEngineActive) {
-                conversationActive = false
-                binding.conversationStatus.text = getString(R.string.wake_mode_waiting)
+                scheduleConversationTimeout()
+                binding.conversationStatus.text = getString(R.string.wake_mode_still_listening)
+                scheduleWakeListeningRestart(700)
             } else {
-                binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
-                scheduleWakeListeningRestart(5500)
+                binding.conversationStatus.text = getString(R.string.wake_mode_still_listening)
+                scheduleWakeListeningRestart(700)
             }
             return true
         }
@@ -3335,9 +3338,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         val intent = buildRecognitionIntent(
             maxResults = 7,
-            completeSilenceMs = 2600L,
-            possibleSilenceMs = 1600L,
-            minimumMs = 0L,
+            completeSilenceMs = 3400L,
+            possibleSilenceMs = 2200L,
+            minimumMs = 500L,
             biasingPhrases = generalVoiceBiasPhrases()
         )
         try {

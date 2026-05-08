@@ -267,6 +267,7 @@
     <string name="wake_mode_waiting">Dex is waiting for "Hey Dex".</string>
     <string name="wake_mode_listening">Dex is listening for the wake phrase.</string>
     <string name="wake_mode_command_ready">Dex is awake. Go ahead.</string>
+    <string name="wake_mode_still_listening">Dex is still listening. Go ahead.</string>
     <string name="wake_mode_session_ended">Dex went back to waiting. Say "Hey Dex" when you want me again.</string>
     <string name="wake_mode_acknowledged">I am here. What do you need?</string>
     <string name="wake_mode_sleep_reply">Okay. I will be quiet until you wake me again.</string>
