@@ -3050,6 +3050,25 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun dexGamesUnlockLevel(): Int {
+        return when {
+            dexGamesChallengeClears >= 20 -> 3
+            dexGamesChallengeClears >= 10 -> 2
+            dexGamesChallengeClears >= 5 -> 1
+            else -> 0
+        }
+    }
+
+    private fun dexGamesTierHaloAlpha(accessoryHaloVisible: Boolean): Float {
+        if (accessoryHaloVisible) return 1f
+        return when (dexGamesUnlockLevel()) {
+            3 -> 0.9f
+            2 -> 0.62f
+            1 -> 0.42f
+            else -> 0f
+        }
+    }
+
     private fun dexGamesUnlockLine(): String {
         return getString(
             R.string.dex_games_unlock_line,
@@ -4075,9 +4094,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val skinColors = dexCompanionSkinColors()
         val accentColor = skinColors.accent
         val bubbleTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.76f)
-        val cardTint = ColorUtils.setAlphaComponent(accentColor, 62)
+        val unlockLevel = dexGamesUnlockLevel()
+        val unlockAccent = when (unlockLevel) {
+            3 -> android.graphics.Color.parseColor("#D8C4FF")
+            2 -> android.graphics.Color.parseColor("#7ED6FF")
+            1 -> android.graphics.Color.parseColor("#F5C451")
+            else -> accentColor
+        }
+        val cardTint = ColorUtils.setAlphaComponent(ColorUtils.blendARGB(accentColor, unlockAccent, if (unlockLevel > 0) 0.42f else 0f), 78)
         val faceTint = ColorUtils.blendARGB(accentColor, skinColors.faceBase, 0.18f)
-        val labelTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.82f)
+        val labelTint = ColorUtils.blendARGB(unlockAccent, android.graphics.Color.WHITE, 0.82f)
         val activeState = dexCompanionState.ifBlank { deriveDexCompanionState() }
         val isPixelFace = currentDexCompanionFaceStyle.lowercase(Locale.US) == DEX_COMPANION_FACE_PIXEL
         val isWinkFace = currentDexCompanionFaceStyle.lowercase(Locale.US) == DEX_COMPANION_FACE_WINK
@@ -4091,6 +4117,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionBubble.backgroundTintList = ColorStateList.valueOf(styledBubbleTint)
         binding.dexCompanionCard.setCardBackgroundColor(ColorUtils.setAlphaComponent(skinColors.card, 220))
         binding.dexCompanionCard.strokeColor = cardTint
+        binding.dexCompanionCard.strokeWidth = dpToPx(if (unlockLevel >= 3) 2 else 1)
         binding.dexCompanionFace.setCardBackgroundColor(faceTint)
         binding.dexCompanionFace.strokeColor = labelTint
         binding.dexCompanionFace.radius = dpToPx(
@@ -4103,7 +4130,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionLabel.setTextColor(labelTint)
         binding.dexCompanionLabel.text = currentDexCompanionName
         val statusSpec = dexCompanionStatusSpec(activeState, accentColor)
-        binding.dexCompanionStatusChip.text = getString(statusSpec.labelRes)
+        val tierSuffix = when (unlockLevel) {
+            3 -> " | Legend"
+            2 -> " | Star"
+            1 -> " | Spark"
+            else -> ""
+        }
+        binding.dexCompanionStatusChip.text = getString(statusSpec.labelRes) + tierSuffix
         binding.dexCompanionStatusChip.backgroundTintList = ColorStateList.valueOf(statusSpec.chipColor)
         binding.dexCompanionStatusChip.setTextColor(statusSpec.textColor)
         binding.dexCompanionStatusDot.backgroundTintList = ColorStateList.valueOf(statusSpec.dotColor)
@@ -4151,7 +4184,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionFace.scaleY = companionFaceScale(activeState)
         binding.dexCompanionCard.alpha = if (activeState == DEX_COMPANION_STATE_PENDING) 1f else 0.98f
         binding.dexCompanionLabel.alpha = if (isPixelFace) 0.88f else 1f
-        val accessoryTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.34f)
+        val accessoryTint = ColorUtils.blendARGB(unlockAccent, android.graphics.Color.WHITE, 0.34f)
         binding.dexCompanionHalo.backgroundTintList = ColorStateList.valueOf(accessoryTint)
         listOf(
             binding.dexCompanionHeadphonesBand,
@@ -4162,8 +4195,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         listOf(binding.dexCompanionGlassesLeft, binding.dexCompanionGlassesRight).forEach {
             it.backgroundTintList = ColorStateList.valueOf(accessoryTint)
         }
+        val tierHaloVisible = unlockLevel > 0
+        val accessoryHaloVisible = currentDexCompanionAccessory.lowercase(Locale.US) == DEX_COMPANION_ACCESSORY_HALO
         binding.dexCompanionHalo.visibility =
-            if (currentDexCompanionAccessory.lowercase(Locale.US) == DEX_COMPANION_ACCESSORY_HALO) View.VISIBLE else View.GONE
+            if (accessoryHaloVisible || tierHaloVisible) View.VISIBLE else View.GONE
+        binding.dexCompanionHalo.alpha = dexGamesTierHaloAlpha(accessoryHaloVisible)
         val showHeadphones = currentDexCompanionAccessory.lowercase(Locale.US) == DEX_COMPANION_ACCESSORY_HEADPHONES
         binding.dexCompanionHeadphonesBand.visibility = if (showHeadphones) View.VISIBLE else View.GONE
         binding.dexCompanionHeadphonesLeft.visibility = if (showHeadphones) View.VISIBLE else View.GONE
@@ -4711,7 +4747,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionFace.scaleY = companionFaceScale(state)
         binding.dexCompanionBubble.scaleX = 1f
         binding.dexCompanionBubble.scaleY = 1f
-        binding.dexCompanionHalo.alpha = if (binding.dexCompanionHalo.visibility == View.VISIBLE) 1f else 0f
+        val accessoryHaloVisible = currentDexCompanionAccessory.lowercase(Locale.US) == DEX_COMPANION_ACCESSORY_HALO
+        binding.dexCompanionHalo.alpha =
+            if (binding.dexCompanionHalo.visibility == View.VISIBLE) dexGamesTierHaloAlpha(accessoryHaloVisible) else 0f
 
         val role = currentDexCompanionPersonality.lowercase(Locale.US)
         val facePeak = when (role) {
