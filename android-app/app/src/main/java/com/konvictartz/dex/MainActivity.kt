@@ -10968,7 +10968,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             }
                         }
                     }
-                }
+                }.sortedBy { it.handled }
             }.getOrElse { emptyList() }
         }
     }
