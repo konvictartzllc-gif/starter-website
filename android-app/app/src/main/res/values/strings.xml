@@ -12,6 +12,7 @@
     <string name="dex_home_title_admin">Admin dashboard</string>
     <string name="dex_home_summary_admin">Keep the operational tools, safety systems, and backend controls in one place.</string>
     <string name="server_title">Backend</string>
+    <string name="server_section_tag">Backend link</string>
     <string name="server_hint">https://your-backend-url.com/api</string>
     <string name="server_help">Most people should leave this on the live Dex server. Hosted Dex backends should use https. For local testing, use http://10.0.2.2:3001/api in the emulator or http://YOUR_COMPUTER_IP:3001/api on a phone using the same Wi-Fi. Port 4000 is usually the wrong local URL for Dex.</string>
     <string name="account_title">Dex account</string>
@@ -263,6 +264,7 @@
     <string name="billing_checkout_failed">Dex could not open Stripe checkout.</string>
     <string name="billing_portal_failed">Dex could not open the billing portal.</string>
     <string name="permissions_title">Dex permissions</string>
+    <string name="permissions_section_tag">System access</string>
     <string name="permissions_summary">These switches control Dex features on your account. Android will also show a device-level disclosure and permission prompt before Dex can use phone, contacts, microphone, or notifications on this device.</string>
     <string name="permission_phone">Allow Dex to connect to phone features</string>
     <string name="permission_calendar">Allow Dex to manage calendar events</string>
@@ -279,6 +281,7 @@
     <string name="permissions_disclosure_continue">Continue</string>
     <string name="permissions_disclosure_cancel">Not now</string>
     <string name="background_access_title">Background access setup</string>
+    <string name="background_access_section_tag">Background tools</string>
     <string name="background_access_summary">If Dex is quiet outside the app, open these phone settings and give Dex unrestricted battery, pop-up notifications, and background activity access.</string>
     <string name="open_app_settings">Open app settings</string>
     <string name="open_battery_settings">Open battery settings</string>
@@ -290,6 +293,7 @@
     <string name="background_settings_open_failed">Dex could not open that settings screen.</string>
     <string name="notification_access_label">Dex notification access</string>
     <string name="voice_title">Dex voice</string>
+    <string name="voice_section_tag">Voice surface</string>
     <string name="voice_summary">Use this section to confirm Dex can speak on your phone before testing incoming-call prompts.</string>
     <string name="voice_ready">Dex voice is ready on this phone.</string>
     <string name="voice_not_ready">Dex voice engine is not ready yet.</string>
@@ -316,6 +320,7 @@
     <string name="test_voice">Test Dex voice</string>
     <string name="setup_voice">Set up voice</string>
     <string name="conversation_title">Conversation mode</string>
+    <string name="conversation_section_tag">Live conversation</string>
     <string name="conversation_summary">Keep Dex listening while this app is open. Say "Hey Dex" and then ask for help, a task, or a little company.</string>
     <string name="start_wake_mode">Start wake mode</string>
     <string name="stop_wake_mode">Stop wake mode</string>
@@ -447,6 +452,7 @@
     <string name="no_appointments_found">You do not have any Dex appointments yet.</string>
     <string name="no_matching_appointments">You do not have any matching appointments for that day.</string>
     <string name="call_monitor_title">Call monitoring</string>
+    <string name="call_monitor_section_tag">Call controls</string>
     <string name="call_monitor_summary">When phone access is enabled and Android permissions are granted, Dex can watch for calls, block likely spam, and help you handle calls while the app or background service is active.</string>
     <string name="call_monitor_waiting">Call monitoring is waiting for login, backend phone permission, and Android runtime access.</string>
     <string name="call_monitor_active">Dex call monitoring is active and ready to help with allowed calls on this device.</string>
