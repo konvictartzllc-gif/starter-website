@@ -2613,7 +2613,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun testEmergencySms() {
-        val savedContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
+        val savedContact = resolveEmergencyTrustedContact()
         val phoneNumber = normalizeSmsPhoneNumber(savedContact)
         if (phoneNumber.isBlank()) {
             val reply = getString(R.string.test_emergency_sms_missing_contact)
@@ -2652,7 +2652,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun previewEmergencyPlan() {
         val personName = resolveEmergencyPersonName()
         val birthday = resolveEmergencyBirthday()
-        val contact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
+        val contact = resolveEmergencyTrustedContact()
         val contactAlerts = if (binding.safetyNotifyTrustedContactSwitch.isChecked) {
             getString(R.string.safety_preview_enabled)
         } else {
@@ -2699,6 +2699,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .orEmpty()
             .trim()
             .ifBlank { getString(R.string.safety_birthday_unknown) }
+    }
+
+    private fun resolveEmergencyTrustedContact(): String {
+        val typedContact = if (::binding.isInitialized) {
+            binding.safetyContactInput.text?.toString()?.trim().orEmpty()
+        } else {
+            ""
+        }
+        if (typedContact.isNotBlank()) return typedContact
+        return getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_EMERGENCY_CONTACT, null)
+            .orEmpty()
+            .trim()
     }
 
     private fun buildEmergencySpokenReply(baseReply: String? = null): String {
@@ -8226,6 +8239,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val assistedPersonName = resolveEmergencyPersonName()
         val birthday = resolveEmergencyBirthday()
         val assistedNameLower = assistedPersonName.lowercase(Locale.US)
+        val trustedContact = resolveEmergencyTrustedContact().ifBlank { getString(R.string.safety_contact_none) }
 
         val asksWho =
             normalized.contains("who are you assisting") ||
@@ -8236,6 +8250,25 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 normalized.contains("who do you help")
         if (asksWho) {
             return getString(R.string.safety_lookup_assisted_person, assistedPersonName, birthday)
+        }
+
+        val asksTrustedContact =
+            normalized.contains("who is the trusted contact") ||
+                normalized.contains("what trusted contact do you have saved") ||
+                normalized.contains("what is the trusted contact") ||
+                normalized.contains("what's the trusted contact") ||
+                normalized.contains("who do you have as the trusted contact")
+        if (asksTrustedContact) {
+            return getString(R.string.safety_lookup_trusted_contact, assistedPersonName, trustedContact)
+        }
+
+        val asksFullProfile =
+            normalized.contains("read the safety profile") ||
+                normalized.contains("read the assisted person profile") ||
+                normalized.contains("tell me the safety profile") ||
+                normalized.contains("tell me the assisted person profile")
+        if (asksFullProfile) {
+            return getString(R.string.safety_lookup_profile, assistedPersonName, birthday, trustedContact)
         }
 
         val asksBirthday =
@@ -9327,8 +9360,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             prefs.getBoolean(KEY_EMERGENCY_CONTACT_PERMISSION, false) || binding.safetyNotifyTrustedContactSwitch.isChecked
         if (!contactPermission) return null
 
-        val savedContact = prefs.getString(KEY_EMERGENCY_CONTACT, null).orEmpty()
-        val contact = savedContact.ifBlank { binding.safetyContactInput.text?.toString()?.trim().orEmpty() }
+        val contact = resolveEmergencyTrustedContact()
         val phoneNumber = normalizeSmsPhoneNumber(contact)
         if (phoneNumber.isBlank()) return null
 
@@ -9524,7 +9556,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         lastTrigger?.let { lastEmergencyTriggerReason = it }
         val assistedPersonName = resolveEmergencyPersonName()
         val birthday = resolveEmergencyBirthday()
-        val savedContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
+        val savedContact = resolveEmergencyTrustedContact()
         val normalizedTarget = normalizeSmsPhoneNumber(savedContact).ifBlank { getString(R.string.safety_contact_none) }
         val alertsEnabled = if (binding.safetyNotifyTrustedContactSwitch.isChecked) {
             getString(R.string.diagnostic_enabled)
