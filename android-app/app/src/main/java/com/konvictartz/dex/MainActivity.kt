@@ -3315,9 +3315,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 )
             ) { _, which ->
                 when (which) {
-                    0 -> openDexShopSectionDialog(getString(R.string.dex_shop_section_looks), buildDexShopLooksEntries())
-                    1 -> openDexShopSectionDialog(getString(R.string.dex_shop_section_accessories), buildDexShopAccessoryEntries())
-                    else -> openDexShopSectionDialog(getString(R.string.dex_shop_section_play), buildDexShopPlayEntries())
+                    0 -> openDexShopSectionDialog(
+                        getString(R.string.dex_shop_section_looks),
+                        getString(
+                            R.string.dex_shop_section_looks_message,
+                            "${dexSkinLabel(DEX_COMPANION_SKIN_VIOLET)} ${dexSkinCost(DEX_COMPANION_SKIN_VIOLET)}c"
+                        ),
+                        buildDexShopLooksEntries()
+                    )
+                    1 -> openDexShopSectionDialog(
+                        getString(R.string.dex_shop_section_accessories),
+                        getString(
+                            R.string.dex_shop_section_accessories_message,
+                            "${dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HALO)} ${dexAccessoryCost(DEX_COMPANION_ACCESSORY_HALO)}c"
+                        ),
+                        buildDexShopAccessoryEntries()
+                    )
+                    else -> openDexShopSectionDialog(
+                        getString(R.string.dex_shop_section_play),
+                        getString(
+                            R.string.dex_shop_section_play_message,
+                            "${dexMiniGameLabel(DexMiniGameType.MEMORY)} ${dexMiniGameCost(DexMiniGameType.MEMORY)}c"
+                        ),
+                        buildDexShopPlayEntries()
+                    )
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -3329,11 +3350,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
-    private fun openDexShopSectionDialog(title: String, entries: List<DexShopEntry>) {
+    private fun openDexShopSectionDialog(title: String, message: String, entries: List<DexShopEntry>) {
         val labels = entries.map { "${it.label}\n${it.detail}" }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle(title)
-            .setMessage(getString(R.string.dex_shop_balance, dexCoins))
+            .setMessage("${getString(R.string.dex_shop_balance, dexCoins)}\n\n$message")
             .setItems(labels) { _, which ->
                 entries.getOrNull(which)?.onSelect?.invoke()
             }

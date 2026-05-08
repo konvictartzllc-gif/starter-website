@@ -230,6 +230,9 @@
     <string name="dex_shop_section_looks">Looks</string>
     <string name="dex_shop_section_accessories">Accessories</string>
     <string name="dex_shop_section_play">Play</string>
+    <string name="dex_shop_section_looks_message">Fresh looks for Dex. Featured: %1$s.</string>
+    <string name="dex_shop_section_accessories_message">Little extras that change Dex’s vibe fast. Featured: %1$s.</string>
+    <string name="dex_shop_section_play_message">Spend a few coins and jump straight into a paid round. Featured: %1$s.</string>
     <string name="dex_shop_owned_suffix">owned</string>
     <string name="dex_shop_equip_suffix">tap to equip</string>
     <string name="dex_shop_buy_suffix">%1$dc to unlock</string>
