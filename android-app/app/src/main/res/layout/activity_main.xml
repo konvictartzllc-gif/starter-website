@@ -1826,42 +1826,58 @@
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/phonePermissionSwitch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="@string/permission_phone" />
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/calendarPermissionSwitch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/permission_calendar" />
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/notificationsPermissionSwitch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/permission_notifications" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/requestAndroidPermissionsButton"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="@string/request_android_permissions" />
+                    android:background="@drawable/dashboard_metric_surface"
+                    android:orientation="vertical"
+                    android:padding="12dp">
 
-                <TextView
-                    android:id="@+id/androidPermissionStatus"
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/phonePermissionSwitch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/permission_phone" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/calendarPermissionSwitch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/permission_calendar" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/notificationsPermissionSwitch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/permission_notifications" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:textColor="@color/dex_text_secondary"
-                    android:textSize="14sp" />
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/dashboard_metric_surface"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/requestAndroidPermissionsButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/request_android_permissions" />
+
+                    <TextView
+                        android:id="@+id/androidPermissionStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="14sp" />
+                </LinearLayout>
 
                 <ProgressBar
                     android:id="@+id/permissionsProgress"
@@ -1913,43 +1929,53 @@
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/openAppSettingsButton"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="@string/open_app_settings" />
+                    android:background="@drawable/dashboard_metric_surface"
+                    android:orientation="vertical"
+                    android:padding="12dp">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/openBatterySettingsButton"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/open_battery_settings" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/openAppSettingsButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/open_app_settings" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/openNotificationSettingsButton"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/open_notification_settings" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/openBatterySettingsButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/open_battery_settings" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/openNotificationAccessButton"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/open_notification_access" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/openNotificationSettingsButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/open_notification_settings" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/openNotificationAccessButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/open_notification_access" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/backgroundAccessMessage"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
+                    android:background="@drawable/dashboard_metric_surface"
+                    android:padding="12dp"
                     android:text="@string/background_access_tip"
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
@@ -1999,26 +2025,34 @@
                     android:textColor="@color/dex_text_secondary"
                     android:textSize="14sp" />
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/autoAnswerKnownContactsSwitch"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:text="@string/auto_answer_known_contacts" />
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/dashboard_metric_surface"
+                    android:orientation="vertical"
+                    android:padding="12dp">
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/autoAnswerAnyCallerSwitch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/auto_answer_any_non_spam_calls" />
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/autoAnswerKnownContactsSwitch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/auto_answer_known_contacts" />
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/autoDeclineSpamSwitch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/auto_decline_spam_calls" />
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/autoAnswerAnyCallerSwitch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/auto_answer_any_non_spam_calls" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/autoDeclineSpamSwitch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/auto_decline_spam_calls" />
+                </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/callActionsRow"
