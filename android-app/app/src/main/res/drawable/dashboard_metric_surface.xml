@@ -3,7 +3,7 @@
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:angle="315"
+                android:angle="270"
                 android:endColor="@color/dex_panel"
                 android:startColor="@color/dex_panel_elevated" />
             <corners android:radius="12dp" />
@@ -12,7 +12,7 @@
                 android:color="@color/dex_border" />
         </shape>
     </item>
-    <item android:bottom="10dp">
+    <item android:bottom="20dp">
         <shape android:shape="rectangle">
             <gradient
                 android:angle="0"
@@ -25,8 +25,8 @@
     </item>
     <item>
         <shape android:shape="rectangle">
-            <size android:height="3dp" />
-            <solid android:color="@color/dex_accent" />
+            <size android:height="2dp" />
+            <solid android:color="@color/dex_border_soft" />
             <corners
                 android:topLeftRadius="12dp"
                 android:topRightRadius="12dp" />

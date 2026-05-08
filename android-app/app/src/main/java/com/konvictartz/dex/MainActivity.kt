@@ -1730,15 +1730,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             "affiliate" -> getColorCompat(if (active) R.color.dex_affiliate_signal else R.color.dex_affiliate_stroke)
             else -> getColorCompat(if (active) R.color.dex_user_signal else R.color.dex_user_stroke)
         }
-        return ColorUtils.setAlphaComponent(base, if (active) 170 else 118)
+        return ColorUtils.setAlphaComponent(base, if (active) 132 else 96)
     }
 
     private fun roleCardElevationPx(roleKey: String, active: Boolean): Float {
-        val dp = when (roleKey) {
-            "admin" -> if (active) 5.5f else 3.5f
-            "affiliate" -> if (active) 5f else 3f
-            else -> if (active) 4.5f else 2.5f
-        }
+        val dp = if (active) 2f else 0f
         return dp * resources.displayMetrics.density
     }
 
@@ -1749,9 +1745,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun roleInputFillColor(roleKey: String): Int = when (roleKey) {
-        "admin" -> ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_admin_panel), 208)
-        "affiliate" -> ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_affiliate_panel), 208)
-        else -> ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_user_panel), 208)
+        "admin" -> ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_panel_elevated), 222)
+        "affiliate" -> ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_panel_elevated), 222)
+        else -> ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_panel_elevated), 222)
     }
 
     private fun collectTextInputLayouts(view: View): List<TextInputLayout> {
@@ -2142,11 +2138,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> R.drawable.dashboard_hero_surface
             }
         )
-        val chipTint = when (roleKey) {
-            "admin" -> getColorCompat(R.color.dex_admin_chip_tint)
-            "affiliate" -> getColorCompat(R.color.dex_affiliate_chip_tint)
-            else -> getColorCompat(R.color.dex_user_chip_tint)
-        }
+        val chipTint = getColorCompat(R.color.dex_chip_start)
         binding.dashboardRole.backgroundTintList = ColorStateList.valueOf(chipTint)
         binding.dashboardAccess.backgroundTintList = ColorStateList.valueOf(chipTint)
         binding.dashboardOverline.setTextColor(
@@ -2157,25 +2149,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         )
         binding.dashboardSignalTall.backgroundTintList = ColorStateList.valueOf(
-            when (roleKey) {
-                "admin" -> getColorCompat(R.color.dex_admin_signal)
-                "affiliate" -> getColorCompat(R.color.dex_affiliate_signal)
-                else -> getColorCompat(R.color.dex_user_signal)
-            }
+            getColorCompat(R.color.dex_border_soft)
         )
         binding.dashboardSignalMid.backgroundTintList = ColorStateList.valueOf(
-            when (roleKey) {
-                "admin" -> getColorCompat(R.color.dex_border_soft)
-                "affiliate" -> getColorCompat(R.color.dex_metric_highlight)
-                else -> getColorCompat(R.color.dex_metric_highlight)
-            }
+            getColorCompat(R.color.dex_border_soft)
         )
         binding.dashboardSignalShort.backgroundTintList = ColorStateList.valueOf(
-            when (roleKey) {
-                "admin" -> getColorCompat(R.color.dex_chip_end)
-                "affiliate" -> getColorCompat(R.color.dex_chip_end)
-                else -> getColorCompat(R.color.dex_border_soft)
-            }
+            getColorCompat(R.color.dex_border_soft)
         )
         applyRoleDashboardMood(roleKey)
         binding.adminBackendValue.text = currentServerUrl()
@@ -2257,16 +2237,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.conversationCard
             )
         }
-        val panelColor = when (roleKey) {
-            "admin" -> getColorCompat(R.color.dex_admin_panel)
-            "affiliate" -> getColorCompat(R.color.dex_affiliate_panel)
-            else -> getColorCompat(R.color.dex_user_panel)
-        }
-        val strokeColor = when (roleKey) {
-            "admin" -> getColorCompat(R.color.dex_admin_stroke)
-            "affiliate" -> getColorCompat(R.color.dex_affiliate_stroke)
-            else -> getColorCompat(R.color.dex_user_stroke)
-        }
+        val panelColor = getColorCompat(R.color.dex_panel)
         roleCards.forEach { card ->
             card.setCardBackgroundColor(panelColor)
             card.strokeColor = sectionEdgeColor(roleKey, active = false)
@@ -2278,16 +2249,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun applyRoleOutputStripMood(roleKey: String) {
-        val primaryTone = when (roleKey) {
-            "admin" -> getColorCompat(R.color.dex_admin_readout)
-            "affiliate" -> getColorCompat(R.color.dex_affiliate_readout)
-            else -> getColorCompat(R.color.dex_user_readout)
-        }
-        val secondaryTone = when (roleKey) {
-            "admin" -> getColorCompat(R.color.dex_admin_readout_alt)
-            "affiliate" -> getColorCompat(R.color.dex_affiliate_readout_alt)
-            else -> getColorCompat(R.color.dex_user_readout_alt)
-        }
+        val primaryTone = getColorCompat(R.color.dex_user_readout)
+        val secondaryTone = getColorCompat(R.color.dex_user_readout_alt)
         listOf(
             binding.learningLessonOutputStrip,
             binding.safetyProfileMessageStrip,
