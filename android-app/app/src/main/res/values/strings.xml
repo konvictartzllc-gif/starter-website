@@ -157,6 +157,11 @@
     <string name="dex_companion_summary">Keep a small Dex companion on screen and tune the mood, side, and size to your liking.</string>
     <string name="dex_companion_visible">Show my Dex companion on screen</string>
     <string name="dex_companion_name_label">Companion name</string>
+    <string name="dex_companion_personality_label">Personality</string>
+    <string name="dex_companion_personality_coach">Coach</string>
+    <string name="dex_companion_personality_bestie">Bestie</string>
+    <string name="dex_companion_personality_guardian">Guardian</string>
+    <string name="dex_companion_personality_study_buddy">Study buddy</string>
     <string name="dex_companion_mood_label">Mood</string>
     <string name="dex_companion_mood_calm">Calm</string>
     <string name="dex_companion_mood_playful">Playful</string>

@@ -267,6 +267,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionAccessory: String = DEX_COMPANION_ACCESSORY_NONE
     private var currentDexCompanionName: String = "Dex"
     private var currentDexCompanionVoice: String = DEX_COMPANION_VOICE_SUPPORTIVE
+    private var currentDexCompanionPersonality: String = DEX_COMPANION_PERSONALITY_COACH
     private var currentDexCompanionOffsetX = 0f
     private var currentDexCompanionOffsetY = 0f
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
@@ -957,6 +958,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             applyDexCompanionUi()
             persistHomeLook()
         }
+        binding.dexCompanionPersonalityToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentDexCompanionPersonality = when (checkedId) {
+                R.id.dexCompanionPersonalityBestieButton -> DEX_COMPANION_PERSONALITY_BESTIE
+                R.id.dexCompanionPersonalityGuardianButton -> DEX_COMPANION_PERSONALITY_GUARDIAN
+                R.id.dexCompanionPersonalityStudyBuddyButton -> DEX_COMPANION_PERSONALITY_STUDY_BUDDY
+                else -> DEX_COMPANION_PERSONALITY_COACH
+            }
+            applyDexCompanionPersonalityPreset()
+            updateDexCompanionControls()
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
         binding.dexCompanionMoodToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             currentDexCompanionMood = when (checkedId) {
@@ -1136,6 +1150,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentDexCompanionVoice = prefs.getString(KEY_DEX_COMPANION_VOICE, DEX_COMPANION_VOICE_SUPPORTIVE)
             .orEmpty()
             .ifBlank { DEX_COMPANION_VOICE_SUPPORTIVE }
+        currentDexCompanionPersonality = prefs.getString(KEY_DEX_COMPANION_PERSONALITY, DEX_COMPANION_PERSONALITY_COACH)
+            .orEmpty()
+            .ifBlank { DEX_COMPANION_PERSONALITY_COACH }
         currentDexCompanionOffsetX = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_X, 0f)
         currentDexCompanionOffsetY = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_Y, 0f)
         updateAdvancedStyleUi(currentThemePreset == "custom")
@@ -3042,6 +3059,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_DEX_COMPANION_ACCESSORY, currentDexCompanionAccessory)
             .putString(KEY_DEX_COMPANION_NAME, currentDexCompanionName)
             .putString(KEY_DEX_COMPANION_VOICE, currentDexCompanionVoice)
+            .putString(KEY_DEX_COMPANION_PERSONALITY, currentDexCompanionPersonality)
             .putFloat(KEY_DEX_COMPANION_OFFSET_X, currentDexCompanionOffsetX)
             .putFloat(KEY_DEX_COMPANION_OFFSET_Y, currentDexCompanionOffsetY)
             .commit()
@@ -3055,6 +3073,43 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
+    private fun applyDexCompanionPersonalityPreset() {
+        when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> {
+                currentDexCompanionMood = DEX_COMPANION_MOOD_PLAYFUL
+                currentDexCompanionVoice = DEX_COMPANION_VOICE_PLAYFUL
+                currentDexCompanionSkin = DEX_COMPANION_SKIN_VIOLET
+                currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_GLASSES
+                currentDexCompanionFaceStyle = DEX_COMPANION_FACE_WINK
+                currentDexCompanionBubbleStyle = DEX_COMPANION_BUBBLE_GLOW
+            }
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> {
+                currentDexCompanionMood = DEX_COMPANION_MOOD_FOCUS
+                currentDexCompanionVoice = DEX_COMPANION_VOICE_DIRECT
+                currentDexCompanionSkin = DEX_COMPANION_SKIN_SUNSET
+                currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_HALO
+                currentDexCompanionFaceStyle = DEX_COMPANION_FACE_CLASSIC
+                currentDexCompanionBubbleStyle = DEX_COMPANION_BUBBLE_BOLD
+            }
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> {
+                currentDexCompanionMood = DEX_COMPANION_MOOD_FOCUS
+                currentDexCompanionVoice = DEX_COMPANION_VOICE_SUPPORTIVE
+                currentDexCompanionSkin = DEX_COMPANION_SKIN_MINT
+                currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_HEADPHONES
+                currentDexCompanionFaceStyle = DEX_COMPANION_FACE_PIXEL
+                currentDexCompanionBubbleStyle = DEX_COMPANION_BUBBLE_SOFT
+            }
+            else -> {
+                currentDexCompanionMood = DEX_COMPANION_MOOD_FOCUS
+                currentDexCompanionVoice = DEX_COMPANION_VOICE_DIRECT
+                currentDexCompanionSkin = DEX_COMPANION_SKIN_SKY
+                currentDexCompanionAccessory = DEX_COMPANION_ACCESSORY_NONE
+                currentDexCompanionFaceStyle = DEX_COMPANION_FACE_CLASSIC
+                currentDexCompanionBubbleStyle = DEX_COMPANION_BUBBLE_BOLD
+            }
+        }
+    }
+
     private fun updateDexCompanionControls() {
         if (binding.dexCompanionVisibleSwitch.isChecked != currentDexCompanionVisible) {
             binding.dexCompanionVisibleSwitch.isChecked = currentDexCompanionVisible
@@ -3064,6 +3119,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.dexCompanionNameInput.setText(currentDexCompanionName)
             binding.dexCompanionNameInput.setSelection(binding.dexCompanionNameInput.text?.length ?: 0)
         }
+        binding.dexCompanionPersonalityToggle.check(
+            when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+                DEX_COMPANION_PERSONALITY_BESTIE -> R.id.dexCompanionPersonalityBestieButton
+                DEX_COMPANION_PERSONALITY_GUARDIAN -> R.id.dexCompanionPersonalityGuardianButton
+                DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> R.id.dexCompanionPersonalityStudyBuddyButton
+                else -> R.id.dexCompanionPersonalityCoachButton
+            }
+        )
         binding.dexCompanionMoodToggle.check(
             when (currentDexCompanionMood.lowercase(Locale.US)) {
                 DEX_COMPANION_MOOD_PLAYFUL -> R.id.dexCompanionMoodPlayfulButton
@@ -8260,6 +8323,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_ACCESSORY = "dex_companion_accessory"
         const val KEY_DEX_COMPANION_NAME = "dex_companion_name"
         const val KEY_DEX_COMPANION_VOICE = "dex_companion_voice"
+        const val KEY_DEX_COMPANION_PERSONALITY = "dex_companion_personality"
         const val KEY_DEX_COMPANION_OFFSET_X = "dex_companion_offset_x"
         const val KEY_DEX_COMPANION_OFFSET_Y = "dex_companion_offset_y"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
@@ -8311,6 +8375,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_VOICE_SUPPORTIVE = "supportive"
         private const val DEX_COMPANION_VOICE_PLAYFUL = "playful"
         private const val DEX_COMPANION_VOICE_DIRECT = "direct"
+        private const val DEX_COMPANION_PERSONALITY_COACH = "coach"
+        private const val DEX_COMPANION_PERSONALITY_BESTIE = "bestie"
+        private const val DEX_COMPANION_PERSONALITY_GUARDIAN = "guardian"
+        private const val DEX_COMPANION_PERSONALITY_STUDY_BUDDY = "study_buddy"
         private const val DEX_COMPANION_STATE_IDLE = "idle"
         private const val DEX_COMPANION_STATE_LISTENING = "listening"
         private const val DEX_COMPANION_STATE_EXCITED = "excited"
