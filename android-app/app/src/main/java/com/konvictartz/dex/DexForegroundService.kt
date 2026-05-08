@@ -41,6 +41,7 @@ import java.io.IOException
 import java.util.Locale
 
 private enum class BackgroundListenMode {
+    GENERAL_COMMAND,
     CALL_COMMAND,
     SMS_COMMAND,
     SMS_REPLY,
@@ -117,7 +118,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         setupSpeechRecognizer()
         wakeWordEngine = DexWakeWordEngine(
             this,
-            onWakeWordDetected = { launchWakeAssistantSurface() },
+            onWakeWordDetected = { handleBackgroundWakeWordDetected() },
             onWakeWordError = { _ -> stopBackgroundWakeWordListening() }
         )
         startCallMonitoringIfReady()
@@ -443,6 +444,16 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         lastCallState = state
     }
 
+    private fun handleBackgroundWakeWordDetected() {
+        if (isAppInForeground()) {
+            launchWakeAssistantSurface()
+            return
+        }
+        activeListenMode = null
+        pendingListenMode = null
+        speakAndThenListen(getString(R.string.wake_mode_detected), BackgroundListenMode.GENERAL_COMMAND)
+    }
+
     private fun launchWakeAssistantSurface() {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -727,6 +738,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             return
         }
         when (mode) {
+            BackgroundListenMode.GENERAL_COMMAND -> sendBackgroundDexChat(cleaned.first())
             BackgroundListenMode.CALL_COMMAND -> {
                 val handled = cleaned.any { handleBackgroundCallCommand(it.lowercase(Locale.US)) }
                 if (!handled) repromptBackgroundListenMode(mode)
@@ -751,6 +763,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun repromptBackgroundListenMode(mode: BackgroundListenMode?) {
         when (mode) {
+            BackgroundListenMode.GENERAL_COMMAND ->
+                speakAndThenListen(
+                    getString(R.string.wake_mode_command_retry),
+                    BackgroundListenMode.GENERAL_COMMAND
+                )
             BackgroundListenMode.CALL_COMMAND ->
                 if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                     speakAndThenListen(
@@ -1321,6 +1338,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             "take a message"
         ).apply {
             when (mode) {
+                BackgroundListenMode.GENERAL_COMMAND -> addAll(
+                    listOf("weather", "forecast", "temperature", "what is", "what's", "tell me", "remind me")
+                )
                 BackgroundListenMode.CALL_COMMAND -> addAll(
                     listOf("answer it", "answer on speaker", "pick up", "decline it", "take a message")
                 )
@@ -1359,9 +1379,21 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         if (!hasPermission(Manifest.permission.RECORD_AUDIO)) return
         val recognizer = speechRecognizer ?: return
         activeListenMode = mode
-        val completeSilenceMs = if (mode == BackgroundListenMode.SMS_REPLY) 6000L else 3600L
-        val possibleSilenceMs = if (mode == BackgroundListenMode.SMS_REPLY) 3800L else 2400L
-        val minimumMs = if (mode == BackgroundListenMode.SMS_REPLY) 14000L else 5000L
+        val completeSilenceMs = when (mode) {
+            BackgroundListenMode.SMS_REPLY -> 6000L
+            BackgroundListenMode.GENERAL_COMMAND -> 4200L
+            else -> 3600L
+        }
+        val possibleSilenceMs = when (mode) {
+            BackgroundListenMode.SMS_REPLY -> 3800L
+            BackgroundListenMode.GENERAL_COMMAND -> 2800L
+            else -> 2400L
+        }
+        val minimumMs = when (mode) {
+            BackgroundListenMode.SMS_REPLY -> 14000L
+            BackgroundListenMode.GENERAL_COMMAND -> 9000L
+            else -> 5000L
+        }
         val intent = buildBackgroundRecognitionIntent(mode, 5, completeSilenceMs, possibleSilenceMs, minimumMs)
         runCatching {
             recognizer.cancel()
@@ -1397,6 +1429,52 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         MainActivity.appendPersistentActivityLog(this, "Background voice", detail)
     }
 
+    private fun isAppInForeground(): Boolean {
+        return getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(MainActivity.KEY_APP_IN_FOREGROUND, false)
+    }
+
+    private fun sendBackgroundDexChat(message: String) {
+        val trimmed = message.trim()
+        if (trimmed.isBlank()) {
+            repromptBackgroundListenMode(BackgroundListenMode.GENERAL_COMMAND)
+            return
+        }
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val token = prefs.getString(MainActivity.KEY_TOKEN, null)
+        val serverUrl = prefs.getString(MainActivity.KEY_SERVER_URL, MainActivity.DEFAULT_SERVER_URL)?.trimEnd('/').orEmpty()
+        if (token.isNullOrBlank() || serverUrl.isBlank()) {
+            speakShortStatus(getString(R.string.wake_mode_server_needed))
+            return
+        }
+        logBackgroundRecognizerEvent("handling wake command in background: ${trimmed.take(48)}")
+        Thread {
+            val spokenReply = runCatching {
+                val payload = JSONObject().apply { put("message", trimmed) }
+                val request = Request.Builder()
+                    .url("$serverUrl/dex/chat")
+                    .post(payload.toString().toRequestBody(jsonType))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer $token")
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        val body = response.body?.string().orEmpty()
+                        throw IOException(body.ifBlank { "Background Dex chat failed with ${response.code}" })
+                    }
+                    val json = JSONObject(response.body?.string().orEmpty())
+                    json.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
+                }
+            }.getOrElse { error ->
+                logBackgroundRecognizerEvent("background wake command failed: ${error.message ?: "unknown error"}")
+                getString(R.string.wake_mode_fallback_reply)
+            }
+            mainHandler.post {
+                speakShortStatus(spokenReply)
+            }
+        }.start()
+    }
+
     private fun backgroundSpeechErrorLabel(error: Int): String {
         return when (error) {
             SpeechRecognizer.ERROR_AUDIO -> "audio error"
@@ -1412,6 +1490,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun BackgroundListenMode.diagnosticLabel(): String {
         return when (this) {
+            BackgroundListenMode.GENERAL_COMMAND -> "general wake listening"
             BackgroundListenMode.CALL_COMMAND -> "call command listening"
             BackgroundListenMode.SMS_COMMAND -> "sms prompt listening"
             BackgroundListenMode.SMS_REPLY -> "sms reply listening"
