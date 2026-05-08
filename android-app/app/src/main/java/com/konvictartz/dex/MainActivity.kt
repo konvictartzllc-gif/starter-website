@@ -89,6 +89,16 @@ private enum class HintTone {
     HEALTHY,
 }
 
+private data class DashboardMotionProfile(
+    val pulseDurationMs: Long,
+    val pulseStartAlpha: Float,
+    val pulseStartScale: Float,
+    val loadingDurationMs: Long,
+    val loadingMinAlpha: Float,
+    val loadingStartOffsetMs: Long,
+    val statusLiftDp: Float,
+)
+
 private enum class DecorationPickTarget {
     BACKGROUND,
     LEFT_STICKER,
@@ -1156,31 +1166,64 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun pulseDashboardValues(vararg views: View) {
+        val motion = dashboardMotionProfile(currentUserRole.lowercase(Locale.US))
         views.forEach { view ->
             view.animate().cancel()
             view.clearAnimation()
-            view.alpha = 0.82f
-            view.scaleX = 0.985f
-            view.scaleY = 0.985f
+            view.alpha = motion.pulseStartAlpha
+            view.scaleX = motion.pulseStartScale
+            view.scaleY = motion.pulseStartScale
             view.animate()
                 .alpha(1f)
                 .scaleX(1f)
                 .scaleY(1f)
-                .setDuration(220L)
+                .setDuration(motion.pulseDurationMs)
                 .start()
         }
     }
 
     private fun startLoadingPulse(vararg views: TextView) {
+        val motion = dashboardMotionProfile(currentUserRole.lowercase(Locale.US))
         views.forEach { view ->
-            val animation = android.view.animation.AlphaAnimation(0.5f, 1f).apply {
-                duration = 720L
+            val animation = android.view.animation.AlphaAnimation(motion.loadingMinAlpha, 1f).apply {
+                duration = motion.loadingDurationMs
                 repeatMode = android.view.animation.Animation.REVERSE
                 repeatCount = android.view.animation.Animation.INFINITE
+                startOffset = motion.loadingStartOffsetMs
             }
             view.clearAnimation()
             view.startAnimation(animation)
         }
+    }
+
+    private fun dashboardMotionProfile(roleKey: String): DashboardMotionProfile = when (roleKey) {
+        "admin" -> DashboardMotionProfile(
+            pulseDurationMs = 180L,
+            pulseStartAlpha = 0.78f,
+            pulseStartScale = 0.976f,
+            loadingDurationMs = 620L,
+            loadingMinAlpha = 0.42f,
+            loadingStartOffsetMs = 0L,
+            statusLiftDp = 2f,
+        )
+        "affiliate" -> DashboardMotionProfile(
+            pulseDurationMs = 280L,
+            pulseStartAlpha = 0.86f,
+            pulseStartScale = 0.982f,
+            loadingDurationMs = 860L,
+            loadingMinAlpha = 0.56f,
+            loadingStartOffsetMs = 70L,
+            statusLiftDp = 1f,
+        )
+        else -> DashboardMotionProfile(
+            pulseDurationMs = 240L,
+            pulseStartAlpha = 0.84f,
+            pulseStartScale = 0.988f,
+            loadingDurationMs = 760L,
+            loadingMinAlpha = 0.5f,
+            loadingStartOffsetMs = 36L,
+            statusLiftDp = 1.5f,
+        )
     }
 
     private fun sectionSignalColor(roleKey: String): Int = when (roleKey) {
@@ -1362,22 +1405,41 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun beginSectionRefresh(label: TextView, card: MaterialCardView, roleKey: String) {
+        val motion = dashboardMotionProfile(roleKey)
         label.text = sectionStatusCopy(roleKey, isLoading = true)
         label.setTextColor(sectionSignalColor(roleKey))
         label.backgroundTintList = ColorStateList.valueOf(sectionChipTint(roleKey, isLoading = true))
         label.alpha = 1f
+        label.translationY = -motion.statusLiftDp * resources.displayMetrics.density
+        label.scaleX = 0.985f
+        label.scaleY = 0.985f
+        label.animate().cancel()
+        label.animate()
+            .translationY(0f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(motion.pulseDurationMs)
+            .start()
         card.strokeColor = sectionSignalColor(roleKey)
         card.strokeWidth = strokeWidthDp(2)
         startLoadingPulse(label)
     }
 
     private fun completeSectionRefresh(label: TextView, card: MaterialCardView, roleKey: String) {
+        val motion = dashboardMotionProfile(roleKey)
         label.clearAnimation()
         label.animate().cancel()
         label.alpha = 0.84f
         label.text = sectionStatusCopy(roleKey, isLoading = false)
         label.setTextColor(sectionLiveColor(roleKey))
         label.backgroundTintList = ColorStateList.valueOf(sectionChipTint(roleKey, isLoading = false))
+        label.translationY = 0f
+        label.scaleX = 1f
+        label.scaleY = 1f
+        label.animate()
+            .alpha(0.84f)
+            .setDuration((motion.pulseDurationMs * 0.8f).toLong())
+            .start()
         card.strokeColor = sectionLiveColor(roleKey)
         card.strokeWidth = strokeWidthDp(1)
     }
