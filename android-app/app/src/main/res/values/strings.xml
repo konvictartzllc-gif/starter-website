@@ -337,6 +337,8 @@
     <string name="ask_who_to_text">Who would you like me to text?</string>
     <string name="ask_who_to_email">Who would you like me to email?</string>
     <string name="ask_what_to_text">What would you like me to text %1$s?</string>
+    <string name="reminder_contact_choice_prompt">I found more than one match for %1$s: %2$s. Say first, second, or the full name you want.</string>
+    <string name="reminder_contact_choice_retry">I missed which contact you meant. Say first, second, third, or the full saved name.</string>
     <string name="sms_dictation_confirmation">I heard this text for %1$s: %2$s. Say yes use that, yes send, or say it again.</string>
     <string name="try_again_with_contact">Try again with the exact saved contact name.</string>
     <string name="default_email_subject">Message from Dex</string>

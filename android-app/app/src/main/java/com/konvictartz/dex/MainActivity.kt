@@ -92,6 +92,11 @@ private enum class DexSpeechProfile {
     PRONUNCIATION,
 }
 
+private enum class ReminderContactDisambiguationMode {
+    CALL,
+    TEXT,
+}
+
 private data class PendingAction(
     val kind: PendingActionKind,
     val summary: String,
@@ -109,6 +114,11 @@ private data class PendingAction(
 private data class ContactMatch(
     val displayName: String,
     val value: String,
+)
+
+private data class ScoredContactMatch(
+    val contact: ContactMatch,
+    val score: Int,
 )
 
 private data class DirectCallRequest(
@@ -200,6 +210,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingReminderCallTriggerAt: LocalDateTime? = null
     private var awaitingReminderCallContact = false
     private var pendingReminderCallTargetName: String? = null
+    private var pendingReminderContactChoices: List<ContactMatch> = emptyList()
+    private var pendingReminderContactDisambiguationMode: ReminderContactDisambiguationMode? = null
     private var pendingIncomingSmsSender: String? = null
     private var pendingIncomingSmsValue: String? = null
     private var pendingIncomingSmsBody: String? = null
@@ -969,6 +981,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingReminderCallTriggerAt = null
         awaitingReminderCallContact = false
         pendingReminderCallTargetName = null
+        pendingReminderContactChoices = emptyList()
+        pendingReminderContactDisambiguationMode = null
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
         pendingIncomingSmsBody = null
@@ -3580,6 +3594,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingReminderCallTriggerAt = null
         awaitingReminderCallContact = false
         pendingReminderCallTargetName = null
+        pendingReminderContactChoices = emptyList()
+        pendingReminderContactDisambiguationMode = null
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
         pendingIncomingSmsBody = null
@@ -3901,6 +3917,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (actionTaken) return true
         }
 
+        consumePendingReminderContactChoice(message)?.let { actionTaken ->
+            if (actionTaken) return true
+        }
+
         consumePendingReminderCallContact(message)?.let { actionTaken ->
             if (actionTaken) return true
         }
@@ -4198,6 +4218,108 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun consumePendingReminderContactChoice(message: String): Boolean? {
+        val choices = pendingReminderContactChoices
+        val mode = pendingReminderContactDisambiguationMode ?: return null
+        if (choices.isEmpty()) return null
+        val trimmed = message.trim()
+        if (trimmed.isBlank()) return false
+        val normalized = trimmed.lowercase(Locale.US)
+        if (normalized == "cancel" || normalized == "cancel it" || normalized == "never mind" || normalized == "stop") {
+            clearPendingReminderContactDisambiguation()
+            val reply = getString(R.string.pending_action_canceled)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return true
+        }
+
+        val chosen = when {
+            normalized == "first" || normalized == "the first one" || normalized == "number one" -> choices.getOrNull(0)
+            normalized == "second" || normalized == "the second one" || normalized == "number two" -> choices.getOrNull(1)
+            normalized == "third" || normalized == "the third one" || normalized == "number three" -> choices.getOrNull(2)
+            else -> choices.firstOrNull { candidate ->
+                val display = normalizeContactLookupText(candidate.displayName)
+                val spoken = normalizeContactLookupText(trimmed)
+                spoken == display || normalizeCompactContactText(spoken) == normalizeCompactContactText(display)
+            }
+        }
+
+        if (chosen == null) {
+            val reply = getString(R.string.reminder_contact_choice_retry)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return true
+        }
+
+        clearPendingReminderContactDisambiguation()
+        when (mode) {
+            ReminderContactDisambiguationMode.CALL -> {
+                awaitingReminderCallContact = false
+                val pendingTime = pendingReminderCallTriggerAt
+                pendingReminderCallTriggerAt = null
+                if (pendingTime != null) {
+                    val reply = scheduleCallReminder(chosen.displayName, pendingTime)
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                } else {
+                    pendingReminderCallTargetName = chosen.displayName
+                    val reply = getString(R.string.call_reminder_time_prompt, chosen.displayName)
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                }
+            }
+            ReminderContactDisambiguationMode.TEXT -> {
+                awaitingReminderSmsContact = false
+                val pendingBody = pendingReminderSmsBody
+                val pendingTime = pendingReminderSmsTriggerAt
+                pendingReminderSmsBody = null
+                pendingReminderSmsTriggerAt = null
+                when {
+                    pendingTime != null && !pendingBody.isNullOrBlank() -> {
+                        val reply = scheduleTextReminder(chosen, pendingBody, pendingTime)
+                        binding.conversationStatus.text = reply
+                        binding.lastReplyValue.text = reply
+                        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    }
+                    pendingTime != null -> {
+                        pendingSmsRecipient = chosen
+                        pendingSmsBodyDraft = null
+                        pendingReminderSmsTriggerAt = pendingTime
+                        val reply = getString(R.string.text_reminder_body_prompt, chosen.displayName, formatReminderDateTime(pendingTime))
+                        binding.conversationStatus.text = reply
+                        binding.lastReplyValue.text = reply
+                        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    }
+                    !pendingBody.isNullOrBlank() -> {
+                        pendingReminderSmsTarget = chosen
+                        pendingReminderSmsBody = pendingBody
+                        val reply = getString(R.string.text_reminder_time_prompt, chosen.displayName)
+                        binding.conversationStatus.text = reply
+                        binding.lastReplyValue.text = reply
+                        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    }
+                    else -> {
+                        pendingReminderSmsTarget = chosen
+                        val reply = getString(R.string.text_reminder_time_prompt, chosen.displayName)
+                        binding.conversationStatus.text = reply
+                        binding.lastReplyValue.text = reply
+                        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    }
+                }
+            }
+        }
+        return true
+    }
+
+    private fun clearPendingReminderContactDisambiguation() {
+        pendingReminderContactChoices = emptyList()
+        pendingReminderContactDisambiguationMode = null
+    }
+
     private fun consumePendingReminderSmsTime(message: String): Boolean? {
         val target = pendingReminderSmsTarget ?: return null
         val trimmed = message.trim()
@@ -4331,6 +4453,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             pendingReminderCallTriggerAt = if (hasExplicitReminderTime(resolvedMessage)) inferDateTimeFromCommand(resolvedMessage) else null
             return getString(R.string.call_reminder_contact_prompt)
         }
+        findAmbiguousPhoneContactMatches(rawTarget).takeIf { it.size > 1 }?.let { candidates ->
+            pendingReminderContactChoices = candidates
+            pendingReminderContactDisambiguationMode = ReminderContactDisambiguationMode.CALL
+            pendingReminderCallTriggerAt = if (hasExplicitReminderTime(resolvedMessage)) inferDateTimeFromCommand(resolvedMessage) else null
+            awaitingReminderCallContact = true
+            return buildReminderContactChoicePrompt(rawTarget, candidates)
+        }
 
         val reminderTarget =
             findExactPhoneContactByName(resolveContactAlias(rawTarget))?.displayName
@@ -4383,6 +4512,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val rawTarget = match.groupValues[1].trim()
             val reminderBody = match.groupValues[2].trim().trimEnd('.', '!', '?')
             if (rawTarget.isBlank() || reminderBody.isBlank()) return null
+            findAmbiguousPhoneContactMatches(rawTarget).takeIf { it.size > 1 }?.let { candidates ->
+                pendingReminderContactChoices = candidates
+                pendingReminderContactDisambiguationMode = ReminderContactDisambiguationMode.TEXT
+                pendingReminderSmsBody = reminderBody
+                pendingReminderSmsTriggerAt = if (hasExplicitReminderTime(resolvedMessage)) inferDateTimeFromCommand(resolvedMessage) else null
+                awaitingReminderSmsContact = true
+                return buildReminderContactChoicePrompt(rawTarget, candidates)
+            }
 
             val targetContact =
                 findExactPhoneContactByName(resolveContactAlias(rawTarget))
@@ -4424,6 +4561,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             )
             .trim()
         if (rawTarget.isBlank()) return null
+        findAmbiguousPhoneContactMatches(rawTarget).takeIf { it.size > 1 }?.let { candidates ->
+            pendingReminderContactChoices = candidates
+            pendingReminderContactDisambiguationMode = ReminderContactDisambiguationMode.TEXT
+            pendingReminderSmsBody = null
+            pendingReminderSmsTriggerAt = if (hasExplicitReminderTime(resolvedMessage)) inferDateTimeFromCommand(resolvedMessage) else null
+            awaitingReminderSmsContact = true
+            return buildReminderContactChoicePrompt(rawTarget, candidates)
+        }
         val targetContact =
             findExactPhoneContactByName(resolveContactAlias(rawTarget))
                 ?: findPhoneContactByName(resolveContactAlias(rawTarget))
@@ -4806,6 +4951,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             pendingReminderCallTriggerAt == null &&
             !awaitingReminderCallContact &&
             pendingReminderCallTargetName == null &&
+            pendingReminderContactChoices.isEmpty() &&
+            pendingReminderContactDisambiguationMode == null &&
             pendingSmsBodyDraft.isNullOrBlank() &&
             !listeningForQuizAnswer &&
             activeQuizSession == null &&
@@ -6020,19 +6167,35 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             ?.second
     }
 
+    private fun findAmbiguousPhoneContactMatches(name: String): List<ContactMatch> {
+        val scoredMatches = findScoredPhoneContactMatches(name, requireExact = false)
+        if (scoredMatches.size < 2) return emptyList()
+        val topScore = scoredMatches.first().score
+        val closeMatches = scoredMatches
+            .takeWhile { topScore - it.score <= 40 }
+            .map { it.contact }
+            .distinctBy { "${it.displayName}|${it.value}" }
+        return if (topScore >= 350 && closeMatches.size > 1) closeMatches.take(3) else emptyList()
+    }
+
     private fun findBestPhoneContactMatch(name: String, requireExact: Boolean): ContactMatch? {
+        return findScoredPhoneContactMatches(name, requireExact).firstOrNull()?.contact
+    }
+
+    private fun findScoredPhoneContactMatches(name: String, requireExact: Boolean): List<ScoredContactMatch> {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            return null
+            return emptyList()
         }
         val variants = buildContactLookupVariants(name)
-        if (variants.isEmpty()) return null
+        if (variants.isEmpty()) return emptyList()
 
         val contacts = readPhoneContacts()
         val exactMatch = contacts.firstOrNull { contact ->
             val display = normalizeContactLookupText(contact.displayName)
             display.isNotBlank() && variants.any { it == display || normalizeCompactContactText(it) == normalizeCompactContactText(display) }
         }
-        if (exactMatch != null || requireExact) return exactMatch
+        if (exactMatch != null) return listOf(ScoredContactMatch(exactMatch, 1000))
+        if (requireExact) return emptyList()
 
         return contacts
             .mapNotNull { contact ->
@@ -6051,11 +6214,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             else -> 0
                         }
                     } ?: 0
-                    if (score > 0) score to contact else null
+                    if (score > 0) ScoredContactMatch(contact, score) else null
                 }
             }
-            .maxByOrNull { it.first }
-            ?.second
+            .sortedByDescending { it.score }
+    }
+
+    private fun buildReminderContactChoicePrompt(originalName: String, candidates: List<ContactMatch>): String {
+        val names = candidates.mapIndexed { index, contact -> "${index + 1}. ${contact.displayName}" }.joinToString(", ")
+        return getString(R.string.reminder_contact_choice_prompt, originalName, names)
     }
 
     private fun readPhoneContacts(): List<ContactMatch> {
