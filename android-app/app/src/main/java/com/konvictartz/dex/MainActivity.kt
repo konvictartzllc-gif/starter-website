@@ -277,6 +277,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionName: String = "Dex"
     private var currentDexCompanionVoice: String = DEX_COMPANION_VOICE_SUPPORTIVE
     private var currentDexCompanionPersonality: String = DEX_COMPANION_PERSONALITY_COACH
+    private var dexCompanionIntroDismissed = false
     private var currentDexCompanionOffsetX = 0f
     private var currentDexCompanionOffsetY = 0f
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
@@ -963,6 +964,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             applyDexCompanionUi()
             persistHomeLook()
         }
+        binding.dexCompanionIntroDismissButton.setOnClickListener {
+            dexCompanionIntroDismissed = true
+            updateDexCompanionIntroUi()
+            persistHomeLook()
+        }
         binding.dexCompanionNameInput.doAfterTextChanged {
             currentDexCompanionName = it?.toString()?.trim().orEmpty().ifBlank { "Dex" }
             applyDexCompanionUi()
@@ -1163,6 +1169,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentDexCompanionPersonality = prefs.getString(KEY_DEX_COMPANION_PERSONALITY, DEX_COMPANION_PERSONALITY_COACH)
             .orEmpty()
             .ifBlank { DEX_COMPANION_PERSONALITY_COACH }
+        dexCompanionIntroDismissed = prefs.getBoolean(KEY_DEX_COMPANION_INTRO_DISMISSED, false)
         currentDexCompanionOffsetX = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_X, 0f)
         currentDexCompanionOffsetY = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_Y, 0f)
         updateAdvancedStyleUi(currentThemePreset == "custom")
@@ -3070,6 +3077,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_DEX_COMPANION_NAME, currentDexCompanionName)
             .putString(KEY_DEX_COMPANION_VOICE, currentDexCompanionVoice)
             .putString(KEY_DEX_COMPANION_PERSONALITY, currentDexCompanionPersonality)
+            .putBoolean(KEY_DEX_COMPANION_INTRO_DISMISSED, dexCompanionIntroDismissed)
             .putFloat(KEY_DEX_COMPANION_OFFSET_X, currentDexCompanionOffsetX)
             .putFloat(KEY_DEX_COMPANION_OFFSET_Y, currentDexCompanionOffsetY)
             .commit()
@@ -3081,6 +3089,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.toggleAdvancedStyleButton.text = getString(
             if (show) R.string.home_style_customize_less else R.string.home_style_customize_more
         )
+    }
+
+    private fun updateDexCompanionIntroUi() {
+        val shouldShowIntro =
+            !authToken.isNullOrBlank() &&
+                !currentUserRole.equals("admin", ignoreCase = true) &&
+                !dexCompanionIntroDismissed
+        binding.dexCompanionIntroStrip.visibility = if (shouldShowIntro) View.VISIBLE else View.GONE
     }
 
     private fun applyDexCompanionPersonalityPreset() {
@@ -3121,6 +3137,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun updateDexCompanionControls() {
+        updateDexCompanionIntroUi()
         if (binding.dexCompanionVisibleSwitch.isChecked != currentDexCompanionVisible) {
             binding.dexCompanionVisibleSwitch.isChecked = currentDexCompanionVisible
         }
@@ -8696,6 +8713,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_NAME = "dex_companion_name"
         const val KEY_DEX_COMPANION_VOICE = "dex_companion_voice"
         const val KEY_DEX_COMPANION_PERSONALITY = "dex_companion_personality"
+        const val KEY_DEX_COMPANION_INTRO_DISMISSED = "dex_companion_intro_dismissed"
         const val KEY_DEX_COMPANION_OFFSET_X = "dex_companion_offset_x"
         const val KEY_DEX_COMPANION_OFFSET_Y = "dex_companion_offset_y"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"

@@ -2686,6 +2686,39 @@
                         android:textColor="@color/dex_text_secondary"
                         android:textSize="13sp" />
 
+                    <LinearLayout
+                        android:id="@+id/dexCompanionIntroStrip"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/dashboard_chip_surface"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="10dp"
+                        android:paddingTop="8dp"
+                        android:paddingEnd="10dp"
+                        android:paddingBottom="8dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/dexCompanionIntroText"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/dex_companion_intro"
+                            android:textColor="@android:color/white"
+                            android:textSize="12sp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/dexCompanionIntroDismissButton"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:minWidth="0dp"
+                            android:text="@string/dex_companion_intro_got_it" />
+                    </LinearLayout>
+
                     <com.google.android.material.switchmaterial.SwitchMaterial
                         android:id="@+id/dexCompanionVisibleSwitch"
                         android:layout_width="match_parent"
