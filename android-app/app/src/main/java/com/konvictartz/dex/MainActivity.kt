@@ -7740,23 +7740,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
 
-        val caller = lastCaller.takeUnless { it.isBlank() } ?: "Unknown caller"
-        val number = lastIncomingNumber
-        createCallFollowUpTask(caller, number)
-        declineRingingCall()
-        val draftedReply = buildCallMessageDraft(caller, number)?.also { queuePendingAction(it) } != null
-
-        val reply = if (number.isNullOrBlank()) {
-            getString(R.string.call_message_taken_no_number, caller)
-        } else {
-            getString(R.string.call_message_taken, caller)
-        }
+        stopListeningForCallCommand()
+        val reply = getString(R.string.call_message_taking)
         binding.callMonitorStatus.text = reply
         binding.conversationStatus.text = reply
         binding.lastReplyValue.text = reply
-        if (!draftedReply) {
-            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+        val intent = Intent(this, DexForegroundService::class.java).apply {
+            action = DexForegroundService.ACTION_CALL_TAKE_MESSAGE
         }
+        ContextCompat.startForegroundService(this, intent)
     }
 
     private fun handleTaskIntent(message: String): Boolean {

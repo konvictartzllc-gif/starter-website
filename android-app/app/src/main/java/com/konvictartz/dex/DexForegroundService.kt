@@ -77,6 +77,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var pendingReminderTextBody: String? = null
     private var backgroundRecognizerRecoveryAttempts = 0
     private var wakeWordEngine: DexWakeWordEngine? = null
+    private var autoTakeMessageRunnable: Runnable? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private inner class DexCallStateCallback : TelephonyCallback(), TelephonyCallback.CallStateListener {
@@ -149,6 +150,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     override fun onDestroy() {
         val shouldRestart = shouldKeepServiceAlive()
+        clearPendingAutoTakeMessage()
         stopCallMonitoring()
         stopBackgroundWakeWordListening()
         speechRecognizer?.destroy()
@@ -403,6 +405,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun handleCallStateChanged(state: Int, phoneNumber: String?) {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getBoolean(MainActivity.KEY_APP_IN_FOREGROUND, false)) {
+            clearPendingAutoTakeMessage()
             lastCallState = state
             return
         }
@@ -411,6 +414,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val autoDeclineSpam = prefs.getBoolean(MainActivity.KEY_AUTO_DECLINE_SPAM, true)
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
+                clearPendingAutoTakeMessage()
                 currentCallWasAnswered = false
                 lastIncomingNumber = rawNumber.ifBlank { null }
                 lastCaller = resolvedCaller
@@ -421,10 +425,13 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 } else {
                     postCallEvent("incoming", resolvedCaller)
                     showIncomingCallNotification(resolvedCaller)
-                    speakIncomingCallPrompt(resolvedCaller)
+                    if (!scheduleAutoTakeMessageIfNeeded(prefs, rawNumber, resolvedCaller)) {
+                        speakIncomingCallPrompt(resolvedCaller)
+                    }
                 }
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
+                clearPendingAutoTakeMessage()
                 currentCallWasAnswered = true
                 dismissNotification(CALL_NOTIFICATION_ID)
                 if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
@@ -432,6 +439,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 }
             }
             TelephonyManager.CALL_STATE_IDLE -> {
+                clearPendingAutoTakeMessage()
                 dismissNotification(CALL_NOTIFICATION_ID)
                 if (lastCallState == TelephonyManager.CALL_STATE_RINGING && !currentCallWasAnswered) {
                     postCallEvent("declined", resolvedCaller)
@@ -469,6 +477,42 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
         val contactName = lookupContactName(rawNumber)
         return contactName ?: rawNumber
+    }
+
+    private fun scheduleAutoTakeMessageIfNeeded(
+        prefs: android.content.SharedPreferences,
+        rawNumber: String,
+        resolvedCaller: String
+    ): Boolean {
+        val autoKnownContacts = prefs.getBoolean(MainActivity.KEY_AUTO_ANSWER_KNOWN_CONTACTS, false)
+        val autoAnyNonSpam = prefs.getBoolean(MainActivity.KEY_AUTO_ANSWER_ANY_NON_SPAM, false)
+        if (!autoKnownContacts && !autoAnyNonSpam) return false
+
+        val knownContact = rawNumber.isNotBlank() && lookupContactName(rawNumber) != null
+        val shouldAutoTakeMessage =
+            (autoKnownContacts && knownContact) || (autoAnyNonSpam && rawNumber.isNotBlank())
+        if (!shouldAutoTakeMessage) return false
+
+        val detail =
+            if (knownContact) {
+                getString(R.string.call_auto_take_message_known_contact, resolvedCaller)
+            } else {
+                getString(R.string.call_auto_take_message_any, resolvedCaller)
+            }
+        MainActivity.appendPersistentActivityLog(this, "Call", detail)
+
+        autoTakeMessageRunnable = Runnable {
+            autoTakeMessageRunnable = null
+            if (lastCallState != TelephonyManager.CALL_STATE_RINGING || currentCallWasAnswered) return@Runnable
+            handleCallTakeMessageAction()
+        }
+        mainHandler.postDelayed(autoTakeMessageRunnable!!, AUTO_TAKE_MESSAGE_DELAY_MS)
+        return true
+    }
+
+    private fun clearPendingAutoTakeMessage() {
+        autoTakeMessageRunnable?.let(mainHandler::removeCallbacks)
+        autoTakeMessageRunnable = null
     }
 
     private fun lookupContactName(phoneNumber: String): String? {
@@ -669,6 +713,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         currentCallWasAnswered = true
         enableSpeakerForActiveCall()
         dismissNotification(CALL_NOTIFICATION_ID)
+        postCallEvent("taking_message", lastCaller)
         speakAndThenListen(
             getString(R.string.call_message_answer_prompt),
             BackgroundListenMode.CALLER_MESSAGE
@@ -1581,6 +1626,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val EXTRA_NOTIFICATION_TITLE = "extra_notification_title"
         const val EXTRA_NOTIFICATION_TEXT = "extra_notification_text"
         const val KEY_REMOTE_REPLY_TEXT = "dex_remote_reply_text"
+        private const val AUTO_TAKE_MESSAGE_DELAY_MS = 5500L
         private const val DEX_TTS_BACKGROUND_RATE = 0.88f
         private const val DEX_TTS_PITCH = 0.95f
         private const val BACKGROUND_RECOGNIZER_RECOVERY_DELAY_MS = 900L
