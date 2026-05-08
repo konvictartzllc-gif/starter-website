@@ -80,6 +80,12 @@ private enum class CallVoiceAction {
     TAKE_MESSAGE,
 }
 
+private enum class HintTone {
+    NEXT_STEP,
+    READY,
+    HEALTHY,
+}
+
 private enum class DecorationPickTarget {
     BACKGROUND,
     LEFT_STICKER,
@@ -1237,10 +1243,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         else -> null
     }
 
-    private fun setHintBand(view: TextView, message: String?) {
+    private fun setHintBand(view: TextView, message: String?, tone: HintTone = HintTone.NEXT_STEP) {
         val text = message?.trim().orEmpty()
         view.text = text
-        view.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+        if (text.isBlank()) {
+            view.visibility = View.GONE
+            return
+        }
+        val (backgroundColor, textColor) = when (tone) {
+            HintTone.READY -> R.color.dex_hint_ready_bg to R.color.dex_hint_ready_text
+            HintTone.HEALTHY -> R.color.dex_hint_healthy_bg to R.color.dex_hint_healthy_text
+            HintTone.NEXT_STEP -> R.color.dex_hint_next_bg to R.color.dex_hint_next_text
+        }
+        view.backgroundTintList = ColorStateList.valueOf(getColorCompat(backgroundColor))
+        view.setTextColor(getColorCompat(textColor))
+        view.visibility = View.VISIBLE
     }
 
     private fun beginSectionRefresh(label: TextView, card: MaterialCardView, roleKey: String) {
@@ -1525,7 +1542,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         if (streak > 0) getString(R.string.dashboard_active_hint_streak)
                         else if (lessons > 0 || !nextLesson?.optString("topic").isNullOrBlank()) getString(R.string.dashboard_active_hint_lessons)
                         else null
-                    setHintBand(binding.userDashboardHint, if (showUserHint) dashboardHintCopy() else activeUserHint)
+                    setHintBand(
+                        binding.userDashboardHint,
+                        if (showUserHint) dashboardHintCopy() else activeUserHint,
+                        if (streak > 0) HintTone.HEALTHY else if (showUserHint) HintTone.NEXT_STEP else HintTone.READY
+                    )
                     pulseDashboardValues(
                         binding.userDashboardLessonCount,
                         binding.userDashboardQuizScore,
@@ -1540,7 +1561,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         getString(R.string.quiz_score_empty)
                     )
                     binding.learningQuizPreview.text = dashboardActivityEmptyCopy()
-                    setHintBand(binding.userDashboardHint, dashboardHintCopy())
+                    setHintBand(binding.userDashboardHint, dashboardHintCopy(), HintTone.NEXT_STEP)
                     pulseDashboardValues(
                         binding.userDashboardLessonCount,
                         binding.userDashboardQuizScore,
@@ -1565,7 +1586,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         setHintBand(
                             binding.affiliateDashboardHint,
                             if (showAffiliateHint) getString(R.string.affiliate_hint_empty)
-                            else getString(R.string.affiliate_hint_active)
+                            else getString(R.string.affiliate_hint_active),
+                            if (showAffiliateHint) HintTone.NEXT_STEP else HintTone.HEALTHY
                         )
                         pulseDashboardValues(
                             binding.affiliatePromoCode,
@@ -1585,7 +1607,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         binding.affiliateSignups.text = getString(R.string.affiliate_signups, 0)
                         binding.affiliatePaidSubs.text = getString(R.string.affiliate_paid_subs, 0)
                         binding.affiliateWithdrawNote.text = getString(R.string.affiliate_withdraw_note_empty)
-                        setHintBand(binding.affiliateDashboardHint, getString(R.string.affiliate_hint_empty))
+                        setHintBand(binding.affiliateDashboardHint, getString(R.string.affiliate_hint_empty), HintTone.NEXT_STEP)
                         pulseDashboardValues(
                             binding.affiliatePromoCode,
                             binding.affiliateEarnings,
@@ -1617,7 +1639,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         setHintBand(
                             binding.adminDashboardHint,
                             if (showAdminHint) getString(R.string.admin_hint_empty)
-                            else getString(R.string.admin_hint_active)
+                            else getString(R.string.admin_hint_active),
+                            if (showAdminHint) HintTone.NEXT_STEP else HintTone.HEALTHY
                         )
                         pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
                         completeSectionRefresh(
@@ -1628,7 +1651,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     }
                     .onFailure {
                         binding.adminStatsValue.text = getString(R.string.admin_stats_empty)
-                        setHintBand(binding.adminDashboardHint, getString(R.string.admin_hint_empty))
+                        setHintBand(binding.adminDashboardHint, getString(R.string.admin_hint_empty), HintTone.NEXT_STEP)
                         pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
                         completeSectionRefresh(
                             binding.adminDashboardStatus,
@@ -2279,7 +2302,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         setHintBand(
             binding.billingHint,
-            if (access == "unknown") billingHintCopy() else billingActiveHintCopy(access)
+            if (access == "unknown") billingHintCopy() else billingActiveHintCopy(access),
+            when (access) {
+                "paid", "unlimited" -> HintTone.HEALTHY
+                "trial" -> HintTone.READY
+                else -> HintTone.NEXT_STEP
+            }
         )
         binding.subscribeNowButton.visibility = if (access == "paid" || access == "unlimited") View.GONE else View.VISIBLE
         binding.manageBillingButton.visibility = if (hasBillingCustomer || access == "paid") View.VISIBLE else View.GONE
@@ -2809,6 +2837,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         getString(R.string.learning_hint_active_reminder)
                     } else {
                         getString(R.string.learning_hint_active_ready)
+                    },
+                    if (preferences.optString("learning_target_language").isBlank()) {
+                        HintTone.NEXT_STEP
+                    } else if (enabled && time.isNotBlank()) {
+                        HintTone.HEALTHY
+                    } else {
+                        HintTone.READY
                     }
                 )
                 binding.learningReminderSummary.text =
@@ -2839,7 +2874,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 // Keep reminder sync quiet if preferences are unavailable.
                 binding.learningProfileSummary.text = learningProfileMissingCopy()
                 binding.learningReminderSummary.text = getString(R.string.learning_reminder_off)
-                setHintBand(binding.learningCenterHint, learningHintCopy())
+                setHintBand(binding.learningCenterHint, learningHintCopy(), HintTone.NEXT_STEP)
                 pulseDashboardValues(binding.learningProfileSummary, binding.learningReminderSummary)
                 completeSectionRefresh(
                     binding.learningCenterStatus,

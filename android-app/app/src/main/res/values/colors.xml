@@ -28,5 +28,11 @@
     <color name="dex_admin_stroke">#8A5B51</color>
     <color name="dex_status_loading">#8EDCFF</color>
     <color name="dex_status_live">#90A0B3</color>
+    <color name="dex_hint_next_bg">#243240</color>
+    <color name="dex_hint_next_text">#B7C2D0</color>
+    <color name="dex_hint_ready_bg">#1E3A4B</color>
+    <color name="dex_hint_ready_text">#A8E3FF</color>
+    <color name="dex_hint_healthy_bg">#1C332A</color>
+    <color name="dex_hint_healthy_text">#9BE3BE</color>
     <color name="dex_text_secondary">#B7C2D0</color>
 </resources>
