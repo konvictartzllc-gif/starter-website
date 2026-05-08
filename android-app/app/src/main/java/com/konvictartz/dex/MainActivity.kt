@@ -259,6 +259,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionMood: String = DEX_COMPANION_MOOD_CALM
     private var currentDexCompanionSize: String = DEX_COMPANION_SIZE_MEDIUM
     private var currentDexCompanionSide: String = DEX_COMPANION_SIDE_RIGHT
+    private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
+    private var dexCompanionBubbleOverride: String? = null
     private var dexCompanionFloatAnimator: AnimatorSet? = null
     private var dexCompanionBlinkScheduled = false
     private var pendingDecorationPickTarget: DecorationPickTarget? = null
@@ -307,6 +309,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (binding.dexCompanionCard.visibility != View.VISIBLE) return@Runnable
         blinkDexCompanion()
         scheduleDexCompanionBlink()
+    }
+
+    private val dexCompanionStateResetRunnable = Runnable {
+        dexCompanionBubbleOverride = null
+        dexCompanionState = deriveDexCompanionState()
+        applyDexCompanionUi()
     }
 
     private val permissionLauncher =
@@ -365,7 +373,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         telecomManager = getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
         textToSpeech = TextToSpeech(this, this)
         textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) = Unit
+            override fun onStart(utteranceId: String?) {
+                runOnUiThread {
+                    setDexCompanionState(DEX_COMPANION_STATE_TALKING)
+                }
+            }
 
             override fun onDone(utteranceId: String?) {
                 runOnUiThread {
@@ -388,6 +400,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         shouldResumeCallListeningAfterSpeech = false
                         mainHandler.postDelayed({ startListeningForCallCommand() }, CALL_COMMAND_PROMPT_GUARD_DELAY_MS)
                     }
+                    restoreDexCompanionState()
                 }
             }
 
@@ -414,6 +427,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         shouldResumeCallListeningAfterSpeech = false
                         mainHandler.postDelayed({ startListeningForCallCommand() }, CALL_COMMAND_PROMPT_GUARD_DELAY_MS)
                     }
+                    restoreDexCompanionState()
                 }
             }
         })
@@ -477,6 +491,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         stopCallMonitoring()
         stopListeningForCallCommand()
         updateCallActionVisibility(false)
+        mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
         stopDexCompanionAnimation()
         maintainBackgroundService()
         super.onStop()
@@ -492,6 +507,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         mainHandler.removeCallbacks(resetWakeWindowRunnable)
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
         mainHandler.removeCallbacks(dexCompanionBlinkRunnable)
+        mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
         stopDexCompanionAnimation()
         wakeWordEngine?.stop()
         wakeSpeechRecognizer?.destroy()
@@ -2948,6 +2964,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!shouldShowCompanion) {
             stopDexCompanionAnimation()
             mainHandler.removeCallbacks(dexCompanionBlinkRunnable)
+            mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
             dexCompanionBlinkScheduled = false
             return
         }
@@ -2958,6 +2975,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val cardTint = ColorUtils.setAlphaComponent(accentColor, 62)
         val faceTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.14f)
         val labelTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.82f)
+        val activeState = dexCompanionState.ifBlank { deriveDexCompanionState() }
 
         binding.dexCompanionBubble.backgroundTintList = ColorStateList.valueOf(bubbleTint)
         binding.dexCompanionCard.setCardBackgroundColor(ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_panel), 208))
@@ -2974,11 +2992,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionLabel.setTextColor(labelTint)
         binding.dexCompanionBubble.setTextColor(getColorCompat(R.color.dex_background))
 
-        binding.dexCompanionBubble.text = when (currentDexCompanionMood.lowercase(Locale.US)) {
-            DEX_COMPANION_MOOD_PLAYFUL -> getString(R.string.dex_companion_bubble_playful)
-            DEX_COMPANION_MOOD_FOCUS -> getString(R.string.dex_companion_bubble_focus)
-            else -> getString(R.string.dex_companion_bubble_calm)
-        }
+        binding.dexCompanionBubble.text = dexCompanionBubbleOverride ?: companionBubbleForState(activeState)
 
         val faceSize = dpToPx(
             when (currentDexCompanionSize.lowercase(Locale.US)) {
@@ -2992,30 +3006,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             height = faceSize
         }
 
-        val mouthWidth = dpToPx(
-            when (currentDexCompanionMood.lowercase(Locale.US)) {
-                DEX_COMPANION_MOOD_PLAYFUL -> 24
-                DEX_COMPANION_MOOD_FOCUS -> 12
-                else -> 18
-            }
-        )
+        val mouthWidth = dpToPx(companionMouthWidthDp(activeState))
         binding.dexCompanionMouth.layoutParams = binding.dexCompanionMouth.layoutParams.apply {
             width = mouthWidth
         }
-        binding.dexCompanionMouth.alpha = when (currentDexCompanionMood.lowercase(Locale.US)) {
-            DEX_COMPANION_MOOD_PLAYFUL -> 1f
-            DEX_COMPANION_MOOD_FOCUS -> 0.84f
-            else -> 0.92f
-        }
-        binding.dexCompanionBubble.alpha = when (currentDexCompanionMood.lowercase(Locale.US)) {
-            DEX_COMPANION_MOOD_PLAYFUL -> 1f
-            DEX_COMPANION_MOOD_FOCUS -> 0.96f
-            else -> 0.98f
-        }
-        binding.dexCompanionBubble.rotation = when (currentDexCompanionMood.lowercase(Locale.US)) {
-            DEX_COMPANION_MOOD_PLAYFUL -> -1.5f
-            else -> 0f
-        }
+        binding.dexCompanionMouth.alpha = companionMouthAlpha(activeState)
+        binding.dexCompanionBubble.alpha = companionBubbleAlpha(activeState)
+        binding.dexCompanionBubble.rotation = companionBubbleRotation(activeState)
+        val eyeScale = companionEyeScale(activeState)
+        binding.dexCompanionEyeLeft.scaleY = eyeScale
+        binding.dexCompanionEyeRight.scaleY = eyeScale
+        binding.dexCompanionFace.scaleX = companionFaceScale(activeState)
+        binding.dexCompanionFace.scaleY = companionFaceScale(activeState)
+        binding.dexCompanionCard.alpha = if (activeState == DEX_COMPANION_STATE_PENDING) 1f else 0.98f
 
         (binding.dexCompanionCard.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
             val sideGravity = if (currentDexCompanionSide.lowercase(Locale.US) == DEX_COMPANION_SIDE_LEFT) {
@@ -3035,17 +3038,133 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         scheduleDexCompanionBlink()
     }
 
+    private fun deriveDexCompanionState(): String {
+        return when {
+            pendingAction != null -> DEX_COMPANION_STATE_PENDING
+            shouldResumeCallListeningAfterSpeech || isListeningForCallCommand || lastCallState == TelephonyManager.CALL_STATE_RINGING -> DEX_COMPANION_STATE_ALERT
+            dexChatInFlight -> DEX_COMPANION_STATE_EXCITED
+            isListeningForDexCommand || awaitingWakeCommand || conversationActive -> DEX_COMPANION_STATE_LISTENING
+            else -> DEX_COMPANION_STATE_IDLE
+        }
+    }
+
+    private fun setDexCompanionState(
+        state: String,
+        bubbleOverride: String? = null,
+        revertAfterMs: Long? = null
+    ) {
+        dexCompanionState = state
+        dexCompanionBubbleOverride = bubbleOverride
+        applyDexCompanionUi()
+        mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
+        if (revertAfterMs != null) {
+            mainHandler.postDelayed(dexCompanionStateResetRunnable, revertAfterMs)
+        }
+    }
+
+    private fun restoreDexCompanionState() {
+        mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
+        dexCompanionBubbleOverride = null
+        dexCompanionState = deriveDexCompanionState()
+        applyDexCompanionUi()
+    }
+
+    private fun companionBubbleForState(state: String): String {
+        return when (state) {
+            DEX_COMPANION_STATE_LISTENING -> getString(R.string.dex_companion_bubble_listening)
+            DEX_COMPANION_STATE_EXCITED -> getString(R.string.dex_companion_bubble_excited)
+            DEX_COMPANION_STATE_TALKING -> getString(R.string.dex_companion_bubble_talking)
+            DEX_COMPANION_STATE_PENDING -> getString(R.string.dex_companion_bubble_pending)
+            DEX_COMPANION_STATE_ALERT -> getString(R.string.dex_companion_bubble_alert)
+            else -> when (currentDexCompanionMood.lowercase(Locale.US)) {
+                DEX_COMPANION_MOOD_PLAYFUL -> getString(R.string.dex_companion_bubble_playful)
+                DEX_COMPANION_MOOD_FOCUS -> getString(R.string.dex_companion_bubble_focus)
+                else -> getString(R.string.dex_companion_bubble_calm)
+            }
+        }
+    }
+
+    private fun companionMouthWidthDp(state: String): Int {
+        return when (state) {
+            DEX_COMPANION_STATE_LISTENING -> 10
+            DEX_COMPANION_STATE_EXCITED -> 26
+            DEX_COMPANION_STATE_TALKING -> 20
+            DEX_COMPANION_STATE_PENDING -> 22
+            DEX_COMPANION_STATE_ALERT -> 14
+            else -> when (currentDexCompanionMood.lowercase(Locale.US)) {
+                DEX_COMPANION_MOOD_PLAYFUL -> 24
+                DEX_COMPANION_MOOD_FOCUS -> 12
+                else -> 18
+            }
+        }
+    }
+
+    private fun companionMouthAlpha(state: String): Float {
+        return when (state) {
+            DEX_COMPANION_STATE_EXCITED, DEX_COMPANION_STATE_PENDING -> 1f
+            DEX_COMPANION_STATE_LISTENING, DEX_COMPANION_STATE_ALERT -> 0.82f
+            else -> when (currentDexCompanionMood.lowercase(Locale.US)) {
+                DEX_COMPANION_MOOD_PLAYFUL -> 1f
+                DEX_COMPANION_MOOD_FOCUS -> 0.84f
+                else -> 0.92f
+            }
+        }
+    }
+
+    private fun companionBubbleAlpha(state: String): Float {
+        return when (state) {
+            DEX_COMPANION_STATE_LISTENING, DEX_COMPANION_STATE_TALKING -> 1f
+            DEX_COMPANION_STATE_PENDING -> 0.99f
+            else -> when (currentDexCompanionMood.lowercase(Locale.US)) {
+                DEX_COMPANION_MOOD_PLAYFUL -> 1f
+                DEX_COMPANION_MOOD_FOCUS -> 0.96f
+                else -> 0.98f
+            }
+        }
+    }
+
+    private fun companionBubbleRotation(state: String): Float {
+        return when (state) {
+            DEX_COMPANION_STATE_EXCITED -> -2f
+            DEX_COMPANION_STATE_PENDING -> -1f
+            else -> if (currentDexCompanionMood.lowercase(Locale.US) == DEX_COMPANION_MOOD_PLAYFUL) -1.5f else 0f
+        }
+    }
+
+    private fun companionEyeScale(state: String): Float {
+        return when (state) {
+            DEX_COMPANION_STATE_LISTENING -> 1.25f
+            DEX_COMPANION_STATE_EXCITED -> 1.15f
+            DEX_COMPANION_STATE_ALERT -> 0.85f
+            else -> 1f
+        }
+    }
+
+    private fun companionFaceScale(state: String): Float {
+        return when (state) {
+            DEX_COMPANION_STATE_EXCITED -> 1.05f
+            DEX_COMPANION_STATE_PENDING -> 1.03f
+            else -> 1f
+        }
+    }
+
     private fun startDexCompanionAnimation() {
         stopDexCompanionAnimation()
-        val role = currentDexCompanionMood.lowercase(Locale.US)
+        val motionKey = if (dexCompanionState == DEX_COMPANION_STATE_EXCITED || dexCompanionState == DEX_COMPANION_STATE_PENDING) {
+            DEX_COMPANION_MOOD_PLAYFUL
+        } else if (dexCompanionState == DEX_COMPANION_STATE_ALERT || dexCompanionState == DEX_COMPANION_STATE_LISTENING) {
+            DEX_COMPANION_MOOD_FOCUS
+        } else {
+            currentDexCompanionMood.lowercase(Locale.US)
+        }
         val bobDistance = dpToPx(
-            when (role) {
+            when (motionKey) {
                 DEX_COMPANION_MOOD_PLAYFUL -> 8
                 DEX_COMPANION_MOOD_FOCUS -> 4
                 else -> 6
             }
         ).toFloat()
-        val duration = when (role) {
+        val duration = when (motionKey) {
             DEX_COMPANION_MOOD_PLAYFUL -> 1700L
             DEX_COMPANION_MOOD_FOCUS -> 2400L
             else -> 2100L
@@ -3070,7 +3189,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.dexCompanionCard,
             View.TRANSLATION_X,
             0f,
-            if (role == DEX_COMPANION_MOOD_PLAYFUL) dpToPx(2).toFloat() else 0f,
+            if (motionKey == DEX_COMPANION_MOOD_PLAYFUL) dpToPx(2).toFloat() else 0f,
             0f
         ).apply {
             this.duration = duration
@@ -3218,6 +3337,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (action != null) {
             binding.pendingActionSummary.text = action.summary
             binding.pendingActionDetail.text = action.detail
+        }
+        if (action != null) {
+            setDexCompanionState(
+                DEX_COMPANION_STATE_PENDING,
+                bubbleOverride = getString(R.string.dex_companion_bubble_pending),
+                revertAfterMs = 2600L
+            )
+        } else {
+            restoreDexCompanionState()
         }
         refreshInteractionStates()
     }
@@ -4506,6 +4634,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
         isListeningForDexCommand = false
         isListeningForCallCommand = true
+        setDexCompanionState(
+            DEX_COMPANION_STATE_ALERT,
+            bubbleOverride = getString(R.string.dex_companion_bubble_alert),
+            revertAfterMs = 3200L
+        )
         recognizer.cancel()
         recognizer.startListening(intent)
     }
@@ -4516,6 +4649,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         shouldResumeCallListeningAfterSpeech = false
         speechRecognizer?.stopListening()
         speechRecognizer?.cancel()
+        restoreDexCompanionState()
     }
 
     private fun startDexCommandListening() {
@@ -4537,10 +4671,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             recognizer.cancel()
             isListeningForDexCommand = true
             lastWakeListenStartedAt = SystemClock.elapsedRealtime()
+            setDexCompanionState(
+                DEX_COMPANION_STATE_LISTENING,
+                bubbleOverride = getString(R.string.dex_companion_bubble_listening),
+                revertAfterMs = 3200L
+            )
             recognizer.startListening(intent)
         } catch (_: Exception) {
             isListeningForDexCommand = false
             binding.conversationStatus.text = getString(R.string.wake_mode_unavailable)
+            restoreDexCompanionState()
         }
     }
 
@@ -4574,6 +4714,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             automatic -> getString(R.string.wake_mode_auto_started)
             else -> getString(R.string.wake_mode_waiting)
         }
+        restoreDexCompanionState()
         updateWakeUi()
         maintainBackgroundService()
         if (!wakeWordEngineActive) {
@@ -4597,6 +4738,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!isListeningForCallCommand) {
             speechRecognizer?.cancel()
         }
+        restoreDexCompanionState()
         updateWakeUi()
         maintainBackgroundService()
     }
@@ -4618,6 +4760,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         try {
             recognizer.cancel()
             lastWakeListenStartedAt = SystemClock.elapsedRealtime()
+            restoreDexCompanionState()
             recognizer.startListening(intent)
         } catch (_: Exception) {
             binding.conversationStatus.text = getString(R.string.wake_mode_unavailable)
@@ -4642,6 +4785,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         scheduleConversationTimeout()
         binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
         resumeCommandCaptureAfterWakePrompt = true
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = getString(R.string.dex_companion_bubble_excited),
+            revertAfterMs = 2400L
+        )
         speakDex(
             getString(R.string.wake_mode_acknowledged),
             R.string.voice_speaking,
@@ -7856,6 +8004,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_SIZE_LARGE = "large"
         private const val DEX_COMPANION_SIDE_LEFT = "left"
         private const val DEX_COMPANION_SIDE_RIGHT = "right"
+        private const val DEX_COMPANION_STATE_IDLE = "idle"
+        private const val DEX_COMPANION_STATE_LISTENING = "listening"
+        private const val DEX_COMPANION_STATE_EXCITED = "excited"
+        private const val DEX_COMPANION_STATE_TALKING = "talking"
+        private const val DEX_COMPANION_STATE_PENDING = "pending"
+        private const val DEX_COMPANION_STATE_ALERT = "alert"
         private val WAKE_WORD_VARIANTS = listOf(
             "hey dex",
             "hey decks",

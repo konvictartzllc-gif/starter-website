@@ -171,6 +171,11 @@
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>
     <string name="dex_companion_bubble_focus">Lets lock in.</string>
+    <string name="dex_companion_bubble_listening">I am listening.</string>
+    <string name="dex_companion_bubble_excited">Okay, lets do it.</string>
+    <string name="dex_companion_bubble_talking">Talking it through.</string>
+    <string name="dex_companion_bubble_pending">I have this ready.</string>
+    <string name="dex_companion_bubble_alert">Something needs you.</string>
     <string name="home_background_image">Background image</string>
     <string name="home_clear_background">Clear background</string>
     <string name="home_left_sticker">Left sticker</string>
