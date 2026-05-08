@@ -201,6 +201,11 @@
     <string name="dex_companion_rewards_summary">Your daily play clears unlock little upgrades for Dex. This is where you can see what you have earned.</string>
     <string name="dex_companion_rewards_value">Tier: %1$s\nStyle: %2$s\nPerk: %3$s\nClears: %4$d daily clears\nFavorite: %5$s</string>
     <string name="dex_companion_rewards_value_preview">Live tier: %1$s\nPreviewing: %2$s\nPerk: %3$s\nClears: %4$d daily clears\nFavorite: %5$s</string>
+    <string name="dex_companion_rewards_shelf_line">Shelf: %1$s  %2$s  %3$s</string>
+    <string name="dex_companion_rewards_shelf_ready">[%1$s ready]</string>
+    <string name="dex_companion_rewards_shelf_locked">[%1$s locked]</string>
+    <string name="dex_companion_rewards_shelf_preview">[%1$s preview]</string>
+    <string name="dex_companion_rewards_shelf_pinned">[%1$s pinned]</string>
     <string name="dex_companion_rewards_tap_hint">Tap to preview reward tiers. Long-press to pin an unlocked look.</string>
     <string name="dex_companion_rewards_preview_live">Back to your live tier: %1$s.</string>
     <string name="dex_companion_rewards_preview_switched">Previewing %1$s now.</string>

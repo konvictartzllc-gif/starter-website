@@ -3097,6 +3097,29 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun dexCompanionShelfBadge(level: Int): String {
+        val tier = dexGamesUnlockTier(level)
+        return when {
+            dexCompanionRewardsPreviewLevel == level ->
+                getString(R.string.dex_companion_rewards_shelf_preview, tier)
+            currentDexCompanionTierStyleOverride == level ->
+                getString(R.string.dex_companion_rewards_shelf_pinned, tier)
+            dexGamesUnlockLevel() >= level ->
+                getString(R.string.dex_companion_rewards_shelf_ready, tier)
+            else ->
+                getString(R.string.dex_companion_rewards_shelf_locked, tier)
+        }
+    }
+
+    private fun dexCompanionRewardsShelfLine(): String {
+        return getString(
+            R.string.dex_companion_rewards_shelf_line,
+            dexCompanionShelfBadge(1),
+            dexCompanionShelfBadge(2),
+            dexCompanionShelfBadge(3)
+        )
+    }
+
     private fun dexCompanionRewardsSummary(): String {
         val favorite = favoriteDexMiniGameLabel()
             ?: getString(R.string.dex_companion_rewards_favorite_none)
@@ -3127,7 +3150,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 favorite
             )
         }
-        return "$body\n${getString(R.string.dex_companion_rewards_tap_hint)}"
+        return "$body\n${dexCompanionRewardsShelfLine()}\n${getString(R.string.dex_companion_rewards_tap_hint)}"
     }
 
     private fun cycleDexCompanionRewardsPreview() {
