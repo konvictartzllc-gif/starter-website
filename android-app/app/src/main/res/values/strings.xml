@@ -175,6 +175,11 @@
     <string name="dex_companion_bubble_style_soft">Soft</string>
     <string name="dex_companion_bubble_style_glow">Glow</string>
     <string name="dex_companion_bubble_style_bold">Bold</string>
+    <string name="dex_companion_skin_label">Color skin</string>
+    <string name="dex_companion_skin_sky">Sky</string>
+    <string name="dex_companion_skin_mint">Mint</string>
+    <string name="dex_companion_skin_sunset">Sunset</string>
+    <string name="dex_companion_skin_violet">Violet</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>

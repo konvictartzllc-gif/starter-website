@@ -261,6 +261,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionSide: String = DEX_COMPANION_SIDE_RIGHT
     private var currentDexCompanionFaceStyle: String = DEX_COMPANION_FACE_CLASSIC
     private var currentDexCompanionBubbleStyle: String = DEX_COMPANION_BUBBLE_SOFT
+    private var currentDexCompanionSkin: String = DEX_COMPANION_SKIN_SKY
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
     private var dexCompanionBubbleOverride: String? = null
     private var dexCompanionFloatAnimator: AnimatorSet? = null
@@ -989,6 +990,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             applyDexCompanionUi()
             persistHomeLook()
         }
+        binding.dexCompanionSkinToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentDexCompanionSkin = when (checkedId) {
+                R.id.dexCompanionSkinMintButton -> DEX_COMPANION_SKIN_MINT
+                R.id.dexCompanionSkinSunsetButton -> DEX_COMPANION_SKIN_SUNSET
+                R.id.dexCompanionSkinVioletButton -> DEX_COMPANION_SKIN_VIOLET
+                else -> DEX_COMPANION_SKIN_SKY
+            }
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
 
         renderAuthMode()
         updateCallActionVisibility(false)
@@ -1049,6 +1061,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentDexCompanionBubbleStyle = prefs.getString(KEY_DEX_COMPANION_BUBBLE_STYLE, DEX_COMPANION_BUBBLE_SOFT)
             .orEmpty()
             .ifBlank { DEX_COMPANION_BUBBLE_SOFT }
+        currentDexCompanionSkin = prefs.getString(KEY_DEX_COMPANION_SKIN, DEX_COMPANION_SKIN_SKY)
+            .orEmpty()
+            .ifBlank { DEX_COMPANION_SKIN_SKY }
         updateAdvancedStyleUi(currentThemePreset == "custom")
         updateDexCompanionControls()
         loadDashboardSections()
@@ -2949,6 +2964,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_DEX_COMPANION_SIDE, currentDexCompanionSide)
             .putString(KEY_DEX_COMPANION_FACE_STYLE, currentDexCompanionFaceStyle)
             .putString(KEY_DEX_COMPANION_BUBBLE_STYLE, currentDexCompanionBubbleStyle)
+            .putString(KEY_DEX_COMPANION_SKIN, currentDexCompanionSkin)
             .commit()
     }
 
@@ -2998,6 +3014,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> R.id.dexCompanionBubbleStyleSoftButton
             }
         )
+        binding.dexCompanionSkinToggle.check(
+            when (currentDexCompanionSkin.lowercase(Locale.US)) {
+                DEX_COMPANION_SKIN_MINT -> R.id.dexCompanionSkinMintButton
+                DEX_COMPANION_SKIN_SUNSET -> R.id.dexCompanionSkinSunsetButton
+                DEX_COMPANION_SKIN_VIOLET -> R.id.dexCompanionSkinVioletButton
+                else -> R.id.dexCompanionSkinSkyButton
+            }
+        )
     }
 
     private fun applyDexCompanionUi() {
@@ -3013,11 +3037,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
 
-        val accentColor = runCatching { android.graphics.Color.parseColor(currentAccentColor) }
-            .getOrElse { getColorCompat(R.color.dex_accent) }
+        val skinColors = dexCompanionSkinColors()
+        val accentColor = skinColors.accent
         val bubbleTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.76f)
         val cardTint = ColorUtils.setAlphaComponent(accentColor, 62)
-        val faceTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.14f)
+        val faceTint = ColorUtils.blendARGB(accentColor, skinColors.faceBase, 0.18f)
         val labelTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.82f)
         val activeState = dexCompanionState.ifBlank { deriveDexCompanionState() }
         val isPixelFace = currentDexCompanionFaceStyle.lowercase(Locale.US) == DEX_COMPANION_FACE_PIXEL
@@ -3030,7 +3054,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             else -> bubbleTint
         }
         binding.dexCompanionBubble.backgroundTintList = ColorStateList.valueOf(styledBubbleTint)
-        binding.dexCompanionCard.setCardBackgroundColor(ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_panel), 208))
+        binding.dexCompanionCard.setCardBackgroundColor(ColorUtils.setAlphaComponent(skinColors.card, 220))
         binding.dexCompanionCard.strokeColor = cardTint
         binding.dexCompanionFace.setCardBackgroundColor(faceTint)
         binding.dexCompanionFace.strokeColor = labelTint
@@ -3212,6 +3236,38 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DEX_COMPANION_STATE_EXCITED -> 1.05f
             DEX_COMPANION_STATE_PENDING -> 1.03f
             else -> 1f
+        }
+    }
+
+    private data class DexCompanionSkinColors(
+        val accent: Int,
+        val card: Int,
+        val faceBase: Int,
+    )
+
+    private fun dexCompanionSkinColors(): DexCompanionSkinColors {
+        return when (currentDexCompanionSkin.lowercase(Locale.US)) {
+            DEX_COMPANION_SKIN_MINT -> DexCompanionSkinColors(
+                accent = getColorCompat(R.color.dex_affiliate_signal),
+                card = getColorCompat(R.color.dex_affiliate_panel),
+                faceBase = getColorCompat(R.color.dex_affiliate_readout)
+            )
+            DEX_COMPANION_SKIN_SUNSET -> DexCompanionSkinColors(
+                accent = getColorCompat(R.color.dex_admin_signal),
+                card = getColorCompat(R.color.dex_admin_panel),
+                faceBase = getColorCompat(R.color.dex_admin_readout)
+            )
+            DEX_COMPANION_SKIN_VIOLET -> DexCompanionSkinColors(
+                accent = android.graphics.Color.parseColor("#B18CFF"),
+                card = android.graphics.Color.parseColor("#241E33"),
+                faceBase = android.graphics.Color.parseColor("#34284A")
+            )
+            else -> DexCompanionSkinColors(
+                accent = runCatching { android.graphics.Color.parseColor(currentAccentColor) }
+                    .getOrElse { getColorCompat(R.color.dex_accent) },
+                card = getColorCompat(R.color.dex_panel),
+                faceBase = getColorCompat(R.color.dex_user_readout)
+            )
         }
     }
 
@@ -8041,6 +8097,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_SIDE = "dex_companion_side"
         const val KEY_DEX_COMPANION_FACE_STYLE = "dex_companion_face_style"
         const val KEY_DEX_COMPANION_BUBBLE_STYLE = "dex_companion_bubble_style"
+        const val KEY_DEX_COMPANION_SKIN = "dex_companion_skin"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"
@@ -8079,6 +8136,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_BUBBLE_SOFT = "soft"
         private const val DEX_COMPANION_BUBBLE_GLOW = "glow"
         private const val DEX_COMPANION_BUBBLE_BOLD = "bold"
+        private const val DEX_COMPANION_SKIN_SKY = "sky"
+        private const val DEX_COMPANION_SKIN_MINT = "mint"
+        private const val DEX_COMPANION_SKIN_SUNSET = "sunset"
+        private const val DEX_COMPANION_SKIN_VIOLET = "violet"
         private const val DEX_COMPANION_STATE_IDLE = "idle"
         private const val DEX_COMPANION_STATE_LISTENING = "listening"
         private const val DEX_COMPANION_STATE_EXCITED = "excited"

@@ -2880,6 +2880,52 @@
                             android:layout_height="wrap_content"
                             android:text="@string/dex_companion_bubble_style_bold" />
                     </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/dex_companion_skin_label"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/dexCompanionSkinToggle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        app:selectionRequired="true"
+                        app:singleSelection="true">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/dexCompanionSkinSkyButton"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dex_companion_skin_sky" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/dexCompanionSkinMintButton"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dex_companion_skin_mint" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/dexCompanionSkinSunsetButton"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dex_companion_skin_sunset" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/dexCompanionSkinVioletButton"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dex_companion_skin_violet" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
                 </LinearLayout>
 
                 <LinearLayout
