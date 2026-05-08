@@ -33,10 +33,12 @@ import android.telecom.TelecomManager
 import android.telephony.SmsManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Toast
 import android.widget.TextView
@@ -251,6 +253,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentBackgroundImageUri: String? = null
     private var currentLeftStickerUri: String? = null
     private var currentRightStickerUri: String? = null
+    private var currentDexCompanionVisible = true
+    private var currentDexCompanionMood: String = DEX_COMPANION_MOOD_CALM
+    private var currentDexCompanionSize: String = DEX_COMPANION_SIZE_MEDIUM
+    private var currentDexCompanionSide: String = DEX_COMPANION_SIDE_RIGHT
     private var pendingDecorationPickTarget: DecorationPickTarget? = null
     private var currentTrialDaysLeft: Int? = null
     private var hasBillingCustomer = false
@@ -896,6 +902,40 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.resetCustomStyleButton.setOnClickListener {
             resetCustomHomeStyle()
         }
+        binding.dexCompanionVisibleSwitch.setOnCheckedChangeListener { _, isChecked ->
+            currentDexCompanionVisible = isChecked
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
+        binding.dexCompanionMoodToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentDexCompanionMood = when (checkedId) {
+                R.id.dexCompanionMoodPlayfulButton -> DEX_COMPANION_MOOD_PLAYFUL
+                R.id.dexCompanionMoodFocusButton -> DEX_COMPANION_MOOD_FOCUS
+                else -> DEX_COMPANION_MOOD_CALM
+            }
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
+        binding.dexCompanionSizeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentDexCompanionSize = when (checkedId) {
+                R.id.dexCompanionSizeSmallButton -> DEX_COMPANION_SIZE_SMALL
+                R.id.dexCompanionSizeLargeButton -> DEX_COMPANION_SIZE_LARGE
+                else -> DEX_COMPANION_SIZE_MEDIUM
+            }
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
+        binding.dexCompanionSideToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentDexCompanionSide = when (checkedId) {
+                R.id.dexCompanionSideLeftButton -> DEX_COMPANION_SIDE_LEFT
+                else -> DEX_COMPANION_SIDE_RIGHT
+            }
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
 
         renderAuthMode()
         updateCallActionVisibility(false)
@@ -940,7 +980,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentBackgroundImageUri = prefs.getString(KEY_HOME_BACKGROUND_URI, null)
         currentLeftStickerUri = prefs.getString(KEY_HOME_LEFT_STICKER_URI, null)
         currentRightStickerUri = prefs.getString(KEY_HOME_RIGHT_STICKER_URI, null)
+        currentDexCompanionVisible = prefs.getBoolean(KEY_DEX_COMPANION_VISIBLE, true)
+        currentDexCompanionMood = prefs.getString(KEY_DEX_COMPANION_MOOD, DEX_COMPANION_MOOD_CALM)
+            .orEmpty()
+            .ifBlank { DEX_COMPANION_MOOD_CALM }
+        currentDexCompanionSize = prefs.getString(KEY_DEX_COMPANION_SIZE, DEX_COMPANION_SIZE_MEDIUM)
+            .orEmpty()
+            .ifBlank { DEX_COMPANION_SIZE_MEDIUM }
+        currentDexCompanionSide = prefs.getString(KEY_DEX_COMPANION_SIDE, DEX_COMPANION_SIDE_RIGHT)
+            .orEmpty()
+            .ifBlank { DEX_COMPANION_SIDE_RIGHT }
         updateAdvancedStyleUi(currentThemePreset == "custom")
+        updateDexCompanionControls()
         loadDashboardSections()
         if (currentThemePreset == "custom") {
             applyHomePalette(
@@ -1048,6 +1099,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         DexLearningReminderScheduler.cancelReminder(this)
         stopDexBackgroundService()
         refreshLoggedInState()
+        applyDexCompanionUi()
     }
 
     private fun refreshLoggedInState() {
@@ -1069,7 +1121,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.billingCard.visibility = if (showRegularDashboard) View.VISIBLE else View.GONE
         binding.affiliateDashboardCard.visibility = if (showAffiliateDashboard) View.VISIBLE else View.GONE
         binding.adminDashboardCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
-        binding.themeCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
+        binding.themeCard.visibility = if (loggedIn) View.VISIBLE else View.GONE
         binding.serverCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
         binding.permissionsCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
         binding.backgroundAccessCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
@@ -1090,6 +1142,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.autoAnswerAnyCallerSwitch.isEnabled = loggedIn
         binding.autoDeclineSpamSwitch.isEnabled = loggedIn
         binding.authMessage.text = if (loggedIn) getString(R.string.connected_as, binding.emailInput.text?.toString().orEmpty()) else getString(R.string.logged_out_message)
+        updateDexCompanionControls()
+        applyDexCompanionUi()
         if (loggedIn) {
             binding.statusTitle.text = when {
                 isAdmin -> getString(R.string.dex_home_title_admin)
@@ -1714,6 +1768,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun getColorCompat(colorRes: Int): Int = ContextCompat.getColor(this, colorRes)
+
+    private fun dpToPx(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun applyRoleDashboardMood(roleKey: String) {
         val defaultPanel = getColorCompat(R.color.dex_panel)
@@ -2797,6 +2854,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             titleOverride = binding.homeTitleInput.text?.toString(),
             subtitleOverride = binding.homeSubtitleInput.text?.toString()
         )
+        applyDexCompanionUi()
     }
 
     private fun bindOptionalImage(view: android.widget.ImageView, uriString: String?) {
@@ -2826,6 +2884,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_HOME_BACKGROUND_URI, currentBackgroundImageUri)
             .putString(KEY_HOME_LEFT_STICKER_URI, currentLeftStickerUri)
             .putString(KEY_HOME_RIGHT_STICKER_URI, currentRightStickerUri)
+            .putBoolean(KEY_DEX_COMPANION_VISIBLE, currentDexCompanionVisible)
+            .putString(KEY_DEX_COMPANION_MOOD, currentDexCompanionMood)
+            .putString(KEY_DEX_COMPANION_SIZE, currentDexCompanionSize)
+            .putString(KEY_DEX_COMPANION_SIDE, currentDexCompanionSide)
             .commit()
     }
 
@@ -2835,6 +2897,110 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.toggleAdvancedStyleButton.text = getString(
             if (show) R.string.home_style_customize_less else R.string.home_style_customize_more
         )
+    }
+
+    private fun updateDexCompanionControls() {
+        if (binding.dexCompanionVisibleSwitch.isChecked != currentDexCompanionVisible) {
+            binding.dexCompanionVisibleSwitch.isChecked = currentDexCompanionVisible
+        }
+        binding.dexCompanionMoodToggle.check(
+            when (currentDexCompanionMood.lowercase(Locale.US)) {
+                DEX_COMPANION_MOOD_PLAYFUL -> R.id.dexCompanionMoodPlayfulButton
+                DEX_COMPANION_MOOD_FOCUS -> R.id.dexCompanionMoodFocusButton
+                else -> R.id.dexCompanionMoodCalmButton
+            }
+        )
+        binding.dexCompanionSizeToggle.check(
+            when (currentDexCompanionSize.lowercase(Locale.US)) {
+                DEX_COMPANION_SIZE_SMALL -> R.id.dexCompanionSizeSmallButton
+                DEX_COMPANION_SIZE_LARGE -> R.id.dexCompanionSizeLargeButton
+                else -> R.id.dexCompanionSizeMediumButton
+            }
+        )
+        binding.dexCompanionSideToggle.check(
+            when (currentDexCompanionSide.lowercase(Locale.US)) {
+                DEX_COMPANION_SIDE_LEFT -> R.id.dexCompanionSideLeftButton
+                else -> R.id.dexCompanionSideRightButton
+            }
+        )
+    }
+
+    private fun applyDexCompanionUi() {
+        val loggedIn = !authToken.isNullOrBlank()
+        val isAdmin = currentUserRole.equals("admin", ignoreCase = true)
+        val shouldShowCompanion = loggedIn && !isAdmin && currentDexCompanionVisible
+        binding.dexCompanionCard.visibility = if (shouldShowCompanion) View.VISIBLE else View.GONE
+        if (!shouldShowCompanion) return
+
+        val accentColor = runCatching { android.graphics.Color.parseColor(currentAccentColor) }
+            .getOrElse { getColorCompat(R.color.dex_accent) }
+        val bubbleTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.76f)
+        val cardTint = ColorUtils.setAlphaComponent(accentColor, 62)
+        val faceTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.14f)
+        val labelTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.82f)
+
+        binding.dexCompanionBubble.backgroundTintList = ColorStateList.valueOf(bubbleTint)
+        binding.dexCompanionCard.setCardBackgroundColor(ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_panel), 208))
+        binding.dexCompanionCard.strokeColor = cardTint
+        binding.dexCompanionFace.setCardBackgroundColor(faceTint)
+        binding.dexCompanionFace.strokeColor = labelTint
+        binding.dexCompanionFace.radius = dpToPx(
+            when (currentDexCompanionSize.lowercase(Locale.US)) {
+                DEX_COMPANION_SIZE_SMALL -> 28
+                DEX_COMPANION_SIZE_LARGE -> 44
+                else -> 36
+            }
+        ).toFloat()
+        binding.dexCompanionLabel.setTextColor(labelTint)
+        binding.dexCompanionBubble.setTextColor(getColorCompat(R.color.dex_background))
+
+        binding.dexCompanionBubble.text = when (currentDexCompanionMood.lowercase(Locale.US)) {
+            DEX_COMPANION_MOOD_PLAYFUL -> getString(R.string.dex_companion_bubble_playful)
+            DEX_COMPANION_MOOD_FOCUS -> getString(R.string.dex_companion_bubble_focus)
+            else -> getString(R.string.dex_companion_bubble_calm)
+        }
+
+        val faceSize = dpToPx(
+            when (currentDexCompanionSize.lowercase(Locale.US)) {
+                DEX_COMPANION_SIZE_SMALL -> 56
+                DEX_COMPANION_SIZE_LARGE -> 88
+                else -> 72
+            }
+        )
+        binding.dexCompanionFace.layoutParams = binding.dexCompanionFace.layoutParams.apply {
+            width = faceSize
+            height = faceSize
+        }
+
+        val mouthWidth = dpToPx(
+            when (currentDexCompanionMood.lowercase(Locale.US)) {
+                DEX_COMPANION_MOOD_PLAYFUL -> 24
+                DEX_COMPANION_MOOD_FOCUS -> 12
+                else -> 18
+            }
+        )
+        binding.dexCompanionMouth.layoutParams = binding.dexCompanionMouth.layoutParams.apply {
+            width = mouthWidth
+        }
+        binding.dexCompanionMouth.alpha = when (currentDexCompanionMood.lowercase(Locale.US)) {
+            DEX_COMPANION_MOOD_PLAYFUL -> 1f
+            DEX_COMPANION_MOOD_FOCUS -> 0.84f
+            else -> 0.92f
+        }
+
+        (binding.dexCompanionCard.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+            val sideGravity = if (currentDexCompanionSide.lowercase(Locale.US) == DEX_COMPANION_SIDE_LEFT) {
+                Gravity.BOTTOM or Gravity.START
+            } else {
+                Gravity.BOTTOM or Gravity.END
+            }
+            params.gravity = sideGravity
+            val sideMargin = dpToPx(18)
+            params.marginStart = sideMargin
+            params.marginEnd = sideMargin
+            params.bottomMargin = dpToPx(22)
+            binding.dexCompanionCard.layoutParams = params
+        }
     }
 
     private fun applyHomePalette(
@@ -2905,6 +3071,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             ).forEach { button ->
                 button.backgroundTintList = tint
             }
+            applyDexCompanionUi()
             true
         }.getOrDefault(false)
     }
@@ -7537,6 +7704,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_HOME_BACKGROUND_URI = "home_background_uri"
         const val KEY_HOME_LEFT_STICKER_URI = "home_left_sticker_uri"
         const val KEY_HOME_RIGHT_STICKER_URI = "home_right_sticker_uri"
+        const val KEY_DEX_COMPANION_VISIBLE = "dex_companion_visible"
+        const val KEY_DEX_COMPANION_MOOD = "dex_companion_mood"
+        const val KEY_DEX_COMPANION_SIZE = "dex_companion_size"
+        const val KEY_DEX_COMPANION_SIDE = "dex_companion_side"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"
@@ -7561,6 +7732,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val THEME_OCEAN = "ocean"
         private const val THEME_SUNSET = "sunset"
         private const val THEME_STUDIO = "studio"
+        private const val DEX_COMPANION_MOOD_CALM = "calm"
+        private const val DEX_COMPANION_MOOD_PLAYFUL = "playful"
+        private const val DEX_COMPANION_MOOD_FOCUS = "focus"
+        private const val DEX_COMPANION_SIZE_SMALL = "small"
+        private const val DEX_COMPANION_SIZE_MEDIUM = "medium"
+        private const val DEX_COMPANION_SIZE_LARGE = "large"
+        private const val DEX_COMPANION_SIDE_LEFT = "left"
+        private const val DEX_COMPANION_SIDE_RIGHT = "right"
         private val WAKE_WORD_VARIANTS = listOf(
             "hey dex",
             "hey decks",
