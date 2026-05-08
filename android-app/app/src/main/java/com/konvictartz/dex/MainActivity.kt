@@ -320,9 +320,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         startDexCommandListening()
                     }
                     if (resumeWakeListeningAfterSpeech && wakeModeEnabled) {
-                        resetWakeSessionIfTaskFinished()
+                        keepWakeConversationOpenAfterSpeech()
                         resumeWakeListeningAfterSpeech = false
-                        scheduleWakeListeningRestart(1200)
+                        scheduleWakeListeningRestart(900)
                     }
                     if (shouldResumeCallListeningAfterSpeech && lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                         shouldResumeCallListeningAfterSpeech = false
@@ -346,9 +346,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         startDexCommandListening()
                     }
                     if (resumeWakeListeningAfterSpeech && wakeModeEnabled) {
-                        resetWakeSessionIfTaskFinished()
+                        keepWakeConversationOpenAfterSpeech()
                         resumeWakeListeningAfterSpeech = false
-                        scheduleWakeListeningRestart(1200)
+                        scheduleWakeListeningRestart(900)
                     }
                     if (shouldResumeCallListeningAfterSpeech && lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                         shouldResumeCallListeningAfterSpeech = false
@@ -4419,15 +4419,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         mainHandler.postDelayed(resetWakeWindowRunnable, CONVERSATION_TIMEOUT_MS)
     }
 
-    private fun resetWakeSessionIfTaskFinished() {
+    private fun keepWakeConversationOpenAfterSpeech() {
         if (!wakeModeEnabled) return
-        if (!shouldReturnToWakeWordMode()) return
         awaitingWakeCommand = false
-        conversationActive = false
-        mainHandler.removeCallbacks(resetWakeWindowRunnable)
-        binding.conversationStatus.text =
-            if (wakeWordEngineActive) getString(R.string.wake_mode_hotword_ready)
-            else getString(R.string.wake_mode_waiting)
+        conversationActive = true
+        scheduleConversationTimeout()
+        if (shouldReturnToWakeWordMode()) {
+            binding.conversationStatus.text = getString(R.string.wake_mode_command_ready)
+        }
     }
 
     private fun shouldReturnToWakeWordMode(): Boolean {
