@@ -350,6 +350,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexGamesCorrect = 0
     private var dexGamesCurrentStreak = 0
     private var dexGamesBestStreak = 0
+    private var dexGuessPlays = 0
+    private var dexRiddlePlays = 0
+    private var dexTriviaPlays = 0
+    private var dexMemoryPlays = 0
+    private var dexWouldYouRatherPlays = 0
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -1301,6 +1306,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexGamesCorrect = prefs.getInt(KEY_DEX_GAMES_CORRECT, 0)
         dexGamesCurrentStreak = prefs.getInt(KEY_DEX_GAMES_STREAK, 0)
         dexGamesBestStreak = prefs.getInt(KEY_DEX_GAMES_BEST_STREAK, 0)
+        dexGuessPlays = prefs.getInt(KEY_DEX_GAMES_GUESS_PLAYS, 0)
+        dexRiddlePlays = prefs.getInt(KEY_DEX_GAMES_RIDDLE_PLAYS, 0)
+        dexTriviaPlays = prefs.getInt(KEY_DEX_GAMES_TRIVIA_PLAYS, 0)
+        dexMemoryPlays = prefs.getInt(KEY_DEX_GAMES_MEMORY_PLAYS, 0)
+        dexWouldYouRatherPlays = prefs.getInt(KEY_DEX_GAMES_WYR_PLAYS, 0)
         updateAdvancedStyleUi(currentThemePreset == "custom")
         updateDexCompanionControls()
         loadDashboardSections()
@@ -1484,9 +1494,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.learningLessonPreview.text = ""
         binding.learningQuizPreview.text = dashboardActivityEmptyCopy()
         binding.dexGamePrompt.text = getString(R.string.dex_games_prompt_default)
-        binding.dexGameStatus.text = dexGamesStatusSummary(getString(R.string.dex_games_status_default))
-        binding.dexGameInput.setText("")
-        activeDexMiniGame = DexMiniGameType.NONE
+            binding.dexGameStatus.text = dexGamesStatusSummary(getString(R.string.dex_games_status_default))
+            binding.dexGameInput.setText("")
+            activeDexMiniGame = DexMiniGameType.NONE
             setHintBand(binding.userDashboardHint, null)
             setHintBand(binding.learningCenterHint, null)
             setHintBand(binding.billingHint, null)
@@ -2958,8 +2968,40 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
+    private fun favoriteDexMiniGame(): DexMiniGameType? {
+        val counts = listOf(
+            DexMiniGameType.GUESS_NUMBER to dexGuessPlays,
+            DexMiniGameType.RIDDLE to dexRiddlePlays,
+            DexMiniGameType.TRIVIA to dexTriviaPlays,
+            DexMiniGameType.MEMORY to dexMemoryPlays,
+            DexMiniGameType.WOULD_YOU_RATHER to dexWouldYouRatherPlays
+        )
+        val best = counts.maxByOrNull { it.second } ?: return null
+        return if (best.second > 0) best.first else null
+    }
+
+    private fun favoriteDexMiniGameLabel(): String? {
+        return when (favoriteDexMiniGame()) {
+            DexMiniGameType.GUESS_NUMBER -> getString(R.string.dex_games_guess_number)
+            DexMiniGameType.RIDDLE -> getString(R.string.dex_games_riddle)
+            DexMiniGameType.TRIVIA -> getString(R.string.dex_games_trivia)
+            DexMiniGameType.MEMORY -> getString(R.string.dex_games_memory)
+            DexMiniGameType.WOULD_YOU_RATHER -> getString(R.string.dex_games_would_you_rather)
+            DexMiniGameType.NONE, null -> null
+        }
+    }
+
+    private fun dexGamesProfileLine(): String {
+        val favorite = favoriteDexMiniGameLabel()
+        return if (favorite.isNullOrBlank()) {
+            getString(R.string.dex_games_profile_line_default)
+        } else {
+            getString(R.string.dex_games_profile_line_favorite, favorite)
+        }
+    }
+
     private fun dexGamesStatusSummary(base: String): String {
-        return "$base\n${dexGamesScoreLine()}"
+        return "$base\n${dexGamesScoreLine()}\n${dexGamesProfileLine()}"
     }
 
     private fun saveDexGameStats() {
@@ -2969,7 +3011,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putInt(KEY_DEX_GAMES_CORRECT, dexGamesCorrect)
             .putInt(KEY_DEX_GAMES_STREAK, dexGamesCurrentStreak)
             .putInt(KEY_DEX_GAMES_BEST_STREAK, dexGamesBestStreak)
+            .putInt(KEY_DEX_GAMES_GUESS_PLAYS, dexGuessPlays)
+            .putInt(KEY_DEX_GAMES_RIDDLE_PLAYS, dexRiddlePlays)
+            .putInt(KEY_DEX_GAMES_TRIVIA_PLAYS, dexTriviaPlays)
+            .putInt(KEY_DEX_GAMES_MEMORY_PLAYS, dexMemoryPlays)
+            .putInt(KEY_DEX_GAMES_WYR_PLAYS, dexWouldYouRatherPlays)
             .apply()
+    }
+
+    private fun recordDexMiniGameStart(type: DexMiniGameType) {
+        when (type) {
+            DexMiniGameType.GUESS_NUMBER -> dexGuessPlays += 1
+            DexMiniGameType.RIDDLE -> dexRiddlePlays += 1
+            DexMiniGameType.TRIVIA -> dexTriviaPlays += 1
+            DexMiniGameType.MEMORY -> dexMemoryPlays += 1
+            DexMiniGameType.WOULD_YOU_RATHER -> dexWouldYouRatherPlays += 1
+            DexMiniGameType.NONE -> Unit
+        }
+        saveDexGameStats()
     }
 
     private fun recordDexGameResult(correct: Boolean, countsAsScoredRound: Boolean = true) {
@@ -2992,6 +3051,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun startGuessNumberGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.GUESS_NUMBER
+        recordDexMiniGameStart(DexMiniGameType.GUESS_NUMBER)
         dexGuessTarget = (1..20).random()
         dexGuessAttempts = 0
         binding.dexGameInput.setText("")
@@ -3013,6 +3073,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun startRiddleGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.RIDDLE
+        recordDexMiniGameStart(DexMiniGameType.RIDDLE)
         currentRiddleIndex = (currentRiddleIndex + 1).mod(DEX_RIDDLES.size)
         val riddle = DEX_RIDDLES[currentRiddleIndex]
         binding.dexGameInput.setText("")
@@ -3032,6 +3093,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun startTriviaGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.TRIVIA
+        recordDexMiniGameStart(DexMiniGameType.TRIVIA)
         currentTriviaIndex = (currentTriviaIndex + 1).mod(DEX_TRIVIA_QUESTIONS.size)
         val trivia = DEX_TRIVIA_QUESTIONS[currentTriviaIndex]
         binding.dexGameInput.setText("")
@@ -3052,6 +3114,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun startMemoryGame(announce: Boolean = false) {
         val continuing = activeDexMiniGame == DexMiniGameType.MEMORY && currentMemoryRound > 0
         activeDexMiniGame = DexMiniGameType.MEMORY
+        recordDexMiniGameStart(DexMiniGameType.MEMORY)
         currentMemoryRound = if (continuing) currentMemoryRound + 1 else 1
         val sequenceLength = minOf(2 + currentMemoryRound, 5)
         currentMemorySequence = List(sequenceLength) {
@@ -3075,6 +3138,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun startWouldYouRatherGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.WOULD_YOU_RATHER
+        recordDexMiniGameStart(DexMiniGameType.WOULD_YOU_RATHER)
         currentWouldYouRatherIndex = (currentWouldYouRatherIndex + 1).mod(DEX_WOULD_YOU_RATHERS.size)
         val round = DEX_WOULD_YOU_RATHERS[currentWouldYouRatherIndex]
         binding.dexGameInput.setText("")
@@ -3259,6 +3323,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.conversationStatus.text = reply
         binding.lastReplyValue.text = reply
         speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+    }
+
+    private fun startFavoriteDexMiniGame(announce: Boolean = false) {
+        when (favoriteDexMiniGame()) {
+            DexMiniGameType.RIDDLE -> startRiddleGame(announce)
+            DexMiniGameType.TRIVIA -> startTriviaGame(announce)
+            DexMiniGameType.MEMORY -> startMemoryGame(announce)
+            DexMiniGameType.WOULD_YOU_RATHER -> startWouldYouRatherGame(announce)
+            DexMiniGameType.GUESS_NUMBER, DexMiniGameType.NONE, null -> startGuessNumberGame(announce)
+        }
     }
 
     private fun loadDashboardSections() {
@@ -6299,7 +6373,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized == "lets play a game" ||
             normalized == "let's play a game"
         ) {
-            startGuessNumberGame(announce = true)
+            startFavoriteDexMiniGame(announce = true)
             return true
         }
 
@@ -9491,6 +9565,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_GAMES_CORRECT = "dex_games_correct"
         const val KEY_DEX_GAMES_STREAK = "dex_games_streak"
         const val KEY_DEX_GAMES_BEST_STREAK = "dex_games_best_streak"
+        const val KEY_DEX_GAMES_GUESS_PLAYS = "dex_games_guess_plays"
+        const val KEY_DEX_GAMES_RIDDLE_PLAYS = "dex_games_riddle_plays"
+        const val KEY_DEX_GAMES_TRIVIA_PLAYS = "dex_games_trivia_plays"
+        const val KEY_DEX_GAMES_MEMORY_PLAYS = "dex_games_memory_plays"
+        const val KEY_DEX_GAMES_WYR_PLAYS = "dex_games_wyr_plays"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"
