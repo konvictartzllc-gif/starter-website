@@ -322,6 +322,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
     private var dexCompanionBubbleOverride: String? = null
     private var dexCompanionRewardsPreviewLevel: Int? = null
+    private var dexCompanionRecentUnlockLevel: Int? = null
     private var dexCompanionFloatAnimator: AnimatorSet? = null
     private var dexCompanionEventAnimator: AnimatorSet? = null
     private var dexCompanionBlinkScheduled = false
@@ -403,6 +404,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexCompanionBubbleOverride = null
         dexCompanionState = deriveDexCompanionState()
         applyDexCompanionUi()
+    }
+
+    private val dexCompanionRecentUnlockResetRunnable = Runnable {
+        dexCompanionRecentUnlockLevel = null
+        refreshDexCompanionRewardsPanel(unlockCelebration = false)
     }
 
     private val dexCompanionSingleTapRunnable = Runnable {
@@ -3196,6 +3202,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun appendDexCompanionRewardBadge(builder: SpannableStringBuilder, level: Int) {
         val badgeText = dexCompanionShelfBadge(level)
         val (fgColor, bgColor) = when {
+            dexCompanionRecentUnlockLevel == level ->
+                android.graphics.Color.WHITE to android.graphics.Color.parseColor("#F59E0B")
             dexCompanionRewardsPreviewLevel == level ->
                 android.graphics.Color.WHITE to android.graphics.Color.parseColor("#5B7CFF")
             currentDexCompanionTierStyleOverride == level ->
@@ -3210,6 +3218,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         builder.setSpan(StyleSpan(Typeface.BOLD), start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         builder.setSpan(ForegroundColorSpan(fgColor), start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         builder.setSpan(BackgroundColorSpan(bgColor), start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+
+    private fun celebrateDexCompanionRewardUnlock(level: Int) {
+        dexCompanionRecentUnlockLevel = level
+        mainHandler.removeCallbacks(dexCompanionRecentUnlockResetRunnable)
+        mainHandler.postDelayed(dexCompanionRecentUnlockResetRunnable, 3600L)
     }
 
     private fun cycleDexCompanionRewardsPreview() {
@@ -3361,6 +3375,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexGamesChallengeCompletedDate = LocalDate.now().toString()
         dexGamesChallengeClears += 1
         saveDexGameStats()
+        val unlockedLevel = dexGamesUnlockLevel()
+        if (dexGamesUnlockBubbleLine() != null) {
+            celebrateDexCompanionRewardUnlock(unlockedLevel)
+        }
         return DexChallengeReward(
             reply = listOfNotNull(
             dexGamesChallengeRewardLine(type),
