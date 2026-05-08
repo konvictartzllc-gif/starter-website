@@ -1169,23 +1169,43 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun beginSectionRefresh(label: TextView) {
+    private fun sectionSignalColor(roleKey: String): Int = when (roleKey) {
+        "admin" -> getColorCompat(R.color.dex_admin_signal)
+        "affiliate" -> getColorCompat(R.color.dex_affiliate_signal)
+        else -> getColorCompat(R.color.dex_user_signal)
+    }
+
+    private fun sectionLiveColor(roleKey: String): Int = when (roleKey) {
+        "admin" -> getColorCompat(R.color.dex_admin_stroke)
+        "affiliate" -> getColorCompat(R.color.dex_affiliate_stroke)
+        else -> getColorCompat(R.color.dex_user_stroke)
+    }
+
+    private fun strokeWidthDp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+
+    private fun beginSectionRefresh(label: TextView, card: MaterialCardView, roleKey: String) {
         label.text = getString(R.string.dashboard_section_status_loading)
-        label.setTextColor(getColorCompat(R.color.dex_status_loading))
+        label.setTextColor(sectionSignalColor(roleKey))
         label.alpha = 1f
+        card.strokeColor = sectionSignalColor(roleKey)
+        card.strokeWidth = strokeWidthDp(2)
         startLoadingPulse(label)
     }
 
-    private fun completeSectionRefresh(label: TextView) {
+    private fun completeSectionRefresh(label: TextView, card: MaterialCardView, roleKey: String) {
         label.clearAnimation()
         label.animate().cancel()
         label.alpha = 0.84f
         label.text = getString(R.string.dashboard_section_status_live)
-        label.setTextColor(getColorCompat(R.color.dex_status_live))
+        label.setTextColor(sectionLiveColor(roleKey))
+        card.strokeColor = sectionLiveColor(roleKey)
+        card.strokeWidth = strokeWidthDp(1)
     }
 
     private fun showDashboardLoadingStates() {
-        beginSectionRefresh(binding.userDashboardStatus)
+        val currentRoleKey = currentUserRole.lowercase(Locale.US)
+        beginSectionRefresh(binding.userDashboardStatus, binding.userDashboardCard, currentRoleKey)
         binding.userDashboardChatCount.text = getString(R.string.dashboard_loading_value)
         binding.userDashboardLessonCount.text = getString(R.string.dashboard_loading_value)
         binding.userDashboardQuizScore.text = getString(R.string.dashboard_loading_value)
@@ -1197,7 +1217,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.learningQuizPreview
         )
         if (currentUserRole == "affiliate") {
-            beginSectionRefresh(binding.affiliateDashboardStatus)
+            beginSectionRefresh(binding.affiliateDashboardStatus, binding.affiliateDashboardCard, "affiliate")
             binding.affiliatePromoCode.text = getString(R.string.affiliate_dashboard_loading)
             binding.affiliateEarnings.text = getString(R.string.dashboard_loading_value)
             binding.affiliateSignups.text = getString(R.string.dashboard_loading_value)
@@ -1210,21 +1230,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             )
         }
         if (currentUserRole == "admin") {
-            beginSectionRefresh(binding.adminDashboardStatus)
+            beginSectionRefresh(binding.adminDashboardStatus, binding.adminDashboardCard, "admin")
             binding.adminStatsValue.text = getString(R.string.admin_dashboard_loading)
             startLoadingPulse(binding.adminStatsValue)
         }
     }
 
     private fun showBillingLoadingState() {
-        beginSectionRefresh(binding.billingStatusTag)
+        beginSectionRefresh(binding.billingStatusTag, binding.billingCard, currentUserRole.lowercase(Locale.US))
         binding.billingStatusText.text = getString(R.string.billing_status_loading)
         binding.billingDetailText.text = getString(R.string.billing_detail_loading)
         startLoadingPulse(binding.billingStatusText, binding.billingDetailText)
     }
 
     private fun showLearningLoadingState() {
-        beginSectionRefresh(binding.learningCenterStatus)
+        beginSectionRefresh(binding.learningCenterStatus, binding.learningCenterCard, currentUserRole.lowercase(Locale.US))
         binding.learningProfileSummary.text = getString(R.string.learning_profile_loading)
         binding.learningReminderSummary.text = getString(R.string.learning_reminder_loading)
         startLoadingPulse(binding.learningProfileSummary, binding.learningReminderSummary)
@@ -1394,7 +1414,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             var userDashboardPending = 2
             fun finishUserDashboardRefresh() {
                 userDashboardPending -= 1
-                if (userDashboardPending <= 0) completeSectionRefresh(binding.userDashboardStatus)
+                if (userDashboardPending <= 0) {
+                    completeSectionRefresh(
+                        binding.userDashboardStatus,
+                        binding.userDashboardCard,
+                        currentUserRole.lowercase(Locale.US)
+                    )
+                }
             }
             getJsonArray("$serverUrl/dex/history", token)
                 .onSuccess { history ->
@@ -1467,7 +1493,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             binding.affiliateSignups,
                             binding.affiliatePaidSubs
                         )
-                        completeSectionRefresh(binding.affiliateDashboardStatus)
+                        completeSectionRefresh(
+                            binding.affiliateDashboardStatus,
+                            binding.affiliateDashboardCard,
+                            "affiliate"
+                        )
                     }
                     .onFailure {
                         binding.affiliatePromoCode.text = getString(R.string.affiliate_promo_code, "-")
@@ -1480,7 +1510,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             binding.affiliateSignups,
                             binding.affiliatePaidSubs
                         )
-                        completeSectionRefresh(binding.affiliateDashboardStatus)
+                        completeSectionRefresh(
+                            binding.affiliateDashboardStatus,
+                            binding.affiliateDashboardCard,
+                            "affiliate"
+                        )
                     }
             }
             if (currentUserRole == "admin") {
@@ -1494,7 +1528,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             response.optInt("learningLessons")
                         )
                         pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
-                        completeSectionRefresh(binding.adminDashboardStatus)
+                        completeSectionRefresh(
+                            binding.adminDashboardStatus,
+                            binding.adminDashboardCard,
+                            "admin"
+                        )
                     }
                     .onFailure {
                         binding.adminStatsValue.text = getString(
@@ -1505,7 +1543,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             0
                         )
                         pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
-                        completeSectionRefresh(binding.adminDashboardStatus)
+                        completeSectionRefresh(
+                            binding.adminDashboardStatus,
+                            binding.adminDashboardCard,
+                            "admin"
+                        )
                     }
             }
         }
@@ -2116,10 +2158,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 currentTrialDaysLeft = if (response.has("trialDaysLeft")) response.optInt("trialDaysLeft") else null
                 hasBillingCustomer = !response.optString("stripe_customer_id").isNullOrBlank()
                 updateBillingUi()
-                completeSectionRefresh(binding.billingStatusTag)
+                completeSectionRefresh(
+                    binding.billingStatusTag,
+                    binding.billingCard,
+                    currentUserRole.lowercase(Locale.US)
+                )
             }.onFailure {
                 updateBillingUi()
-                completeSectionRefresh(binding.billingStatusTag)
+                completeSectionRefresh(
+                    binding.billingStatusTag,
+                    binding.billingCard,
+                    currentUserRole.lowercase(Locale.US)
+                )
             }
         }
     }
@@ -2679,13 +2729,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 } else {
                     DexLearningReminderScheduler.cancelReminder(this@MainActivity)
                 }
-                completeSectionRefresh(binding.learningCenterStatus)
+                completeSectionRefresh(
+                    binding.learningCenterStatus,
+                    binding.learningCenterCard,
+                    currentUserRole.lowercase(Locale.US)
+                )
             }.onFailure {
                 // Keep reminder sync quiet if preferences are unavailable.
                 binding.learningProfileSummary.text = getString(R.string.learning_profile_missing)
                 binding.learningReminderSummary.text = getString(R.string.learning_reminder_off)
                 pulseDashboardValues(binding.learningProfileSummary, binding.learningReminderSummary)
-                completeSectionRefresh(binding.learningCenterStatus)
+                completeSectionRefresh(
+                    binding.learningCenterStatus,
+                    binding.learningCenterCard,
+                    currentUserRole.lowercase(Locale.US)
+                )
             }
         }
     }
