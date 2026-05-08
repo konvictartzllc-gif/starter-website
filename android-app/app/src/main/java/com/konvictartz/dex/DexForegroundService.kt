@@ -170,13 +170,10 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 override fun onResults(results: Bundle?) {
                     val mode = activeListenMode
                     activeListenMode = null
-                    val transcript = results
+                    val transcripts = results
                         ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         .orEmpty()
-                        .firstOrNull()
-                        ?.trim()
-                        .orEmpty()
-                    handleBackgroundVoiceTranscript(mode, transcript)
+                    handleBackgroundVoiceMatches(mode, transcripts)
                 }
             })
         }
@@ -633,18 +630,27 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         dismissNotification(NOTIFICATION_PROMPT_ID)
     }
 
-    private fun handleBackgroundVoiceTranscript(mode: BackgroundListenMode?, transcript: String) {
-        val normalized = transcript.trim().lowercase(Locale.US)
-        if (normalized.isBlank()) {
+    private fun handleBackgroundVoiceMatches(mode: BackgroundListenMode?, transcripts: List<String>) {
+        val cleaned = transcripts.map { it.trim() }.filter { it.isNotBlank() }
+        if (cleaned.isEmpty()) {
             repromptBackgroundListenMode(mode)
             return
         }
         when (mode) {
-            BackgroundListenMode.CALL_COMMAND -> handleBackgroundCallCommand(normalized)
-            BackgroundListenMode.SMS_COMMAND -> handleBackgroundSmsCommand(normalized)
-            BackgroundListenMode.SMS_REPLY -> sendPendingSmsReply(transcript)
-            BackgroundListenMode.NOTIFICATION_COMMAND -> handleBackgroundNotificationCommand(normalized)
-            BackgroundListenMode.CALLER_MESSAGE -> handleCallerMessage(transcript)
+            BackgroundListenMode.CALL_COMMAND -> {
+                val handled = cleaned.any { handleBackgroundCallCommand(it.lowercase(Locale.US)) }
+                if (!handled) repromptBackgroundListenMode(mode)
+            }
+            BackgroundListenMode.SMS_COMMAND -> {
+                val handled = cleaned.any { handleBackgroundSmsCommand(it.lowercase(Locale.US)) }
+                if (!handled) repromptBackgroundListenMode(mode)
+            }
+            BackgroundListenMode.SMS_REPLY -> sendPendingSmsReply(cleaned.first())
+            BackgroundListenMode.NOTIFICATION_COMMAND -> {
+                val handled = cleaned.any { handleBackgroundNotificationCommand(it.lowercase(Locale.US)) }
+                if (!handled) repromptBackgroundListenMode(mode)
+            }
+            BackgroundListenMode.CALLER_MESSAGE -> handleCallerMessage(cleaned.first())
             null -> Unit
         }
     }
@@ -685,50 +691,72 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun handleBackgroundCallCommand(normalized: String) {
-        when {
-            isAffirmativeCommand(normalized) -> handleCallAnswerAction()
+    private fun handleBackgroundCallCommand(normalized: String): Boolean {
+        return when {
+            isAffirmativeCommand(normalized) -> {
+                handleCallAnswerAction()
+                true
+            }
             normalized.contains("take a message") ||
                 normalized.contains("take the message") ||
                 normalized.contains("ask who") ||
-                normalized.contains("ask them") -> handleCallTakeMessageAction()
+                normalized.contains("ask them") -> {
+                handleCallTakeMessageAction()
+                true
+            }
             normalized.contains("answer on speaker") ||
                 normalized.contains("pick up on speaker") -> {
                 val answered = answerRingingCall()
                 currentCallWasAnswered = answered
                 if (answered) enableSpeakerForActiveCall()
                 speakShortStatus(if (answered) getString(R.string.call_answered) else getString(R.string.call_answer_failed))
+                true
             }
             normalized == "answer" ||
                 normalized.startsWith("answer ") ||
                 normalized.contains("pick up") ||
-                normalized.contains("take the call") -> handleCallAnswerAction()
+                normalized.contains("take the call") -> {
+                handleCallAnswerAction()
+                true
+            }
             normalized == "decline" ||
                 normalized.startsWith("decline ") ||
                 normalized.contains("reject") ||
                 normalized.contains("hang up") ||
-                normalized.contains("ignore") -> handleCallDeclineAction()
-            else -> if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
-                speakAndThenListen(getString(R.string.call_listening_retry), BackgroundListenMode.CALL_COMMAND)
+                normalized.contains("ignore") -> {
+                handleCallDeclineAction()
+                true
             }
+            else -> false
         }
     }
 
-    private fun handleBackgroundSmsCommand(normalized: String) {
-        when {
+    private fun handleBackgroundSmsCommand(normalized: String): Boolean {
+        return when {
             isAffirmativeCommand(normalized) -> {
                 if (awaitingSmsReplyChoice) {
                     promptForPendingSmsReply()
                 } else {
                     handleSmsReadAction()
                 }
+                true
             }
-            normalized.contains("read") -> handleSmsReadAction()
+            normalized.contains("read") -> {
+                handleSmsReadAction()
+                true
+            }
             normalized.contains("reply") ||
                 normalized.contains("text back") ||
-                normalized.contains("respond") -> promptForPendingSmsReply()
+                normalized.contains("respond") -> {
+                promptForPendingSmsReply()
+                true
+            }
             normalized.contains("ignore") ||
-                normalized.contains("leave it") -> handleSmsIgnoreAction()
+                normalized.contains("leave it") -> {
+                handleSmsIgnoreAction()
+                true
+            }
+            else -> false
         }
     }
 
@@ -744,12 +772,22 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         speakAndThenListen(getString(R.string.incoming_sms_reply_prompt, sender), BackgroundListenMode.SMS_REPLY)
     }
 
-    private fun handleBackgroundNotificationCommand(normalized: String) {
-        when {
-            isAffirmativeCommand(normalized) -> handleNotificationReadAction()
-            normalized.contains("read") -> handleNotificationReadAction()
+    private fun handleBackgroundNotificationCommand(normalized: String): Boolean {
+        return when {
+            isAffirmativeCommand(normalized) -> {
+                handleNotificationReadAction()
+                true
+            }
+            normalized.contains("read") -> {
+                handleNotificationReadAction()
+                true
+            }
             normalized.contains("ignore") ||
-                normalized.contains("leave it") -> handleNotificationIgnoreAction()
+                normalized.contains("leave it") -> {
+                handleNotificationIgnoreAction()
+                true
+            }
+            else -> false
         }
     }
 
@@ -1026,22 +1064,64 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         startBackgroundListening(mode)
     }
 
+    private fun buildBackgroundRecognitionIntent(
+        mode: BackgroundListenMode,
+        maxResults: Int,
+        completeSilenceMs: Long,
+        possibleSilenceMs: Long,
+        minimumMs: Long
+    ): Intent {
+        val biasingPhrases = linkedSetOf(
+            "yes",
+            "no",
+            "read it",
+            "reply",
+            "ignore",
+            "answer",
+            "decline",
+            "speaker",
+            "take a message"
+        ).apply {
+            when (mode) {
+                BackgroundListenMode.CALL_COMMAND -> addAll(
+                    listOf("answer it", "answer on speaker", "pick up", "decline it", "take a message")
+                )
+                BackgroundListenMode.SMS_COMMAND -> addAll(
+                    listOf("read it", "reply", "text back", "ignore it")
+                )
+                BackgroundListenMode.SMS_REPLY -> {
+                    val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+                    prefs.getString(MainActivity.KEY_PENDING_INCOMING_SMS_SENDER, null)?.let { add(it) }
+                }
+                BackgroundListenMode.NOTIFICATION_COMMAND -> addAll(
+                    listOf("read it", "reply", "ignore it")
+                )
+                BackgroundListenMode.CALLER_MESSAGE -> {
+                    lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" }?.let { add(it) }
+                }
+            }
+        }
+
+        return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, maxResults)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, completeSilenceMs)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, possibleSilenceMs)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, minimumMs)
+            putStringArrayListExtra("android.speech.extra.BIASING_STRINGS", ArrayList(biasingPhrases.filter { it.isNotBlank() }))
+        }
+    }
+
     private fun startBackgroundListening(mode: BackgroundListenMode) {
         if (!hasPermission(Manifest.permission.RECORD_AUDIO)) return
         val recognizer = speechRecognizer ?: return
         activeListenMode = mode
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            val completeSilenceMs = if (mode == BackgroundListenMode.SMS_REPLY) 5500L else 3500L
-            val possibleSilenceMs = if (mode == BackgroundListenMode.SMS_REPLY) 3500L else 2200L
-            val minimumMs = if (mode == BackgroundListenMode.SMS_REPLY) 12000L else 7000L
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, completeSilenceMs)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, possibleSilenceMs)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, minimumMs)
-        }
+        val completeSilenceMs = if (mode == BackgroundListenMode.SMS_REPLY) 6000L else 3600L
+        val possibleSilenceMs = if (mode == BackgroundListenMode.SMS_REPLY) 3800L else 2400L
+        val minimumMs = if (mode == BackgroundListenMode.SMS_REPLY) 14000L else 5000L
+        val intent = buildBackgroundRecognitionIntent(mode, 5, completeSilenceMs, possibleSilenceMs, minimumMs)
         runCatching {
             recognizer.cancel()
             recognizer.startListening(intent)

@@ -3200,6 +3200,76 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .show()
     }
 
+    private fun buildRecognitionIntent(
+        maxResults: Int,
+        completeSilenceMs: Long,
+        possibleSilenceMs: Long,
+        minimumMs: Long = 0L,
+        biasingPhrases: List<String> = emptyList()
+    ): Intent {
+        return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, maxResults)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, completeSilenceMs)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, possibleSilenceMs)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, minimumMs)
+            val cleanedPhrases = biasingPhrases
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+            if (cleanedPhrases.isNotEmpty()) {
+                putStringArrayListExtra("android.speech.extra.BIASING_STRINGS", ArrayList(cleanedPhrases))
+            }
+        }
+    }
+
+    private fun generalVoiceBiasPhrases(): List<String> {
+        val phrases = linkedSetOf(
+            "hey dex",
+            "call",
+            "text",
+            "email",
+            "reply",
+            "read it",
+            "ignore it",
+            "set a reminder",
+            "remind me",
+            "remind me to call",
+            "yes",
+            "no",
+            "approve",
+            "cancel"
+        )
+        relationshipAliases.forEach { (alias, contact) ->
+            phrases += alias
+            phrases += contact
+        }
+        pendingContactTarget?.displayName?.let { phrases += it }
+        pendingSmsRecipient?.displayName?.let { phrases += it }
+        pendingIncomingSmsSender?.let { phrases += it }
+        pendingNotificationTitle?.let { phrases += it }
+        lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" }?.let { phrases += it }
+        return phrases.toList()
+    }
+
+    private fun callCommandBiasPhrases(): List<String> = listOf(
+        "answer",
+        "answer it",
+        "answer on speaker",
+        "pick up",
+        "pick up on speaker",
+        "decline",
+        "decline it",
+        "reject",
+        "take a message",
+        "take message",
+        "send them to voicemail",
+        "yes",
+        "no"
+    )
+
     private fun startListeningForCallCommand() {
         if (isListeningForCallCommand) return
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
@@ -3211,14 +3281,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.callMonitorStatus.text = getString(R.string.call_voice_unavailable)
             return
         }
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
-        }
+        val intent = buildRecognitionIntent(
+            maxResults = 5,
+            completeSilenceMs = 2800L,
+            possibleSilenceMs = 2000L,
+            minimumMs = 500L,
+            biasingPhrases = callCommandBiasPhrases()
+        )
         isListeningForDexCommand = false
         isListeningForCallCommand = true
         recognizer.cancel()
@@ -3240,15 +3309,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.conversationStatus.text = getString(R.string.wake_mode_permission_needed)
             return
         }
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1400L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 0L)
-        }
+        val intent = buildRecognitionIntent(
+            maxResults = 7,
+            completeSilenceMs = 2600L,
+            possibleSilenceMs = 1600L,
+            minimumMs = 0L,
+            biasingPhrases = generalVoiceBiasPhrases()
+        )
         try {
             wakeSpeechRecognizer?.cancel()
             recognizer.cancel()
@@ -3325,15 +3392,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
         val recognizer = wakeSpeechRecognizer ?: return
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 15000L)
-        }
+        val intent = buildRecognitionIntent(
+            maxResults = 5,
+            completeSilenceMs = 5500L,
+            possibleSilenceMs = 3500L,
+            minimumMs = 15000L,
+            biasingPhrases = listOf("hey dex", "dex")
+        )
         try {
             recognizer.cancel()
             lastWakeListenStartedAt = SystemClock.elapsedRealtime()
