@@ -1141,6 +1141,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun pulseDashboardValues(vararg views: View) {
+        views.forEach { view ->
+            view.animate().cancel()
+            view.alpha = 0.82f
+            view.scaleX = 0.985f
+            view.scaleY = 0.985f
+            view.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(220L)
+                .start()
+        }
+    }
+
     private fun updateDashboardHeader() {
         val name = currentUserName.ifBlank {
             binding.emailInput.text?.toString()?.substringBefore("@").orEmpty().ifBlank { "Dex user" }
@@ -1303,6 +1318,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         lifecycleScope.launch {
             getJsonArray("$serverUrl/dex/history", token).onSuccess { history ->
                 binding.userDashboardChatCount.text = getString(R.string.chat_history_count, history.length())
+                pulseDashboardValues(binding.userDashboardChatCount)
             }
             getJson("$serverUrl/dex/learning/history", token).onSuccess { response ->
                 val lessons = response.optJSONArray("lessons")?.length() ?: 0
@@ -1328,6 +1344,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         append("Next lesson: $topic")
                     }
                 }
+                pulseDashboardValues(
+                    binding.userDashboardLessonCount,
+                    binding.userDashboardQuizScore,
+                    binding.learningQuizPreview
+                )
             }
             if (currentUserRole == "affiliate") {
                 getJson("$serverUrl/affiliate/dashboard", token).onSuccess { response ->
@@ -1336,6 +1357,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     binding.affiliateEarnings.text = getString(R.string.affiliate_earnings, String.format(Locale.US, "%.2f", earningsValue))
                     binding.affiliateSignups.text = getString(R.string.affiliate_signups, response.optInt("signups"))
                     binding.affiliatePaidSubs.text = getString(R.string.affiliate_paid_subs, response.optInt("paidSubs"))
+                    pulseDashboardValues(
+                        binding.affiliatePromoCode,
+                        binding.affiliateEarnings,
+                        binding.affiliateSignups,
+                        binding.affiliatePaidSubs
+                    )
                 }
             }
             if (currentUserRole == "admin") {
@@ -1347,6 +1374,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         response.optInt("activeToday"),
                         response.optInt("learningLessons")
                     )
+                    pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
                 }
             }
         }
@@ -1980,6 +2008,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         binding.subscribeNowButton.visibility = if (access == "paid" || access == "unlimited") View.GONE else View.VISIBLE
         binding.manageBillingButton.visibility = if (hasBillingCustomer || access == "paid") View.VISIBLE else View.GONE
+        pulseDashboardValues(binding.billingStatusText, binding.billingDetailText)
     }
 
     private fun openStripeCheckout() {
@@ -2499,6 +2528,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.learningReminderSummary.text =
                     if (enabled && time.isNotBlank()) getString(R.string.learning_reminder_on, time)
                     else getString(R.string.learning_reminder_off)
+                pulseDashboardValues(binding.learningProfileSummary, binding.learningReminderSummary)
 
                 getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                     .edit()
@@ -2518,6 +2548,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 // Keep reminder sync quiet if preferences are unavailable.
                 binding.learningProfileSummary.text = getString(R.string.learning_profile_missing)
                 binding.learningReminderSummary.text = getString(R.string.learning_reminder_off)
+                pulseDashboardValues(binding.learningProfileSummary, binding.learningReminderSummary)
             }
         }
     }
