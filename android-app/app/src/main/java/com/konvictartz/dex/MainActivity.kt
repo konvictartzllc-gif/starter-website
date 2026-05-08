@@ -360,6 +360,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var lastEmergencyTriggerReason = ""
     private var lastEmergencySmsStatus = ""
     private val activityLogEntries = ArrayDeque<String>()
+    private var showUnhandledCallerMessagesOnly = true
     private val animatedDashboardCards = mutableSetOf<Int>()
     private var activeDexMiniGame = DexMiniGameType.NONE
     private var dexGuessTarget = 0
@@ -896,6 +897,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         binding.callMessageLogValue.setOnClickListener {
             showSavedCallerMessagePicker()
+        }
+        (binding.callMessageLogValue.parent as? View)?.setOnLongClickListener {
+            toggleCallerMessageFilter()
+            true
         }
 
         binding.phonePermissionSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -6197,11 +6202,35 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun refreshCallMessageLogFromPrefs() {
         if (!::binding.isInitialized) return
-        val messages = readPersistentCallMessageLog(this)
+        val records = readPersistentCallMessageRecords(this)
+        val visibleRecords =
+            if (showUnhandledCallerMessagesOnly) records.filter { !it.handled } else records
+        val messages = visibleRecords.map { formatSavedCallMessageForDisplay(it) }
+        binding.callMessageActionButton.text =
+            getString(
+                if (showUnhandledCallerMessagesOnly) {
+                    R.string.call_message_log_title_unhandled
+                } else {
+                    R.string.call_message_action_button
+                }
+            )
         binding.callMessageLogValue.text =
-            if (messages.isEmpty()) getString(R.string.call_message_log_empty)
+            if (messages.isEmpty()) {
+                getString(
+                    if (showUnhandledCallerMessagesOnly) {
+                        R.string.call_message_log_empty_unhandled
+                    } else {
+                        R.string.call_message_log_empty
+                    }
+                )
+            }
             else messages.joinToString("\n")
         binding.callMessageActionButton.isEnabled = readLatestPersistentCallMessage(this) != null
+    }
+
+    private fun toggleCallerMessageFilter() {
+        showUnhandledCallerMessagesOnly = !showUnhandledCallerMessagesOnly
+        refreshCallMessageLogFromPrefs()
     }
 
     private fun showSavedCallerMessageActions() {
@@ -6302,6 +6331,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun describeSavedCallMessageForPicker(message: SavedCallMessage): String {
         val base = "[${message.timeLabel}] ${message.callerLabel}: ${message.message}"
         return if (message.handled) "$base (${getString(R.string.call_message_handled_label)})" else base
+    }
+
+    private fun formatSavedCallMessageForDisplay(message: SavedCallMessage): String {
+        return "[${message.timeLabel}] " + if (message.handled) {
+            getString(
+                R.string.call_message_log_entry_handled,
+                message.callerLabel,
+                message.message,
+                getString(R.string.call_message_handled_label)
+            )
+        } else {
+            getString(R.string.call_message_log_entry, message.callerLabel, message.message)
+        }
     }
 
     private fun updateSavedCallMessage(updated: SavedCallMessage) {

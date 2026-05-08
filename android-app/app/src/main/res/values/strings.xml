@@ -684,7 +684,9 @@
     <string name="call_monitor_waiting">Call monitoring is waiting for login, backend phone permission, and Android runtime access.</string>
     <string name="call_monitor_active">Dex call monitoring is active and ready to help with allowed calls on this device.</string>
     <string name="call_message_log_title">Saved caller messages</string>
+    <string name="call_message_log_title_unhandled">Saved caller messages - unhandled only</string>
     <string name="call_message_log_empty">No caller messages saved yet.</string>
+    <string name="call_message_log_empty_unhandled">No unhandled caller messages right now.</string>
     <string name="call_message_action_button">Latest message actions</string>
     <string name="call_message_picker_title">Choose a saved caller message</string>
     <string name="call_message_action_call_back">Call back</string>
