@@ -690,10 +690,13 @@
     <string name="call_message_action_call_back">Call back</string>
     <string name="call_message_action_text_back">Text back</string>
     <string name="call_message_action_mark_handled">Mark handled</string>
+    <string name="call_message_action_mark_all_handled">Mark all handled</string>
     <string name="call_message_action_delete">Delete</string>
     <string name="call_message_action_unavailable">Dex could not find a phone number for %1$s yet.</string>
     <string name="call_message_handled_label">handled</string>
     <string name="call_message_marked_handled">Marked %1$s\'s message as handled.</string>
+    <string name="call_message_marked_all_handled">Marked all saved caller messages as handled.</string>
+    <string name="call_message_all_handled_empty">There are no unhandled caller messages right now.</string>
     <string name="call_message_deleted">Deleted %1$s\'s saved message.</string>
     <string name="auto_answer_known_contacts">Auto-answer saved contacts and let Dex take a message outside the app</string>
     <string name="auto_answer_any_non_spam_calls">Auto-answer any non-spam caller and let Dex take a message outside the app</string>

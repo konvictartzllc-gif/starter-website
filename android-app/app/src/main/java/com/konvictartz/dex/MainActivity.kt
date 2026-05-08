@@ -890,6 +890,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.callMessageActionButton.setOnClickListener {
             showSavedCallerMessageActions()
         }
+        binding.callMessageActionButton.setOnLongClickListener {
+            markAllSavedCallerMessagesHandled()
+            true
+        }
         binding.callMessageLogValue.setOnClickListener {
             showSavedCallerMessagePicker()
         }
@@ -6242,7 +6246,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (!savedMessage.handled) {
                 menu.add(0, 3, 2, getString(R.string.call_message_action_mark_handled))
             }
-            menu.add(0, 4, 3, getString(R.string.call_message_action_delete))
+            if (readPersistentCallMessageRecords(this@MainActivity).any { !it.handled }) {
+                menu.add(0, 5, 3, getString(R.string.call_message_action_mark_all_handled))
+            }
+            menu.add(0, 4, 4, getString(R.string.call_message_action_delete))
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     1 -> {
@@ -6272,6 +6279,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         deleteSavedCallMessage(savedMessage)
                         val reply = getString(R.string.call_message_deleted, savedMessage.callerLabel)
                         binding.callMonitorStatus.text = reply
+                        true
+                    }
+                    5 -> {
+                        markAllSavedCallerMessagesHandled()
                         true
                     }
                     else -> false
@@ -6314,6 +6325,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             persistSavedCallMessages(records)
             refreshCallMessageLogFromPrefs()
         }
+    }
+
+    private fun markAllSavedCallerMessagesHandled() {
+        val records = readPersistentCallMessageRecords(this)
+        if (records.none { !it.handled }) {
+            binding.callMonitorStatus.text = getString(R.string.call_message_all_handled_empty)
+            return
+        }
+        persistSavedCallMessages(records.map { it.copy(handled = true) })
+        refreshCallMessageLogFromPrefs()
+        binding.callMonitorStatus.text = getString(R.string.call_message_marked_all_handled)
     }
 
     private fun persistSavedCallMessages(messages: List<SavedCallMessage>) {
