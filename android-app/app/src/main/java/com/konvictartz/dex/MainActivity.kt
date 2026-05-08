@@ -3310,7 +3310,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             getString(R.string.dex_cosmetic_unlocked, label, finalCost, dexCoins)
         setDexCompanionState(
             DEX_COMPANION_STATE_EXCITED,
-            bubbleOverride = getString(R.string.dex_cosmetic_unlocked_bubble, label),
+            bubbleOverride = shopUnlockBubble(label),
             revertAfterMs = 2200L
         )
         return true
@@ -3342,6 +3342,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         saveDexGameStats()
         binding.dexGameStatus.text = dexGamesStatusSummary(
             getString(R.string.dex_game_cost_paid, label, cost, dexCoins)
+        )
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = shopPlayBubble(label),
+            revertAfterMs = 1800L
         )
         return true
     }
@@ -3556,9 +3561,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             updateDexCompanionControls()
             applyDexCompanionUi()
             persistHomeLook()
-            binding.homeStyleMessage.text =
-                if (owned) "$label equipped." else binding.homeStyleMessage.text
+            if (owned) {
+                binding.homeStyleMessage.text = "$label equipped."
+                setDexCompanionState(
+                    DEX_COMPANION_STATE_EXCITED,
+                    bubbleOverride = shopEquipBubble(label),
+                    revertAfterMs = 1800L
+                )
+            }
         }
+    }
+
+    private fun shopUnlockBubble(label: String): String {
+        return getString(R.string.dex_shop_bubble_unlocked, label)
+    }
+
+    private fun shopEquipBubble(label: String): String {
+        return getString(R.string.dex_shop_bubble_equipped, label)
+    }
+
+    private fun shopPlayBubble(label: String): String {
+        return getString(R.string.dex_shop_bubble_play_bought, label)
     }
 
     private fun gameShopEntry(type: DexMiniGameType, start: () -> Unit): DexShopEntry {

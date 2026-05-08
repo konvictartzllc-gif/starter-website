@@ -246,6 +246,9 @@
     <string name="dex_shop_hint_your_favorite">your favorite</string>
     <string name="dex_shop_hint_challenge_pick">challenge pick</string>
     <string name="dex_shop_hint_matches_your_vibe">matches your vibe</string>
+    <string name="dex_shop_bubble_unlocked">Nice. %1$s is unlocked now.</string>
+    <string name="dex_shop_bubble_equipped">%1$s is on. Looking good.</string>
+    <string name="dex_shop_bubble_play_bought">%1$s is ready. Have fun.</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>
