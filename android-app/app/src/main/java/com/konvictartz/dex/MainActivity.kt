@@ -3319,7 +3319,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         getString(R.string.dex_shop_section_looks),
                         getString(
                             R.string.dex_shop_section_looks_message,
-                            "${dexSkinLabel(DEX_COMPANION_SKIN_VIOLET)} ${dexSkinCost(DEX_COMPANION_SKIN_VIOLET)}c"
+                            featuredLooksShopItem()
                         ),
                         buildDexShopLooksEntries()
                     )
@@ -3327,7 +3327,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         getString(R.string.dex_shop_section_accessories),
                         getString(
                             R.string.dex_shop_section_accessories_message,
-                            "${dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HALO)} ${dexAccessoryCost(DEX_COMPANION_ACCESSORY_HALO)}c"
+                            featuredAccessoriesShopItem()
                         ),
                         buildDexShopAccessoryEntries()
                     )
@@ -3335,7 +3335,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         getString(R.string.dex_shop_section_play),
                         getString(
                             R.string.dex_shop_section_play_message,
-                            "${dexMiniGameLabel(DexMiniGameType.MEMORY)} ${dexMiniGameCost(DexMiniGameType.MEMORY)}c"
+                            featuredPlayShopItem()
                         ),
                         buildDexShopPlayEntries()
                     )
@@ -3348,6 +3348,38 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             bubbleOverride = "Shop is open.",
             revertAfterMs = 1800L
         )
+    }
+
+    private fun featuredLooksShopItem(): String {
+        val candidates = listOf(
+            Triple(skinCosmeticKey(DEX_COMPANION_SKIN_VIOLET), dexSkinLabel(DEX_COMPANION_SKIN_VIOLET), dexSkinCost(DEX_COMPANION_SKIN_VIOLET)),
+            Triple(skinCosmeticKey(DEX_COMPANION_SKIN_SUNSET), dexSkinLabel(DEX_COMPANION_SKIN_SUNSET), dexSkinCost(DEX_COMPANION_SKIN_SUNSET)),
+            Triple(faceStyleCosmeticKey(DEX_COMPANION_FACE_PIXEL), dexFaceStyleLabel(DEX_COMPANION_FACE_PIXEL), dexFaceStyleCost(DEX_COMPANION_FACE_PIXEL)),
+            Triple(bubbleStyleCosmeticKey(DEX_COMPANION_BUBBLE_GLOW), dexBubbleStyleLabel(DEX_COMPANION_BUBBLE_GLOW), dexBubbleStyleCost(DEX_COMPANION_BUBBLE_GLOW))
+        )
+        val featured = candidates.firstOrNull { !ownedDexCosmetics.contains(it.first) } ?: candidates.first()
+        return "${featured.second} ${featured.third}c"
+    }
+
+    private fun featuredAccessoriesShopItem(): String {
+        val candidates = listOf(
+            Triple(accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HALO), dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HALO), dexAccessoryCost(DEX_COMPANION_ACCESSORY_HALO)),
+            Triple(accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_GLASSES), dexAccessoryLabel(DEX_COMPANION_ACCESSORY_GLASSES), dexAccessoryCost(DEX_COMPANION_ACCESSORY_GLASSES)),
+            Triple(accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HEADPHONES), dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HEADPHONES), dexAccessoryCost(DEX_COMPANION_ACCESSORY_HEADPHONES))
+        )
+        val featured = candidates.firstOrNull { !ownedDexCosmetics.contains(it.first) } ?: candidates.first()
+        return "${featured.second} ${featured.third}c"
+    }
+
+    private fun featuredPlayShopItem(): String {
+        val candidates = listOf(
+            DexMiniGameType.MEMORY,
+            DexMiniGameType.TRIVIA,
+            DexMiniGameType.WOULD_YOU_RATHER
+        )
+        val favorite = favoriteDexMiniGame()
+        val featured = candidates.firstOrNull { it != favorite } ?: candidates.first()
+        return "${dexMiniGameLabel(featured)} ${dexMiniGameCost(featured)}c"
     }
 
     private fun openDexShopSectionDialog(title: String, message: String, entries: List<DexShopEntry>) {
