@@ -1156,6 +1156,32 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun showDashboardLoadingStates() {
+        binding.userDashboardChatCount.text = getString(R.string.dashboard_loading_value)
+        binding.userDashboardLessonCount.text = getString(R.string.dashboard_loading_value)
+        binding.userDashboardQuizScore.text = getString(R.string.dashboard_loading_value)
+        binding.learningQuizPreview.text = getString(R.string.dashboard_loading_detail)
+        if (currentUserRole == "affiliate") {
+            binding.affiliatePromoCode.text = getString(R.string.affiliate_dashboard_loading)
+            binding.affiliateEarnings.text = getString(R.string.dashboard_loading_value)
+            binding.affiliateSignups.text = getString(R.string.dashboard_loading_value)
+            binding.affiliatePaidSubs.text = getString(R.string.dashboard_loading_value)
+        }
+        if (currentUserRole == "admin") {
+            binding.adminStatsValue.text = getString(R.string.admin_dashboard_loading)
+        }
+    }
+
+    private fun showBillingLoadingState() {
+        binding.billingStatusText.text = getString(R.string.billing_status_loading)
+        binding.billingDetailText.text = getString(R.string.billing_detail_loading)
+    }
+
+    private fun showLearningLoadingState() {
+        binding.learningProfileSummary.text = getString(R.string.learning_profile_loading)
+        binding.learningReminderSummary.text = getString(R.string.learning_reminder_loading)
+    }
+
     private fun updateDashboardHeader() {
         val name = currentUserName.ifBlank {
             binding.emailInput.text?.toString()?.substringBefore("@").orEmpty().ifBlank { "Dex user" }
@@ -1315,6 +1341,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun fetchDashboardData() {
         val token = authToken ?: return
         val serverUrl = currentServerUrl()
+        showDashboardLoadingStates()
         lifecycleScope.launch {
             getJsonArray("$serverUrl/dex/history", token).onSuccess { history ->
                 binding.userDashboardChatCount.text = getString(R.string.chat_history_count, history.length())
@@ -1977,6 +2004,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun fetchBillingStatus() {
         val token = authToken ?: return
         val serverUrl = currentServerUrl()
+        showBillingLoadingState()
         lifecycleScope.launch {
             val result = getJson("$serverUrl/payments/status", token)
             result.onSuccess { response ->
@@ -2500,6 +2528,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun fetchLearningReminderPreferences() {
         val token = authToken ?: return
         val serverUrl = currentServerUrl()
+        showLearningLoadingState()
         lifecycleScope.launch {
             val result = getJson("$serverUrl/dex/preferences", token)
             result.onSuccess { response ->

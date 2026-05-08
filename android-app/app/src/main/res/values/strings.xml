@@ -64,6 +64,10 @@
     <string name="lesson_history_count">Lessons completed: %1$d</string>
     <string name="quiz_score_summary">Quiz average: %1$s</string>
     <string name="quiz_score_empty">No quiz score yet</string>
+    <string name="dashboard_loading_value">Refreshing...</string>
+    <string name="dashboard_loading_detail">Pulling your latest Dex activity.</string>
+    <string name="affiliate_dashboard_loading">Refreshing affiliate performance.</string>
+    <string name="admin_dashboard_loading">Refreshing platform snapshot.</string>
     <string name="affiliate_dashboard_title">Affiliate earnings</string>
     <string name="affiliate_dashboard_section_tag">Growth track</string>
     <string name="affiliate_dashboard_summary">See your promo code, commissions, and referrals in one place.</string>
@@ -144,6 +148,8 @@
     <string name="learning_profile_missing">Set your language profile to start lessons and quizzes.</string>
     <string name="learning_reminder_off">Daily learning reminder is off.</string>
     <string name="learning_reminder_on">Daily reminder is set for %1$s.</string>
+    <string name="learning_profile_loading">Refreshing your learning profile.</string>
+    <string name="learning_reminder_loading">Checking your daily reminder settings.</string>
     <string name="learning_profile_saved">Learning profile saved.</string>
     <string name="learning_profile_failed">Dex could not save your learning profile.</string>
     <string name="learning_lesson_preview_title">%1$s lesson: %2$s</string>
@@ -216,10 +222,12 @@
     <string name="billing_status_expired">Subscription needed</string>
     <string name="billing_status_unlimited">Unlimited access</string>
     <string name="billing_status_unknown">Billing status unavailable</string>
+    <string name="billing_status_loading">Refreshing billing status</string>
     <string name="billing_detail_trial">%1$d day(s) left in your Dex trial. Subscribe now so your access rolls over without interruption.</string>
     <string name="billing_detail_paid">Your Dex subscription is active. Manage payment method or billing details anytime.</string>
     <string name="billing_detail_expired">Your trial or subscription has ended. Subscribe to keep using Dex.</string>
     <string name="billing_detail_unlimited">This account already has unlimited Dex access.</string>
+    <string name="billing_detail_loading">Checking your latest plan and payment details.</string>
     <string name="subscribe_now">Subscribe now</string>
     <string name="manage_billing">Manage billing</string>
     <string name="billing_checkout_failed">Dex could not open Stripe checkout.</string>
