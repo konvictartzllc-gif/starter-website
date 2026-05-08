@@ -23,6 +23,8 @@ import android.provider.ContactsContract
 import android.provider.ContactsContract.Intents.Insert
 import android.provider.MediaStore
 import android.provider.Settings
+import android.text.SpannableStringBuilder
+import android.text.Spanned
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -33,6 +35,9 @@ import android.telecom.TelecomManager
 import android.telephony.SmsManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
+import android.text.style.BackgroundColorSpan
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -78,6 +83,7 @@ import java.time.DayOfWeek
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import android.graphics.Typeface
 import kotlin.math.max
 import java.net.URI
 
@@ -3120,7 +3126,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
-    private fun dexCompanionRewardsSummary(): String {
+    private fun dexCompanionRewardsBodyText(): String {
         val favorite = favoriteDexMiniGameLabel()
             ?: getString(R.string.dex_companion_rewards_favorite_none)
         val previewLevel = dexCompanionRewardsPreviewLevel
@@ -3150,7 +3156,60 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 favorite
             )
         }
-        return "$body\n${dexCompanionRewardsShelfLine()}\n${getString(R.string.dex_companion_rewards_tap_hint)}"
+        return body
+    }
+
+    private fun dexCompanionRewardsSummary(): CharSequence {
+        val builder = SpannableStringBuilder()
+        builder.append(dexCompanionRewardsBodyText())
+        builder.append('\n')
+        appendDexCompanionRewardShelf(builder)
+        builder.append('\n')
+        val hintStart = builder.length
+        builder.append(getString(R.string.dex_companion_rewards_tap_hint))
+        builder.setSpan(
+            ForegroundColorSpan(getColorCompat(R.color.dex_text_secondary)),
+            hintStart,
+            builder.length,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        return builder
+    }
+
+    private fun appendDexCompanionRewardShelf(builder: SpannableStringBuilder) {
+        val labelStart = builder.length
+        builder.append("Shelf:")
+        builder.setSpan(
+            ForegroundColorSpan(getColorCompat(R.color.dex_text_secondary)),
+            labelStart,
+            builder.length,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        builder.append(' ')
+        appendDexCompanionRewardBadge(builder, 1)
+        builder.append(' ')
+        appendDexCompanionRewardBadge(builder, 2)
+        builder.append(' ')
+        appendDexCompanionRewardBadge(builder, 3)
+    }
+
+    private fun appendDexCompanionRewardBadge(builder: SpannableStringBuilder, level: Int) {
+        val badgeText = dexCompanionShelfBadge(level)
+        val (fgColor, bgColor) = when {
+            dexCompanionRewardsPreviewLevel == level ->
+                android.graphics.Color.WHITE to android.graphics.Color.parseColor("#5B7CFF")
+            currentDexCompanionTierStyleOverride == level ->
+                android.graphics.Color.WHITE to android.graphics.Color.parseColor("#8B5CF6")
+            dexGamesUnlockLevel() >= level ->
+                android.graphics.Color.parseColor("#0F172A") to android.graphics.Color.parseColor("#8FE3B0")
+            else ->
+                android.graphics.Color.parseColor("#C7D2E4") to android.graphics.Color.parseColor("#334155")
+        }
+        val start = builder.length
+        builder.append(badgeText)
+        builder.setSpan(StyleSpan(Typeface.BOLD), start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        builder.setSpan(ForegroundColorSpan(fgColor), start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        builder.setSpan(BackgroundColorSpan(bgColor), start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
     }
 
     private fun cycleDexCompanionRewardsPreview() {
