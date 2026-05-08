@@ -355,6 +355,7 @@
     <string name="safety_follow_up">Let Dex keep checking in after a distress moment</string>
     <string name="save_safety_profile">Save safety profile</string>
     <string name="safety_profile_saved">Safety profile saved.</string>
+    <string name="safety_profile_saved_named">I saved the assisted person profile for %1$s. Birthday: %2$s.</string>
     <string name="safety_profile_failed">Dex could not save your safety profile.</string>
     <string name="safety_profile_message_tag">Profile status</string>
     <string name="safety_contact_none">not set</string>

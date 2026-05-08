@@ -2580,9 +2580,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 )
                 if (result.isFailure) failed = true
             }
-            binding.safetyProfileMessage.text =
-                if (failed) getString(R.string.safety_profile_failed) else getString(R.string.safety_profile_saved)
-            if (!failed) fetchSafetyPreferences()
+            val reply =
+                if (failed) {
+                    getString(R.string.safety_profile_failed)
+                } else {
+                    val confirmedName = emergencyPersonName.ifBlank { resolveEmergencyPersonName() }
+                    val confirmedBirthday = emergencyBirthday.ifBlank { getString(R.string.safety_birthday_unknown) }
+                    getString(R.string.safety_profile_saved_named, confirmedName, confirmedBirthday)
+                }
+            binding.safetyProfileMessage.text = reply
+            binding.lastReplyValue.text = reply
+            if (!failed) {
+                fetchSafetyPreferences()
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
+            }
             refreshSafetyDiagnostics()
         }
     }
