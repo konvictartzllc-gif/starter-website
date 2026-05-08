@@ -3550,6 +3550,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun processDexCommand(message: String, allowAiFallback: Boolean = true): Boolean {
+        if (shouldResetPromptStateForFreshCommand(message)) {
+            clearStalePromptState()
+        }
         if (handleImmediateEmergencyCommand(message)) return true
         if (handleTaskIntent(message)) return true
         detectContactOnlyIntent(message)?.let { contact ->
@@ -5496,10 +5499,81 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun detectContactOnlyIntent(message: String): ContactMatch? {
-        val resolvedName = resolveContactAlias(message.trim())
+        val trimmed = message.trim()
+        if (!isLikelyBareContactName(trimmed)) return null
+        val resolvedName = resolveContactAlias(trimmed)
         if (resolvedName.isBlank()) return null
         return findExactPhoneContactByName(resolvedName)
             ?: findPhoneContactByName(resolvedName)
+    }
+
+    private fun clearStalePromptState() {
+        clearPendingIncomingSms()
+        clearPendingNotification()
+        pendingContactTarget = null
+        pendingContactAction = null
+    }
+
+    private fun shouldResetPromptStateForFreshCommand(message: String): Boolean {
+        val normalized = message.trim().lowercase(Locale.US)
+        if (normalized.isBlank()) return false
+        if (isLikelySmsPromptReply(normalized) || isLikelyNotificationPromptReply(normalized)) return false
+        return looksLikeFreshStandaloneCommand(normalized)
+    }
+
+    private fun looksLikeFreshStandaloneCommand(normalized: String): Boolean {
+        if (
+            normalized.contains("weather") ||
+            normalized.contains("forecast") ||
+            normalized.contains("temperature")
+        ) {
+            return true
+        }
+        return normalized.startsWith("what ") ||
+            normalized.startsWith("what's ") ||
+            normalized.startsWith("whats ") ||
+            normalized.startsWith("how ") ||
+            normalized.startsWith("how's ") ||
+            normalized.startsWith("hows ") ||
+            normalized.startsWith("when ") ||
+            normalized.startsWith("where ") ||
+            normalized.startsWith("who ") ||
+            normalized.startsWith("why ") ||
+            normalized.startsWith("tell me ") ||
+            normalized.startsWith("open ") ||
+            normalized.startsWith("play ") ||
+            normalized.startsWith("set ") ||
+            normalized.startsWith("start ") ||
+            normalized.startsWith("can you ") ||
+            normalized.startsWith("could you ") ||
+            normalized.startsWith("will you ") ||
+            normalized.startsWith("do i ") ||
+            normalized.startsWith("is it ") ||
+            normalized.startsWith("are there ")
+    }
+
+    private fun isLikelyBareContactName(message: String): Boolean {
+        val normalized = message.trim().lowercase(Locale.US)
+        if (normalized.isBlank() || normalized.length > 32) return false
+        if (looksLikeFreshStandaloneCommand(normalized)) return false
+        if (normalized.contains("?")) return false
+        val words = normalized.split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (words.isEmpty() || words.size > 3) return false
+        val blockedWords = setOf(
+            "call",
+            "text",
+            "message",
+            "email",
+            "weather",
+            "forecast",
+            "temperature",
+            "read",
+            "reply",
+            "ignore",
+            "yes",
+            "no"
+        )
+        return words.none { it in blockedWords }
     }
 
     private fun consumePendingContactTarget(normalized: String): Boolean? {
