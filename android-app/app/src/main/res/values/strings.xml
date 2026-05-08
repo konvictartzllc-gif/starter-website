@@ -66,6 +66,8 @@
     <string name="lesson_history_count">Lessons completed: %1$d</string>
     <string name="quiz_score_summary">Quiz average: %1$s</string>
     <string name="quiz_score_empty">No quiz score yet</string>
+    <string name="dashboard_activity_empty_user">No streak or next lesson yet. Ask Dex for a lesson when you are ready.</string>
+    <string name="dashboard_activity_empty_affiliate">No streak or next lesson yet. Build your learning track so your affiliate workspace starts to tell a story.</string>
     <string name="dashboard_loading_value">Refreshing...</string>
     <string name="dashboard_loading_detail">Pulling your latest Dex activity.</string>
     <string name="affiliate_dashboard_loading">Refreshing affiliate performance.</string>
@@ -84,6 +86,8 @@
     <string name="affiliate_signups">Signups: %1$d</string>
     <string name="affiliate_paid_subs">Paid subscribers: %1$d</string>
     <string name="affiliate_withdraw_note">Withdrawals will use your Stripe verification once payout setup is live.</string>
+    <string name="affiliate_promo_code_empty">Promo code: getting your first setup ready</string>
+    <string name="affiliate_withdraw_note_empty">Your growth dashboard is ready. Once referrals start landing, Dex will show your code, earnings, and payout path here.</string>
     <string name="admin_dashboard_title">Admin portal</string>
     <string name="admin_dashboard_section_tag">Live systems</string>
     <string name="admin_dashboard_summary">Manage backend access, affiliate codes, and platform health from here.</string>
@@ -96,6 +100,7 @@
     <string name="admin_generate_invite">Generate Affiliate Code</string>
     <string name="admin_invite_created">Affiliate code ready: %1$s</string>
     <string name="admin_stats_summary">Users: %1$d | Affiliates: %2$d | Active today: %3$d | Lessons: %4$d</string>
+    <string name="admin_stats_empty">Platform snapshot is waiting on live backend data.</string>
     <string name="home_style_title">Home style</string>
     <string name="home_style_summary">Pick a look for Dex, then change the home text if you want it to feel more personal.</string>
     <string name="home_style_quick_tip">Choose a style first. Open advanced colors only if you want a more custom look.</string>
@@ -148,6 +153,7 @@
     <string name="start_learning_quiz">Build quiz</string>
     <string name="learning_profile_summary">Learning %1$s at %2$s level with a %3$s focus.</string>
     <string name="learning_profile_missing">Set your language profile to start lessons and quizzes.</string>
+    <string name="learning_profile_missing_affiliate">Set your learning profile so your affiliate workspace can build lessons and show progress here.</string>
     <string name="learning_reminder_off">Daily learning reminder is off.</string>
     <string name="learning_reminder_on">Daily reminder is set for %1$s.</string>
     <string name="learning_profile_loading">Refreshing your learning profile.</string>
@@ -224,6 +230,9 @@
     <string name="billing_status_expired">Subscription needed</string>
     <string name="billing_status_unlimited">Unlimited access</string>
     <string name="billing_status_unknown">Billing status unavailable</string>
+    <string name="billing_detail_unknown_user">Dex has not pulled your plan details yet. Your everyday dashboard will update as soon as billing checks in.</string>
+    <string name="billing_detail_unknown_affiliate">Dex is still pulling your affiliate account access and plan details.</string>
+    <string name="billing_detail_unknown_admin">Dex is still checking this admin account access details.</string>
     <string name="billing_status_loading">Refreshing billing status</string>
     <string name="billing_detail_trial">%1$d day(s) left in your Dex trial. Subscribe now so your access rolls over without interruption.</string>
     <string name="billing_detail_paid">Your Dex subscription is active. Manage payment method or billing details anytime.</string>

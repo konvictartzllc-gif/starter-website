@@ -1090,10 +1090,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.userDashboardChatCount.text = getString(R.string.chat_history_count, 0)
             binding.userDashboardLessonCount.text = getString(R.string.lesson_history_count, 0)
             binding.userDashboardQuizScore.text = getString(R.string.quiz_score_summary, getString(R.string.quiz_score_empty))
-            binding.learningProfileSummary.text = getString(R.string.learning_profile_missing)
+            binding.learningProfileSummary.text = learningProfileMissingCopy()
             binding.learningReminderSummary.text = getString(R.string.learning_reminder_off)
             binding.learningLessonPreview.text = ""
-            binding.learningQuizPreview.text = ""
+            binding.learningQuizPreview.text = dashboardActivityEmptyCopy()
             binding.lifeSectionsPreview.text = ""
             dashboardSections.clear()
             renderDashboardSections()
@@ -1183,6 +1183,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun strokeWidthDp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+
+    private fun dashboardActivityEmptyCopy(): String =
+        if (currentUserRole.equals("affiliate", true)) {
+            getString(R.string.dashboard_activity_empty_affiliate)
+        } else {
+            getString(R.string.dashboard_activity_empty_user)
+        }
+
+    private fun learningProfileMissingCopy(): String =
+        if (currentUserRole.equals("affiliate", true)) {
+            getString(R.string.learning_profile_missing_affiliate)
+        } else {
+            getString(R.string.learning_profile_missing)
+        }
+
+    private fun billingUnknownDetailCopy(): String = when (currentUserRole.lowercase(Locale.US)) {
+        "admin" -> getString(R.string.billing_detail_unknown_admin)
+        "affiliate" -> getString(R.string.billing_detail_unknown_affiliate)
+        else -> getString(R.string.billing_detail_unknown_user)
+    }
 
     private fun beginSectionRefresh(label: TextView, card: MaterialCardView, roleKey: String) {
         label.text = getString(R.string.dashboard_section_status_loading)
@@ -1458,6 +1478,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             append("Next lesson: $topic")
                         }
                     }
+                    if (binding.learningQuizPreview.text.isNullOrBlank()) {
+                        binding.learningQuizPreview.text = dashboardActivityEmptyCopy()
+                    }
                     pulseDashboardValues(
                         binding.userDashboardLessonCount,
                         binding.userDashboardQuizScore,
@@ -1471,7 +1494,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         R.string.quiz_score_summary,
                         getString(R.string.quiz_score_empty)
                     )
-                    binding.learningQuizPreview.text = ""
+                    binding.learningQuizPreview.text = dashboardActivityEmptyCopy()
                     pulseDashboardValues(
                         binding.userDashboardLessonCount,
                         binding.userDashboardQuizScore,
@@ -1487,6 +1510,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         binding.affiliateEarnings.text = getString(R.string.affiliate_earnings, String.format(Locale.US, "%.2f", earningsValue))
                         binding.affiliateSignups.text = getString(R.string.affiliate_signups, response.optInt("signups"))
                         binding.affiliatePaidSubs.text = getString(R.string.affiliate_paid_subs, response.optInt("paidSubs"))
+                        binding.affiliateWithdrawNote.text = getString(R.string.affiliate_withdraw_note)
                         pulseDashboardValues(
                             binding.affiliatePromoCode,
                             binding.affiliateEarnings,
@@ -1500,10 +1524,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         )
                     }
                     .onFailure {
-                        binding.affiliatePromoCode.text = getString(R.string.affiliate_promo_code, "-")
+                        binding.affiliatePromoCode.text = getString(R.string.affiliate_promo_code_empty)
                         binding.affiliateEarnings.text = getString(R.string.affiliate_earnings, "0.00")
                         binding.affiliateSignups.text = getString(R.string.affiliate_signups, 0)
                         binding.affiliatePaidSubs.text = getString(R.string.affiliate_paid_subs, 0)
+                        binding.affiliateWithdrawNote.text = getString(R.string.affiliate_withdraw_note_empty)
                         pulseDashboardValues(
                             binding.affiliatePromoCode,
                             binding.affiliateEarnings,
@@ -1535,13 +1560,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         )
                     }
                     .onFailure {
-                        binding.adminStatsValue.text = getString(
-                            R.string.admin_stats_summary,
-                            0,
-                            0,
-                            0,
-                            0
-                        )
+                        binding.adminStatsValue.text = getString(R.string.admin_stats_empty)
                         pulseDashboardValues(binding.adminStatsValue, binding.adminBackendValue)
                         completeSectionRefresh(
                             binding.adminDashboardStatus,
@@ -2188,7 +2207,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             "paid" -> getString(R.string.billing_detail_paid)
             "expired" -> getString(R.string.billing_detail_expired)
             "unlimited" -> getString(R.string.billing_detail_unlimited)
-            else -> getString(R.string.billing_status_unknown)
+            else -> billingUnknownDetailCopy()
         }
         binding.subscribeNowButton.visibility = if (access == "paid" || access == "unlimited") View.GONE else View.VISIBLE
         binding.manageBillingButton.visibility = if (hasBillingCustomer || access == "paid") View.VISIBLE else View.GONE
@@ -2706,7 +2725,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.learningReminderTimeInput.setText(time)
                 binding.learningProfileSummary.text =
                     if (preferences.optString("learning_target_language").isBlank()) {
-                        getString(R.string.learning_profile_missing)
+                        learningProfileMissingCopy()
                     } else {
                         getString(R.string.learning_profile_summary, language, level, focus)
                     }
@@ -2736,7 +2755,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 )
             }.onFailure {
                 // Keep reminder sync quiet if preferences are unavailable.
-                binding.learningProfileSummary.text = getString(R.string.learning_profile_missing)
+                binding.learningProfileSummary.text = learningProfileMissingCopy()
                 binding.learningReminderSummary.text = getString(R.string.learning_reminder_off)
                 pulseDashboardValues(binding.learningProfileSummary, binding.learningReminderSummary)
                 completeSectionRefresh(
