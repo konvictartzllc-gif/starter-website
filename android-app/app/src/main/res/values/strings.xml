@@ -167,6 +167,14 @@
     <string name="dex_companion_side_label">Side</string>
     <string name="dex_companion_side_left">Left</string>
     <string name="dex_companion_side_right">Right</string>
+    <string name="dex_companion_face_style_label">Face style</string>
+    <string name="dex_companion_face_style_classic">Classic</string>
+    <string name="dex_companion_face_style_wink">Wink</string>
+    <string name="dex_companion_face_style_pixel">Pixel</string>
+    <string name="dex_companion_bubble_style_label">Bubble style</string>
+    <string name="dex_companion_bubble_style_soft">Soft</string>
+    <string name="dex_companion_bubble_style_glow">Glow</string>
+    <string name="dex_companion_bubble_style_bold">Bold</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>

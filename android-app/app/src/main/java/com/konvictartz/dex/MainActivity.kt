@@ -259,6 +259,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionMood: String = DEX_COMPANION_MOOD_CALM
     private var currentDexCompanionSize: String = DEX_COMPANION_SIZE_MEDIUM
     private var currentDexCompanionSide: String = DEX_COMPANION_SIDE_RIGHT
+    private var currentDexCompanionFaceStyle: String = DEX_COMPANION_FACE_CLASSIC
+    private var currentDexCompanionBubbleStyle: String = DEX_COMPANION_BUBBLE_SOFT
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
     private var dexCompanionBubbleOverride: String? = null
     private var dexCompanionFloatAnimator: AnimatorSet? = null
@@ -967,6 +969,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             applyDexCompanionUi()
             persistHomeLook()
         }
+        binding.dexCompanionFaceStyleToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentDexCompanionFaceStyle = when (checkedId) {
+                R.id.dexCompanionFaceStyleWinkButton -> DEX_COMPANION_FACE_WINK
+                R.id.dexCompanionFaceStylePixelButton -> DEX_COMPANION_FACE_PIXEL
+                else -> DEX_COMPANION_FACE_CLASSIC
+            }
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
+        binding.dexCompanionBubbleStyleToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentDexCompanionBubbleStyle = when (checkedId) {
+                R.id.dexCompanionBubbleStyleGlowButton -> DEX_COMPANION_BUBBLE_GLOW
+                R.id.dexCompanionBubbleStyleBoldButton -> DEX_COMPANION_BUBBLE_BOLD
+                else -> DEX_COMPANION_BUBBLE_SOFT
+            }
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
 
         renderAuthMode()
         updateCallActionVisibility(false)
@@ -1021,6 +1043,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentDexCompanionSide = prefs.getString(KEY_DEX_COMPANION_SIDE, DEX_COMPANION_SIDE_RIGHT)
             .orEmpty()
             .ifBlank { DEX_COMPANION_SIDE_RIGHT }
+        currentDexCompanionFaceStyle = prefs.getString(KEY_DEX_COMPANION_FACE_STYLE, DEX_COMPANION_FACE_CLASSIC)
+            .orEmpty()
+            .ifBlank { DEX_COMPANION_FACE_CLASSIC }
+        currentDexCompanionBubbleStyle = prefs.getString(KEY_DEX_COMPANION_BUBBLE_STYLE, DEX_COMPANION_BUBBLE_SOFT)
+            .orEmpty()
+            .ifBlank { DEX_COMPANION_BUBBLE_SOFT }
         updateAdvancedStyleUi(currentThemePreset == "custom")
         updateDexCompanionControls()
         loadDashboardSections()
@@ -2919,6 +2947,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_DEX_COMPANION_MOOD, currentDexCompanionMood)
             .putString(KEY_DEX_COMPANION_SIZE, currentDexCompanionSize)
             .putString(KEY_DEX_COMPANION_SIDE, currentDexCompanionSide)
+            .putString(KEY_DEX_COMPANION_FACE_STYLE, currentDexCompanionFaceStyle)
+            .putString(KEY_DEX_COMPANION_BUBBLE_STYLE, currentDexCompanionBubbleStyle)
             .commit()
     }
 
@@ -2954,6 +2984,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> R.id.dexCompanionSideRightButton
             }
         )
+        binding.dexCompanionFaceStyleToggle.check(
+            when (currentDexCompanionFaceStyle.lowercase(Locale.US)) {
+                DEX_COMPANION_FACE_WINK -> R.id.dexCompanionFaceStyleWinkButton
+                DEX_COMPANION_FACE_PIXEL -> R.id.dexCompanionFaceStylePixelButton
+                else -> R.id.dexCompanionFaceStyleClassicButton
+            }
+        )
+        binding.dexCompanionBubbleStyleToggle.check(
+            when (currentDexCompanionBubbleStyle.lowercase(Locale.US)) {
+                DEX_COMPANION_BUBBLE_GLOW -> R.id.dexCompanionBubbleStyleGlowButton
+                DEX_COMPANION_BUBBLE_BOLD -> R.id.dexCompanionBubbleStyleBoldButton
+                else -> R.id.dexCompanionBubbleStyleSoftButton
+            }
+        )
     }
 
     private fun applyDexCompanionUi() {
@@ -2976,23 +3020,40 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val faceTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.14f)
         val labelTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.82f)
         val activeState = dexCompanionState.ifBlank { deriveDexCompanionState() }
+        val isPixelFace = currentDexCompanionFaceStyle.lowercase(Locale.US) == DEX_COMPANION_FACE_PIXEL
+        val isWinkFace = currentDexCompanionFaceStyle.lowercase(Locale.US) == DEX_COMPANION_FACE_WINK
+        val bubbleStyle = currentDexCompanionBubbleStyle.lowercase(Locale.US)
 
-        binding.dexCompanionBubble.backgroundTintList = ColorStateList.valueOf(bubbleTint)
+        val styledBubbleTint = when (bubbleStyle) {
+            DEX_COMPANION_BUBBLE_GLOW -> ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.58f)
+            DEX_COMPANION_BUBBLE_BOLD -> ColorUtils.blendARGB(accentColor, android.graphics.Color.BLACK, 0.18f)
+            else -> bubbleTint
+        }
+        binding.dexCompanionBubble.backgroundTintList = ColorStateList.valueOf(styledBubbleTint)
         binding.dexCompanionCard.setCardBackgroundColor(ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_panel), 208))
         binding.dexCompanionCard.strokeColor = cardTint
         binding.dexCompanionFace.setCardBackgroundColor(faceTint)
         binding.dexCompanionFace.strokeColor = labelTint
         binding.dexCompanionFace.radius = dpToPx(
             when (currentDexCompanionSize.lowercase(Locale.US)) {
-                DEX_COMPANION_SIZE_SMALL -> 28
-                DEX_COMPANION_SIZE_LARGE -> 44
-                else -> 36
+                DEX_COMPANION_SIZE_SMALL -> if (isPixelFace) 18 else 28
+                DEX_COMPANION_SIZE_LARGE -> if (isPixelFace) 24 else 44
+                else -> if (isPixelFace) 20 else 36
             }
         ).toFloat()
         binding.dexCompanionLabel.setTextColor(labelTint)
-        binding.dexCompanionBubble.setTextColor(getColorCompat(R.color.dex_background))
+        binding.dexCompanionBubble.setTextColor(
+            if (bubbleStyle == DEX_COMPANION_BUBBLE_BOLD) android.graphics.Color.WHITE else getColorCompat(R.color.dex_background)
+        )
 
-        binding.dexCompanionBubble.text = dexCompanionBubbleOverride ?: companionBubbleForState(activeState)
+        val bubbleText = dexCompanionBubbleOverride ?: companionBubbleForState(activeState)
+        binding.dexCompanionBubble.text =
+            if (bubbleStyle == DEX_COMPANION_BUBBLE_BOLD) bubbleText.uppercase(Locale.US) else bubbleText
+        binding.dexCompanionBubble.textSize = when (bubbleStyle) {
+            DEX_COMPANION_BUBBLE_BOLD -> 11f
+            DEX_COMPANION_BUBBLE_GLOW -> 12.5f
+            else -> 12f
+        }
 
         val faceSize = dpToPx(
             when (currentDexCompanionSize.lowercase(Locale.US)) {
@@ -3011,14 +3072,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             width = mouthWidth
         }
         binding.dexCompanionMouth.alpha = companionMouthAlpha(activeState)
-        binding.dexCompanionBubble.alpha = companionBubbleAlpha(activeState)
+        binding.dexCompanionBubble.alpha = when (bubbleStyle) {
+            DEX_COMPANION_BUBBLE_GLOW -> 1f
+            else -> companionBubbleAlpha(activeState)
+        }
         binding.dexCompanionBubble.rotation = companionBubbleRotation(activeState)
         val eyeScale = companionEyeScale(activeState)
         binding.dexCompanionEyeLeft.scaleY = eyeScale
-        binding.dexCompanionEyeRight.scaleY = eyeScale
+        binding.dexCompanionEyeRight.scaleY = if (isWinkFace && activeState == DEX_COMPANION_STATE_IDLE) 0.35f else eyeScale
+        binding.dexCompanionEyeLeft.scaleX = if (isPixelFace) 1.25f else 1f
+        binding.dexCompanionEyeRight.scaleX = if (isPixelFace) 1.25f else 1f
         binding.dexCompanionFace.scaleX = companionFaceScale(activeState)
         binding.dexCompanionFace.scaleY = companionFaceScale(activeState)
         binding.dexCompanionCard.alpha = if (activeState == DEX_COMPANION_STATE_PENDING) 1f else 0.98f
+        binding.dexCompanionLabel.alpha = if (isPixelFace) 0.88f else 1f
 
         (binding.dexCompanionCard.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
             val sideGravity = if (currentDexCompanionSide.lowercase(Locale.US) == DEX_COMPANION_SIDE_LEFT) {
@@ -7972,6 +8039,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_MOOD = "dex_companion_mood"
         const val KEY_DEX_COMPANION_SIZE = "dex_companion_size"
         const val KEY_DEX_COMPANION_SIDE = "dex_companion_side"
+        const val KEY_DEX_COMPANION_FACE_STYLE = "dex_companion_face_style"
+        const val KEY_DEX_COMPANION_BUBBLE_STYLE = "dex_companion_bubble_style"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"
@@ -8004,6 +8073,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_SIZE_LARGE = "large"
         private const val DEX_COMPANION_SIDE_LEFT = "left"
         private const val DEX_COMPANION_SIDE_RIGHT = "right"
+        private const val DEX_COMPANION_FACE_CLASSIC = "classic"
+        private const val DEX_COMPANION_FACE_WINK = "wink"
+        private const val DEX_COMPANION_FACE_PIXEL = "pixel"
+        private const val DEX_COMPANION_BUBBLE_SOFT = "soft"
+        private const val DEX_COMPANION_BUBBLE_GLOW = "glow"
+        private const val DEX_COMPANION_BUBBLE_BOLD = "bold"
         private const val DEX_COMPANION_STATE_IDLE = "idle"
         private const val DEX_COMPANION_STATE_LISTENING = "listening"
         private const val DEX_COMPANION_STATE_EXCITED = "excited"
