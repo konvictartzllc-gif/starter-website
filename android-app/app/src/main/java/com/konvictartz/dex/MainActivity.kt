@@ -176,6 +176,7 @@ data class SavedCallMessage(
     val phoneNumber: String?,
     val message: String,
     val timeLabel: String,
+    val handled: Boolean = false,
 )
 
 private data class DashboardSection(
@@ -6214,7 +6215,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.callMonitorStatus.text = getString(R.string.call_message_log_empty)
             return
         }
-        val labels = messages.map { "[${it.timeLabel}] ${it.callerLabel}: ${it.message}" }.toTypedArray()
+        val labels = messages.map { describeSavedCallMessageForPicker(it) }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle(R.string.call_message_picker_title)
             .setItems(labels) { _, which ->
@@ -6238,6 +6239,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         PopupMenu(this, binding.callMessageActionButton).apply {
             menu.add(0, 1, 0, getString(R.string.call_message_action_call_back))
             menu.add(0, 2, 1, getString(R.string.call_message_action_text_back))
+            if (!savedMessage.handled) {
+                menu.add(0, 3, 2, getString(R.string.call_message_action_mark_handled))
+            }
+            menu.add(0, 4, 3, getString(R.string.call_message_action_delete))
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     1 -> {
@@ -6257,6 +6262,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         )
                         true
                     }
+                    3 -> {
+                        updateSavedCallMessage(savedMessage.copy(handled = true))
+                        val reply = getString(R.string.call_message_marked_handled, savedMessage.callerLabel)
+                        binding.callMonitorStatus.text = reply
+                        true
+                    }
+                    4 -> {
+                        deleteSavedCallMessage(savedMessage)
+                        val reply = getString(R.string.call_message_deleted, savedMessage.callerLabel)
+                        binding.callMonitorStatus.text = reply
+                        true
+                    }
                     else -> false
                 }
             }
@@ -6269,6 +6286,54 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return ContactMatch(message.callerLabel, directNumber)
         }
         return findBestPhoneContactMatch(message.callerLabel, requireExact = false)
+    }
+
+    private fun describeSavedCallMessageForPicker(message: SavedCallMessage): String {
+        val base = "[${message.timeLabel}] ${message.callerLabel}: ${message.message}"
+        return if (message.handled) "$base (${getString(R.string.call_message_handled_label)})" else base
+    }
+
+    private fun updateSavedCallMessage(updated: SavedCallMessage) {
+        val records = readPersistentCallMessageRecords(this).toMutableList()
+        val index = records.indexOfFirst {
+            it.callerLabel == updated.callerLabel &&
+                it.phoneNumber == updated.phoneNumber &&
+                it.message == updated.message &&
+                it.timeLabel == updated.timeLabel
+        }
+        if (index >= 0) {
+            records[index] = updated
+            persistSavedCallMessages(records)
+            refreshCallMessageLogFromPrefs()
+        }
+    }
+
+    private fun deleteSavedCallMessage(target: SavedCallMessage) {
+        val records = readPersistentCallMessageRecords(this).toMutableList()
+        if (records.remove(target)) {
+            persistSavedCallMessages(records)
+            refreshCallMessageLogFromPrefs()
+        }
+    }
+
+    private fun persistSavedCallMessages(messages: List<SavedCallMessage>) {
+        val payload = JSONArray().apply {
+            messages.take(6).forEach { entry ->
+                put(
+                    JSONObject().apply {
+                        put("caller", entry.callerLabel)
+                        put("phoneNumber", entry.phoneNumber ?: "")
+                        put("message", entry.message)
+                        put("time", entry.timeLabel)
+                        put("handled", entry.handled)
+                    }
+                )
+            }
+        }
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_CALL_MESSAGE_LOG, payload.toString())
+            .apply()
     }
 
     private fun updatePermissions(key: String, enabled: Boolean) {
@@ -10843,7 +10908,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         fun readPersistentCallMessageLog(context: Context): List<String> {
             return readPersistentCallMessageRecords(context).map {
-                "[${it.timeLabel}] " + context.getString(R.string.call_message_log_entry, it.callerLabel, it.message)
+                "[${it.timeLabel}] " + if (it.handled) {
+                    context.getString(
+                        R.string.call_message_log_entry_handled,
+                        it.callerLabel,
+                        it.message,
+                        context.getString(R.string.call_message_handled_label)
+                    )
+                } else {
+                    context.getString(R.string.call_message_log_entry, it.callerLabel, it.message)
+                }
             }
         }
 
@@ -10872,7 +10946,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                                             callerLabel = caller,
                                             phoneNumber = item.optString("phoneNumber").trim().ifBlank { null },
                                             message = message,
-                                            timeLabel = time
+                                            timeLabel = time,
+                                            handled = item.optBoolean("handled", false)
                                         )
                                     )
                                 }
@@ -10885,7 +10960,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                                             callerLabel = context.getString(R.string.unknown_number_label),
                                             phoneNumber = null,
                                             message = legacy,
-                                            timeLabel = "--"
+                                            timeLabel = "--",
+                                            handled = false
                                         )
                                     )
                                 }
