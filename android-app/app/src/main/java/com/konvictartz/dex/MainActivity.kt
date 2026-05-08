@@ -196,6 +196,23 @@ private enum class PendingContactAction {
     EMAIL,
 }
 
+private enum class DexMiniGameType {
+    NONE,
+    GUESS_NUMBER,
+    RIDDLE,
+    WOULD_YOU_RATHER,
+}
+
+private data class DexRiddle(
+    val prompt: String,
+    val answer: String,
+)
+
+private data class DexWouldYouRather(
+    val prompt: String,
+    val followUp: String,
+)
+
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var binding: ActivityMainBinding
     private val client = OkHttpClient()
@@ -313,6 +330,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var lastEmergencySmsStatus = ""
     private val activityLogEntries = ArrayDeque<String>()
     private val animatedDashboardCards = mutableSetOf<Int>()
+    private var activeDexMiniGame = DexMiniGameType.NONE
+    private var dexGuessTarget = 0
+    private var dexGuessAttempts = 0
+    private var currentRiddleIndex = -1
+    private var currentWouldYouRatherIndex = -1
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -920,6 +942,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             )
         }
 
+        binding.startGuessNumberButton.setOnClickListener {
+            startGuessNumberGame()
+        }
+
+        binding.startRiddleButton.setOnClickListener {
+            startRiddleGame()
+        }
+
+        binding.startWouldYouRatherButton.setOnClickListener {
+            startWouldYouRatherGame()
+        }
+
+        binding.submitDexGameAnswerButton.setOnClickListener {
+            submitDexGameAnswer()
+        }
+
+        binding.nextDexGameRoundButton.setOnClickListener {
+            playNextDexMiniGameRound()
+        }
+
         binding.addCustomSectionButton.setOnClickListener {
             val custom = binding.customSectionInput.text?.toString()?.trim().orEmpty()
             if (custom.isBlank()) {
@@ -1359,6 +1401,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.userDashboardCard.visibility = if (showRegularDashboard || showAffiliateDashboard) View.VISIBLE else View.GONE
         binding.learningCenterCard.visibility = if (showRegularDashboard || showAffiliateDashboard) View.VISIBLE else View.GONE
         binding.safetyProfileCard.visibility = if (showRegularDashboard || showAdminDashboard) View.VISIBLE else View.GONE
+        binding.dexGamesCard.visibility = if (showRegularDashboard) View.VISIBLE else View.GONE
         binding.lifeSectionsCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
         binding.billingCard.visibility = if (showRegularDashboard) View.VISIBLE else View.GONE
         binding.affiliateDashboardCard.visibility = if (showAffiliateDashboard) View.VISIBLE else View.GONE
@@ -1413,6 +1456,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.learningReminderSummary.text = getString(R.string.learning_reminder_off)
             binding.learningLessonPreview.text = ""
             binding.learningQuizPreview.text = dashboardActivityEmptyCopy()
+            binding.dexGamePrompt.text = getString(R.string.dex_games_prompt_default)
+            binding.dexGameStatus.text = getString(R.string.dex_games_status_default)
+            binding.dexGameInput.setText("")
+            activeDexMiniGame = DexMiniGameType.NONE
             setHintBand(binding.userDashboardHint, null)
             setHintBand(binding.learningCenterHint, null)
             setHintBand(binding.billingHint, null)
@@ -1434,6 +1481,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.userDashboardCard,
             binding.learningCenterCard,
             binding.safetyProfileCard,
+            binding.dexGamesCard,
             binding.lifeSectionsCard,
             binding.billingCard,
             binding.affiliateDashboardCard,
@@ -2871,6 +2919,135 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .edit()
             .putString(KEY_DASHBOARD_SECTIONS, json.toString())
             .commit()
+    }
+
+    private fun startGuessNumberGame() {
+        activeDexMiniGame = DexMiniGameType.GUESS_NUMBER
+        dexGuessTarget = (1..20).random()
+        dexGuessAttempts = 0
+        binding.dexGameInput.setText("")
+        binding.dexGamePrompt.text = getString(R.string.dex_game_guess_prompt)
+        binding.dexGameStatus.text = getString(R.string.dex_game_guess_status)
+        binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_submit)
+        binding.nextDexGameRoundButton.text = getString(R.string.dex_game_new_round)
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = getString(R.string.dex_game_guess_bubble),
+            revertAfterMs = 2600L
+        )
+    }
+
+    private fun startRiddleGame() {
+        activeDexMiniGame = DexMiniGameType.RIDDLE
+        currentRiddleIndex = (currentRiddleIndex + 1).mod(DEX_RIDDLES.size)
+        val riddle = DEX_RIDDLES[currentRiddleIndex]
+        binding.dexGameInput.setText("")
+        binding.dexGamePrompt.text = riddle.prompt
+        binding.dexGameStatus.text = getString(R.string.dex_game_riddle_status)
+        binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_submit)
+        binding.nextDexGameRoundButton.text = getString(R.string.dex_game_next_riddle)
+        setDexCompanionState(
+            DEX_COMPANION_STATE_THINKING,
+            bubbleOverride = getString(R.string.dex_game_riddle_bubble),
+            revertAfterMs = 2600L
+        )
+    }
+
+    private fun startWouldYouRatherGame() {
+        activeDexMiniGame = DexMiniGameType.WOULD_YOU_RATHER
+        currentWouldYouRatherIndex = (currentWouldYouRatherIndex + 1).mod(DEX_WOULD_YOU_RATHERS.size)
+        val round = DEX_WOULD_YOU_RATHERS[currentWouldYouRatherIndex]
+        binding.dexGameInput.setText("")
+        binding.dexGamePrompt.text = round.prompt
+        binding.dexGameStatus.text = getString(R.string.dex_game_wyr_status)
+        binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_share_answer)
+        binding.nextDexGameRoundButton.text = getString(R.string.dex_game_next_round)
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = getString(R.string.dex_game_wyr_bubble),
+            revertAfterMs = 2600L
+        )
+    }
+
+    private fun submitDexGameAnswer() {
+        val answer = binding.dexGameInput.text?.toString()?.trim().orEmpty()
+        if (activeDexMiniGame == DexMiniGameType.NONE) {
+            binding.dexGameStatus.text = getString(R.string.dex_game_pick_one_first)
+            return
+        }
+        if (answer.isBlank()) {
+            binding.dexGameStatus.text = getString(R.string.dex_game_answer_needed)
+            return
+        }
+        when (activeDexMiniGame) {
+            DexMiniGameType.GUESS_NUMBER -> handleGuessNumberAnswer(answer)
+            DexMiniGameType.RIDDLE -> handleRiddleAnswer(answer)
+            DexMiniGameType.WOULD_YOU_RATHER -> handleWouldYouRatherAnswer(answer)
+            DexMiniGameType.NONE -> Unit
+        }
+    }
+
+    private fun playNextDexMiniGameRound() {
+        when (activeDexMiniGame) {
+            DexMiniGameType.GUESS_NUMBER -> startGuessNumberGame()
+            DexMiniGameType.RIDDLE -> startRiddleGame()
+            DexMiniGameType.WOULD_YOU_RATHER -> startWouldYouRatherGame()
+            DexMiniGameType.NONE -> binding.dexGameStatus.text = getString(R.string.dex_game_pick_one_first)
+        }
+    }
+
+    private fun handleGuessNumberAnswer(answer: String) {
+        val guess = answer.toIntOrNull()
+        if (guess == null) {
+            binding.dexGameStatus.text = getString(R.string.dex_game_guess_number_needed)
+            return
+        }
+        dexGuessAttempts += 1
+        val reply = when {
+            guess < dexGuessTarget -> getString(R.string.dex_game_guess_low, dexGuessAttempts)
+            guess > dexGuessTarget -> getString(R.string.dex_game_guess_high, dexGuessAttempts)
+            else -> getString(R.string.dex_game_guess_correct, dexGuessAttempts)
+        }
+        binding.dexGameStatus.text = reply
+        binding.dexGameInput.setText("")
+        setDexCompanionState(
+            if (guess == dexGuessTarget) DEX_COMPANION_STATE_EXCITED else DEX_COMPANION_STATE_TALKING,
+            bubbleOverride = reply,
+            revertAfterMs = 2600L
+        )
+    }
+
+    private fun handleRiddleAnswer(answer: String) {
+        val riddle = DEX_RIDDLES.getOrNull(currentRiddleIndex) ?: return
+        val normalized = answer.lowercase(Locale.US).trim()
+        val isCorrect = normalized.contains(riddle.answer.lowercase(Locale.US))
+        val reply = if (isCorrect) {
+            getString(R.string.dex_game_riddle_correct, riddle.answer)
+        } else {
+            getString(R.string.dex_game_riddle_try_again)
+        }
+        binding.dexGameStatus.text = reply
+        if (isCorrect) {
+            binding.dexGameInput.setText("")
+        }
+        setDexCompanionState(
+            if (isCorrect) DEX_COMPANION_STATE_EXCITED else DEX_COMPANION_STATE_THINKING,
+            bubbleOverride = reply,
+            revertAfterMs = 2800L
+        )
+    }
+
+    private fun handleWouldYouRatherAnswer(answer: String) {
+        val round = DEX_WOULD_YOU_RATHERS.getOrNull(currentWouldYouRatherIndex) ?: return
+        val trimmed = answer.trim()
+        val reply = getString(R.string.dex_game_wyr_reply, trimmed, round.followUp)
+        binding.dexGameStatus.text = reply
+        binding.dexGameInput.setText("")
+        setDexCompanionState(
+            DEX_COMPANION_STATE_TALKING,
+            bubbleOverride = getString(R.string.dex_game_wyr_bubble_reply),
+            revertAfterMs = 2400L
+        )
     }
 
     private fun loadDashboardSections() {
@@ -9018,6 +9195,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_STATE_TALKING = "talking"
         private const val DEX_COMPANION_STATE_PENDING = "pending"
         private const val DEX_COMPANION_STATE_ALERT = "alert"
+        private val DEX_RIDDLES = listOf(
+            DexRiddle("What has to be broken before you can use it?", "egg"),
+            DexRiddle("What gets wetter the more it dries?", "towel"),
+            DexRiddle("What has hands but can not clap?", "clock"),
+            DexRiddle("What has a face and two hands but no arms or legs?", "clock"),
+        )
+        private val DEX_WOULD_YOU_RATHERS = listOf(
+            DexWouldYouRather(
+                "Would you rather explore space for a week or the deep ocean for a week?",
+                "That says a lot about your vibe."
+            ),
+            DexWouldYouRather(
+                "Would you rather always have the perfect playlist or always know the best food spot nearby?",
+                "Honestly, Dex can work with either answer."
+            ),
+            DexWouldYouRather(
+                "Would you rather have one extra day every weekend or one extra hour every morning?",
+                "That is a strong life choice."
+            ),
+            DexWouldYouRather(
+                "Would you rather be amazing at every game night or every karaoke night?",
+                "I respect that answer."
+            ),
+        )
         private val WAKE_WORD_VARIANTS = listOf(
             "hey dex",
             "hey decks",
