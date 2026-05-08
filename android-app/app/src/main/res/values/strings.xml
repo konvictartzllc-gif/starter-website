@@ -311,6 +311,8 @@
     <string name="call_reminder_set">Okay. I will remind you to call %1$s at %2$s.</string>
     <string name="call_reminder_title">Call %1$s</string>
     <string name="call_reminder_text">Reminder to call %1$s.</string>
+    <string name="call_reminder_check_in_prompt">It is time to call %1$s. Do you want me to call now, or remind you again in ten minutes?</string>
+    <string name="call_reminder_check_in_retry">I missed that. Say call now, remind me again, or no.</string>
     <string name="reminder_check_in_prompt">%1$s. %2$s. I am checking in. Do you want me to remind you again in ten minutes?</string>
     <string name="reminder_check_in_retry">I missed that. Say yes if you want another reminder in ten minutes, or say no.</string>
     <string name="reminder_check_in_confirmed">Okay. I will check back in ten minutes.</string>
