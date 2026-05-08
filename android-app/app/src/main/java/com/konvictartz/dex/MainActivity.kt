@@ -3077,6 +3077,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
+    private fun dexGamesUnlockPerkLine(): String {
+        return when (dexGamesUnlockLevel()) {
+            3 -> getString(R.string.dex_companion_rewards_perk_legend)
+            2 -> getString(R.string.dex_companion_rewards_perk_star)
+            1 -> getString(R.string.dex_companion_rewards_perk_spark)
+            else -> getString(R.string.dex_companion_rewards_perk_new)
+        }
+    }
+
+    private fun dexCompanionRewardsSummary(): String {
+        val favorite = favoriteDexMiniGameLabel()
+            ?: getString(R.string.dex_companion_rewards_favorite_none)
+        return getString(
+            R.string.dex_companion_rewards_value,
+            dexGamesUnlockTier(),
+            dexGamesUnlockPerkLine(),
+            dexGamesChallengeClears,
+            favorite
+        )
+    }
+
     private fun dexGamesProfileLine(): String {
         val favorite = favoriteDexMiniGameLabel()
         return if (favorite.isNullOrBlank()) {
@@ -4076,6 +4097,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> R.id.dexCompanionVoiceSupportiveButton
             }
         )
+        binding.dexCompanionRewardsValue.text = dexCompanionRewardsSummary()
     }
 
     private fun applyDexCompanionUi() {

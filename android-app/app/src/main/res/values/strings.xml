@@ -197,6 +197,14 @@
     <string name="dex_companion_voice_supportive">Supportive</string>
     <string name="dex_companion_voice_playful">Playful</string>
     <string name="dex_companion_voice_direct">Direct</string>
+    <string name="dex_companion_rewards_label">Earned rewards</string>
+    <string name="dex_companion_rewards_summary">Your daily play clears unlock little upgrades for Dex. This is where you can see what you have earned.</string>
+    <string name="dex_companion_rewards_value">Tier: %1$s\nPerk: %2$s\nClears: %3$d daily clears\nFavorite: %4$s</string>
+    <string name="dex_companion_rewards_perk_new">Base companion look with room to grow.</string>
+    <string name="dex_companion_rewards_perk_spark">Soft halo glow and a Spark-ready status accent.</string>
+    <string name="dex_companion_rewards_perk_star">Brighter halo, stronger card edge, and Star status shine.</string>
+    <string name="dex_companion_rewards_perk_legend">Full halo energy, sharper card edge, and Legend-ready status cues.</string>
+    <string name="dex_companion_rewards_favorite_none">Still learning</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>
