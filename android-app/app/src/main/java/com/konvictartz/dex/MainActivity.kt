@@ -34,6 +34,7 @@ import android.telephony.SmsManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -263,10 +264,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionBubbleStyle: String = DEX_COMPANION_BUBBLE_SOFT
     private var currentDexCompanionSkin: String = DEX_COMPANION_SKIN_SKY
     private var currentDexCompanionAccessory: String = DEX_COMPANION_ACCESSORY_NONE
+    private var currentDexCompanionOffsetX = 0f
+    private var currentDexCompanionOffsetY = 0f
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
     private var dexCompanionBubbleOverride: String? = null
     private var dexCompanionFloatAnimator: AnimatorSet? = null
     private var dexCompanionBlinkScheduled = false
+    private var dexCompanionDragDownRawX = 0f
+    private var dexCompanionDragDownRawY = 0f
+    private var dexCompanionDragStartX = 0f
+    private var dexCompanionDragStartY = 0f
     private var pendingDecorationPickTarget: DecorationPickTarget? = null
     private var currentTrialDaysLeft: Int? = null
     private var hasBillingCustomer = false
@@ -968,6 +975,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 R.id.dexCompanionSideLeftButton -> DEX_COMPANION_SIDE_LEFT
                 else -> DEX_COMPANION_SIDE_RIGHT
             }
+            currentDexCompanionOffsetX = 0f
+            currentDexCompanionOffsetY = 0f
             applyDexCompanionUi()
             persistHomeLook()
         }
@@ -1012,6 +1021,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             applyDexCompanionUi()
             persistHomeLook()
+        }
+        binding.dexCompanionCard.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    dexCompanionDragDownRawX = event.rawX
+                    dexCompanionDragDownRawY = event.rawY
+                    dexCompanionDragStartX = currentDexCompanionOffsetX
+                    dexCompanionDragStartY = currentDexCompanionOffsetY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    currentDexCompanionOffsetX = dexCompanionDragStartX + (event.rawX - dexCompanionDragDownRawX)
+                    currentDexCompanionOffsetY = dexCompanionDragStartY + (event.rawY - dexCompanionDragDownRawY)
+                    applyDexCompanionDragPosition()
+                    true
+                }
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> {
+                    applyDexCompanionDragPosition()
+                    persistHomeLook()
+                    true
+                }
+                else -> false
+            }
         }
 
         renderAuthMode()
@@ -1079,6 +1112,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentDexCompanionAccessory = prefs.getString(KEY_DEX_COMPANION_ACCESSORY, DEX_COMPANION_ACCESSORY_NONE)
             .orEmpty()
             .ifBlank { DEX_COMPANION_ACCESSORY_NONE }
+        currentDexCompanionOffsetX = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_X, 0f)
+        currentDexCompanionOffsetY = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_Y, 0f)
         updateAdvancedStyleUi(currentThemePreset == "custom")
         updateDexCompanionControls()
         loadDashboardSections()
@@ -2981,6 +3016,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_DEX_COMPANION_BUBBLE_STYLE, currentDexCompanionBubbleStyle)
             .putString(KEY_DEX_COMPANION_SKIN, currentDexCompanionSkin)
             .putString(KEY_DEX_COMPANION_ACCESSORY, currentDexCompanionAccessory)
+            .putFloat(KEY_DEX_COMPANION_OFFSET_X, currentDexCompanionOffsetX)
+            .putFloat(KEY_DEX_COMPANION_OFFSET_Y, currentDexCompanionOffsetY)
             .commit()
     }
 
@@ -3167,9 +3204,34 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             params.bottomMargin = dpToPx(22)
             binding.dexCompanionCard.layoutParams = params
         }
+        applyDexCompanionDragPosition()
 
         startDexCompanionAnimation()
         scheduleDexCompanionBlink()
+    }
+
+    private fun applyDexCompanionDragPosition() {
+        binding.dexCompanionCard.translationX = currentDexCompanionOffsetX
+        binding.dexCompanionCard.translationY = currentDexCompanionOffsetY
+        binding.dexCompanionCard.post {
+            val parentWidth = binding.root.width
+            val parentHeight = binding.root.height
+            val cardWidth = binding.dexCompanionCard.width
+            val cardHeight = binding.dexCompanionCard.height
+            if (parentWidth <= 0 || parentHeight <= 0 || cardWidth <= 0 || cardHeight <= 0) return@post
+            val minX = dpToPx(8).toFloat()
+            val maxX = (parentWidth - cardWidth - dpToPx(8)).toFloat()
+            val minY = dpToPx(56).toFloat()
+            val maxY = (parentHeight - cardHeight - dpToPx(8)).toFloat()
+            val currentX = binding.dexCompanionCard.left + currentDexCompanionOffsetX
+            val currentY = binding.dexCompanionCard.top + currentDexCompanionOffsetY
+            val clampedX = currentX.coerceIn(minX, maxX)
+            val clampedY = currentY.coerceIn(minY, maxY)
+            currentDexCompanionOffsetX = clampedX - binding.dexCompanionCard.left
+            currentDexCompanionOffsetY = clampedY - binding.dexCompanionCard.top
+            binding.dexCompanionCard.translationX = currentDexCompanionOffsetX
+            binding.dexCompanionCard.translationY = currentDexCompanionOffsetY
+        }
     }
 
     private fun deriveDexCompanionState(): String {
@@ -3351,8 +3413,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
         }
-        val cardAnimator = ObjectAnimator.ofFloat(
-            binding.dexCompanionCard,
+        val labelAnimator = ObjectAnimator.ofFloat(
+            binding.dexCompanionLabel,
             View.TRANSLATION_X,
             0f,
             if (motionKey == DEX_COMPANION_MOOD_PLAYFUL) dpToPx(2).toFloat() else 0f,
@@ -3363,7 +3425,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             repeatMode = ValueAnimator.RESTART
         }
         dexCompanionFloatAnimator = AnimatorSet().apply {
-            playTogether(faceAnimator, bubbleAnimator, cardAnimator)
+            playTogether(faceAnimator, bubbleAnimator, labelAnimator)
             start()
         }
     }
@@ -3371,9 +3433,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun stopDexCompanionAnimation() {
         dexCompanionFloatAnimator?.cancel()
         dexCompanionFloatAnimator = null
-        binding.dexCompanionCard.translationX = 0f
         binding.dexCompanionFace.translationY = 0f
         binding.dexCompanionBubble.translationY = 0f
+        binding.dexCompanionLabel.translationX = 0f
         binding.dexCompanionEyeLeft.scaleY = 1f
         binding.dexCompanionEyeRight.scaleY = 1f
     }
@@ -8142,6 +8204,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_BUBBLE_STYLE = "dex_companion_bubble_style"
         const val KEY_DEX_COMPANION_SKIN = "dex_companion_skin"
         const val KEY_DEX_COMPANION_ACCESSORY = "dex_companion_accessory"
+        const val KEY_DEX_COMPANION_OFFSET_X = "dex_companion_offset_x"
+        const val KEY_DEX_COMPANION_OFFSET_Y = "dex_companion_offset_y"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"
