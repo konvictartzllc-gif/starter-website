@@ -79,6 +79,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var wakeWordEngine: DexWakeWordEngine? = null
     private var autoTakeMessageRunnable: Runnable? = null
     private var callMessageCaptureAttempts = 0
+    private var callScreeningPhraseIndex = 0
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private inner class DexCallStateCallback : TelephonyCallback(), TelephonyCallback.CallStateListener {
@@ -555,7 +556,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun speakIncomingCallPrompt(caller: String) {
-        speakAndThenListen(getString(R.string.call_background_prompt_template, caller), BackgroundListenMode.CALL_COMMAND)
+        val prompt = when (nextCallScreeningPhraseVariant()) {
+            0 -> getString(R.string.call_background_prompt_template, caller)
+            1 -> getString(R.string.call_background_prompt_template_alt_1, caller)
+            else -> getString(R.string.call_background_prompt_template_alt_2, caller)
+        }
+        speakAndThenListen(prompt, BackgroundListenMode.CALL_COMMAND)
     }
 
     private fun handleIncomingSms(intent: Intent) {
@@ -731,8 +737,13 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         enableSpeakerForActiveCall()
         dismissNotification(CALL_NOTIFICATION_ID)
         postCallEvent("taking_message", lastCaller)
+        val prompt = when (nextCallScreeningPhraseVariant()) {
+            0 -> getString(R.string.call_message_answer_prompt)
+            1 -> getString(R.string.call_message_answer_prompt_alt_1)
+            else -> getString(R.string.call_message_answer_prompt_alt_2)
+        }
         speakAndThenListen(
-            getString(R.string.call_message_answer_prompt),
+            prompt,
             BackgroundListenMode.CALLER_MESSAGE
         )
     }
@@ -857,12 +868,22 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 )
             BackgroundListenMode.CALLER_MESSAGE ->
                 if (callMessageCaptureAttempts < MAX_CALL_MESSAGE_CAPTURE_ATTEMPTS) {
+                    val retryPrompt = when (nextCallScreeningPhraseVariant()) {
+                        0 -> getString(R.string.call_message_answer_retry)
+                        1 -> getString(R.string.call_message_answer_retry_alt_1)
+                        else -> getString(R.string.call_message_answer_retry_alt_2)
+                    }
                     speakAndThenListen(
-                        getString(R.string.call_message_answer_retry),
+                        retryPrompt,
                         BackgroundListenMode.CALLER_MESSAGE
                     )
                 } else {
-                    speakShortStatus(getString(R.string.call_message_answer_give_up))
+                    val giveUp = when (nextCallScreeningPhraseVariant()) {
+                        0 -> getString(R.string.call_message_answer_give_up)
+                        1 -> getString(R.string.call_message_answer_give_up_alt_1)
+                        else -> getString(R.string.call_message_answer_give_up_alt_2)
+                    }
+                    speakShortStatus(giveUp)
                     mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
                 }
             BackgroundListenMode.REMINDER_CHECK_IN ->
@@ -1151,7 +1172,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             message = cleanedMessage
         )
         callMessageCaptureAttempts = 0
-        speakShortStatus(getString(R.string.call_message_saved, caller))
+        val savedReply = when (nextCallScreeningPhraseVariant()) {
+            0 -> getString(R.string.call_message_saved, caller)
+            1 -> getString(R.string.call_message_saved_alt_1, caller)
+            else -> getString(R.string.call_message_saved_alt_2, caller)
+        }
+        speakShortStatus(savedReply)
         mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
     }
 
@@ -1179,6 +1205,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val wordCount = normalized.split(" ").count { it.isNotBlank() }
         if (wordCount < MIN_CALL_MESSAGE_WORDS && junkPhrases.any { normalized.contains(it) }) return null
         return cleaned
+    }
+
+    private fun nextCallScreeningPhraseVariant(): Int {
+        val value = callScreeningPhraseIndex % 3
+        callScreeningPhraseIndex += 1
+        return value
     }
 
     private fun sendPendingSmsReply(replyText: String) {
