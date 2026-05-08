@@ -686,9 +686,10 @@
     <string name="call_message_log_title">Saved caller messages</string>
     <string name="call_message_log_empty">No caller messages saved yet.</string>
     <string name="call_message_action_button">Latest message actions</string>
+    <string name="call_message_picker_title">Choose a saved caller message</string>
     <string name="call_message_action_call_back">Call back</string>
     <string name="call_message_action_text_back">Text back</string>
-    <string name="call_message_action_unavailable">Dex could not find a phone number for the latest caller message yet.</string>
+    <string name="call_message_action_unavailable">Dex could not find a phone number for %1$s yet.</string>
     <string name="auto_answer_known_contacts">Auto-answer saved contacts and let Dex take a message outside the app</string>
     <string name="auto_answer_any_non_spam_calls">Auto-answer any non-spam caller and let Dex take a message outside the app</string>
     <string name="auto_decline_spam_calls">Auto-decline likely spam calls</string>

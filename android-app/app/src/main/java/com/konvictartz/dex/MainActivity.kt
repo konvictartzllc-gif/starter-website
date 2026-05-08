@@ -171,7 +171,7 @@ private data class DirectCallRequest(
     val phoneNumber: String,
 )
 
-private data class SavedCallMessage(
+data class SavedCallMessage(
     val callerLabel: String,
     val phoneNumber: String?,
     val message: String,
@@ -888,6 +888,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         binding.callMessageActionButton.setOnClickListener {
             showSavedCallerMessageActions()
+        }
+        binding.callMessageLogValue.setOnClickListener {
+            showSavedCallerMessagePicker()
         }
 
         binding.phonePermissionSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -6202,9 +6205,29 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.callMonitorStatus.text = getString(R.string.call_message_log_empty)
             return
         }
-        val actionTarget = resolveSavedCallMessageTarget(latest)
+        showSavedCallerMessageActions(latest)
+    }
+
+    private fun showSavedCallerMessagePicker() {
+        val messages = readPersistentCallMessageRecords(this)
+        if (messages.isEmpty()) {
+            binding.callMonitorStatus.text = getString(R.string.call_message_log_empty)
+            return
+        }
+        val labels = messages.map { "[${it.timeLabel}] ${it.callerLabel}: ${it.message}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.call_message_picker_title)
+            .setItems(labels) { _, which ->
+                messages.getOrNull(which)?.let { showSavedCallerMessageActions(it) }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showSavedCallerMessageActions(savedMessage: SavedCallMessage) {
+        val actionTarget = resolveSavedCallMessageTarget(savedMessage)
         if (actionTarget == null) {
-            val reply = getString(R.string.call_message_action_unavailable)
+            val reply = getString(R.string.call_message_action_unavailable, savedMessage.callerLabel)
             binding.callMonitorStatus.text = reply
             binding.conversationStatus.text = reply
             binding.lastReplyValue.text = reply
@@ -10824,10 +10847,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-        private fun readLatestPersistentCallMessage(context: Context): SavedCallMessage? =
+        fun readLatestPersistentCallMessage(context: Context): SavedCallMessage? =
             readPersistentCallMessageRecords(context).firstOrNull()
 
-        private fun readPersistentCallMessageRecords(context: Context): List<SavedCallMessage> {
+        fun readPersistentCallMessageRecords(context: Context): List<SavedCallMessage> {
             val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getString(KEY_CALL_MESSAGE_LOG, null)
                 .orEmpty()
