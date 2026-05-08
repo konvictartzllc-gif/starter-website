@@ -197,6 +197,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingReminderSmsTarget: ContactMatch? = null
     private var pendingReminderSmsBody: String? = null
     private var awaitingReminderSmsContact = false
+    private var pendingReminderCallTriggerAt: LocalDateTime? = null
+    private var awaitingReminderCallContact = false
     private var pendingReminderCallTargetName: String? = null
     private var pendingIncomingSmsSender: String? = null
     private var pendingIncomingSmsValue: String? = null
@@ -964,6 +966,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingReminderSmsTarget = null
         pendingReminderSmsBody = null
         awaitingReminderSmsContact = false
+        pendingReminderCallTriggerAt = null
+        awaitingReminderCallContact = false
         pendingReminderCallTargetName = null
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
@@ -3573,6 +3577,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingReminderSmsTarget = null
         pendingReminderSmsBody = null
         awaitingReminderSmsContact = false
+        pendingReminderCallTriggerAt = null
+        awaitingReminderCallContact = false
         pendingReminderCallTargetName = null
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
@@ -3895,6 +3901,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (actionTaken) return true
         }
 
+        consumePendingReminderCallContact(message)?.let { actionTaken ->
+            if (actionTaken) return true
+        }
+
         consumePendingReminderCallTime(message)?.let { actionTaken ->
             if (actionTaken) return true
         }
@@ -4142,6 +4152,52 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun consumePendingReminderCallContact(message: String): Boolean? {
+        if (!awaitingReminderCallContact) return null
+        val trimmed = message.trim()
+        if (trimmed.isBlank()) return false
+        val normalized = trimmed.lowercase(Locale.US)
+        return when (normalized) {
+            "cancel", "cancel it", "never mind", "stop" -> {
+                awaitingReminderCallContact = false
+                pendingReminderCallTriggerAt = null
+                val reply = getString(R.string.pending_action_canceled)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                true
+            }
+            else -> {
+                val contact = findExactPhoneContactByName(resolveContactAlias(trimmed))
+                    ?: findPhoneContactByName(resolveContactAlias(trimmed))
+                if (contact == null) {
+                    val reply = getString(R.string.call_reminder_contact_prompt)
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    true
+                } else {
+                    awaitingReminderCallContact = false
+                    val pendingTime = pendingReminderCallTriggerAt
+                    pendingReminderCallTriggerAt = null
+                    if (pendingTime != null) {
+                        val reply = scheduleCallReminder(contact.displayName, pendingTime)
+                        binding.conversationStatus.text = reply
+                        binding.lastReplyValue.text = reply
+                        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    } else {
+                        pendingReminderCallTargetName = contact.displayName
+                        val reply = getString(R.string.call_reminder_time_prompt, contact.displayName)
+                        binding.conversationStatus.text = reply
+                        binding.lastReplyValue.text = reply
+                        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    }
+                    true
+                }
+            }
+        }
+    }
+
     private fun consumePendingReminderSmsTime(message: String): Boolean? {
         val target = pendingReminderSmsTarget ?: return null
         val trimmed = message.trim()
@@ -4270,12 +4326,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!reminderIntent || !normalized.contains("call ")) return null
 
         val rawTarget = extractReminderCallTarget(resolvedMessage)
-        if (rawTarget.isBlank()) return null
+        if (rawTarget.isBlank()) {
+            awaitingReminderCallContact = true
+            pendingReminderCallTriggerAt = if (hasExplicitReminderTime(resolvedMessage)) inferDateTimeFromCommand(resolvedMessage) else null
+            return getString(R.string.call_reminder_contact_prompt)
+        }
 
         val reminderTarget =
             findExactPhoneContactByName(resolveContactAlias(rawTarget))?.displayName
                 ?: findPhoneContactByName(resolveContactAlias(rawTarget))?.displayName
-                ?: rawTarget
+        if (reminderTarget == null) {
+            awaitingReminderCallContact = true
+            pendingReminderCallTriggerAt = if (hasExplicitReminderTime(resolvedMessage)) inferDateTimeFromCommand(resolvedMessage) else null
+            return getString(R.string.call_reminder_contact_prompt)
+        }
         if (!hasExplicitReminderTime(resolvedMessage)) {
             pendingReminderCallTargetName = reminderTarget
             return getString(R.string.call_reminder_time_prompt, reminderTarget)
@@ -4739,6 +4803,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             pendingReminderSmsTarget == null &&
             pendingReminderSmsBody.isNullOrBlank() &&
             !awaitingReminderSmsContact &&
+            pendingReminderCallTriggerAt == null &&
+            !awaitingReminderCallContact &&
             pendingReminderCallTargetName == null &&
             pendingSmsBodyDraft.isNullOrBlank() &&
             !listeningForQuizAnswer &&
