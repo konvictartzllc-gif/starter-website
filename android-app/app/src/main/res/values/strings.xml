@@ -16,9 +16,14 @@
     <string name="server_hint">https://your-backend-url.com/api</string>
     <string name="server_help">Most people should leave this on the live Dex server. Hosted Dex backends should use https. For local testing, use http://10.0.2.2:3001/api in the emulator or http://YOUR_COMPUTER_IP:3001/api on a phone using the same Wi-Fi. Port 4000 is usually the wrong local URL for Dex.</string>
     <string name="account_title">Dex account</string>
+    <string name="account_section_tag">Secure entry</string>
+    <string name="auth_mode_tag">Choose your path</string>
+    <string name="auth_message_tag">Account status</string>
     <string name="invite_code_title">Have an affiliate code?</string>
+    <string name="invite_code_section_tag">Partner access</string>
     <string name="invite_code_summary">Paste the code from your admin or affiliate invite here, then Dex will open the signup flow for you.</string>
     <string name="invite_code_hint">Affiliate invite code</string>
+    <string name="invite_code_message_tag">Invite status</string>
     <string name="use_invite_code">Use Code</string>
     <string name="invite_code_applied">Affiliate invite code applied. Finish signup below.</string>
     <string name="invite_code_needed">Enter the affiliate invite code first.</string>
