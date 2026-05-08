@@ -43,6 +43,8 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import android.widget.TextView
 import android.animation.ArgbEvaluator
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -257,6 +259,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionMood: String = DEX_COMPANION_MOOD_CALM
     private var currentDexCompanionSize: String = DEX_COMPANION_SIZE_MEDIUM
     private var currentDexCompanionSide: String = DEX_COMPANION_SIDE_RIGHT
+    private var dexCompanionFloatAnimator: AnimatorSet? = null
+    private var dexCompanionBlinkScheduled = false
     private var pendingDecorationPickTarget: DecorationPickTarget? = null
     private var currentTrialDaysLeft: Int? = null
     private var hasBillingCustomer = false
@@ -296,6 +300,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 startWakeWordListening()
             }
         }
+    }
+
+    private val dexCompanionBlinkRunnable = Runnable {
+        dexCompanionBlinkScheduled = false
+        if (binding.dexCompanionCard.visibility != View.VISIBLE) return@Runnable
+        blinkDexCompanion()
+        scheduleDexCompanionBlink()
     }
 
     private val permissionLauncher =
@@ -446,6 +457,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         updateAndroidPermissionStatus()
         refreshCallMonitorState()
         autoStartWakeModeIfReady()
+        applyDexCompanionUi()
         if (!authToken.isNullOrBlank()) {
             fetchLearningReminderPreferences()
             fetchSafetyPreferences()
@@ -465,6 +477,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         stopCallMonitoring()
         stopListeningForCallCommand()
         updateCallActionVisibility(false)
+        stopDexCompanionAnimation()
         maintainBackgroundService()
         super.onStop()
     }
@@ -478,6 +491,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         resumeCommandCaptureAfterWakePrompt = false
         mainHandler.removeCallbacks(resetWakeWindowRunnable)
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
+        mainHandler.removeCallbacks(dexCompanionBlinkRunnable)
+        stopDexCompanionAnimation()
         wakeWordEngine?.stop()
         wakeSpeechRecognizer?.destroy()
         speechRecognizer?.destroy()
@@ -2930,7 +2945,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val isAdmin = currentUserRole.equals("admin", ignoreCase = true)
         val shouldShowCompanion = loggedIn && !isAdmin && currentDexCompanionVisible
         binding.dexCompanionCard.visibility = if (shouldShowCompanion) View.VISIBLE else View.GONE
-        if (!shouldShowCompanion) return
+        if (!shouldShowCompanion) {
+            stopDexCompanionAnimation()
+            mainHandler.removeCallbacks(dexCompanionBlinkRunnable)
+            dexCompanionBlinkScheduled = false
+            return
+        }
 
         val accentColor = runCatching { android.graphics.Color.parseColor(currentAccentColor) }
             .getOrElse { getColorCompat(R.color.dex_accent) }
@@ -2987,6 +3007,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DEX_COMPANION_MOOD_FOCUS -> 0.84f
             else -> 0.92f
         }
+        binding.dexCompanionBubble.alpha = when (currentDexCompanionMood.lowercase(Locale.US)) {
+            DEX_COMPANION_MOOD_PLAYFUL -> 1f
+            DEX_COMPANION_MOOD_FOCUS -> 0.96f
+            else -> 0.98f
+        }
+        binding.dexCompanionBubble.rotation = when (currentDexCompanionMood.lowercase(Locale.US)) {
+            DEX_COMPANION_MOOD_PLAYFUL -> -1.5f
+            else -> 0f
+        }
 
         (binding.dexCompanionCard.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
             val sideGravity = if (currentDexCompanionSide.lowercase(Locale.US) == DEX_COMPANION_SIDE_LEFT) {
@@ -3000,6 +3029,93 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             params.marginEnd = sideMargin
             params.bottomMargin = dpToPx(22)
             binding.dexCompanionCard.layoutParams = params
+        }
+
+        startDexCompanionAnimation()
+        scheduleDexCompanionBlink()
+    }
+
+    private fun startDexCompanionAnimation() {
+        stopDexCompanionAnimation()
+        val role = currentDexCompanionMood.lowercase(Locale.US)
+        val bobDistance = dpToPx(
+            when (role) {
+                DEX_COMPANION_MOOD_PLAYFUL -> 8
+                DEX_COMPANION_MOOD_FOCUS -> 4
+                else -> 6
+            }
+        ).toFloat()
+        val duration = when (role) {
+            DEX_COMPANION_MOOD_PLAYFUL -> 1700L
+            DEX_COMPANION_MOOD_FOCUS -> 2400L
+            else -> 2100L
+        }
+        val faceAnimator = ObjectAnimator.ofFloat(binding.dexCompanionFace, View.TRANSLATION_Y, 0f, -bobDistance, 0f).apply {
+            this.duration = duration
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+        }
+        val bubbleAnimator = ObjectAnimator.ofFloat(
+            binding.dexCompanionBubble,
+            View.TRANSLATION_Y,
+            0f,
+            -(bobDistance * 0.5f),
+            0f
+        ).apply {
+            this.duration = duration
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+        }
+        val cardAnimator = ObjectAnimator.ofFloat(
+            binding.dexCompanionCard,
+            View.TRANSLATION_X,
+            0f,
+            if (role == DEX_COMPANION_MOOD_PLAYFUL) dpToPx(2).toFloat() else 0f,
+            0f
+        ).apply {
+            this.duration = duration
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+        }
+        dexCompanionFloatAnimator = AnimatorSet().apply {
+            playTogether(faceAnimator, bubbleAnimator, cardAnimator)
+            start()
+        }
+    }
+
+    private fun stopDexCompanionAnimation() {
+        dexCompanionFloatAnimator?.cancel()
+        dexCompanionFloatAnimator = null
+        binding.dexCompanionCard.translationX = 0f
+        binding.dexCompanionFace.translationY = 0f
+        binding.dexCompanionBubble.translationY = 0f
+        binding.dexCompanionEyeLeft.scaleY = 1f
+        binding.dexCompanionEyeRight.scaleY = 1f
+    }
+
+    private fun scheduleDexCompanionBlink() {
+        if (dexCompanionBlinkScheduled || binding.dexCompanionCard.visibility != View.VISIBLE) return
+        val delay = when (currentDexCompanionMood.lowercase(Locale.US)) {
+            DEX_COMPANION_MOOD_PLAYFUL -> 1800L
+            DEX_COMPANION_MOOD_FOCUS -> 3200L
+            else -> 2500L
+        }
+        dexCompanionBlinkScheduled = true
+        mainHandler.postDelayed(dexCompanionBlinkRunnable, delay)
+    }
+
+    private fun blinkDexCompanion() {
+        listOf(binding.dexCompanionEyeLeft, binding.dexCompanionEyeRight).forEach { eye ->
+            eye.animate()
+                .scaleY(0.15f)
+                .setDuration(90L)
+                .withEndAction {
+                    eye.animate()
+                        .scaleY(1f)
+                        .setDuration(110L)
+                        .start()
+                }
+                .start()
         }
     }
 
