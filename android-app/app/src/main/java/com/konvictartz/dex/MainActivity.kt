@@ -2546,15 +2546,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun saveSafetyProfile() {
         val token = authToken ?: return
+        val emergencyPersonName = binding.safetyNameInput.text?.toString()?.trim().orEmpty()
+        val emergencyBirthday = binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty()
         val emergencyContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
         val contactPermission = binding.safetyNotifyTrustedContactSwitch.isChecked
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
+            .putString(KEY_EMERGENCY_PROFILE_NAME, emergencyPersonName)
+            .putString(KEY_EMERGENCY_PROFILE_BIRTHDAY, emergencyBirthday)
             .putString(KEY_EMERGENCY_CONTACT, emergencyContact)
             .putBoolean(KEY_EMERGENCY_CONTACT_PERMISSION, contactPermission)
             .apply()
         val serverUrl = currentServerUrl()
         val updates = listOf(
+            "safety_person_name" to emergencyPersonName,
+            "safety_birthday" to emergencyBirthday,
             "emergency_contact" to emergencyContact,
             "comfort_style" to binding.safetyComfortInput.text?.toString()?.trim().orEmpty(),
             "grounding_preference" to binding.safetyGroundingInput.text?.toString()?.trim().orEmpty(),
@@ -2615,7 +2621,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
 
-        val userName = currentUserName.ifBlank { getString(R.string.dex_user_fallback_name) }
+        val userName = resolveEmergencyPersonName()
         val body = getString(R.string.test_emergency_sms_body, userName)
         val status = sendLocalEmergencySmsWithStatus(
             phoneNumber = phoneNumber,
@@ -2633,6 +2639,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun previewEmergencyPlan() {
+        val personName = resolveEmergencyPersonName()
         val contact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
         val contactAlerts = if (binding.safetyNotifyTrustedContactSwitch.isChecked) {
             getString(R.string.safety_preview_enabled)
@@ -2645,13 +2652,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             getString(R.string.safety_preview_disabled)
         }
         val reply = if (contact.isNotBlank()) {
-            getString(R.string.safety_emergency_preview_with_contact, contact, contactAlerts, followUps)
+            getString(R.string.safety_emergency_preview_with_contact, personName, contact, contactAlerts, followUps)
         } else {
-            getString(R.string.safety_emergency_preview_without_contact, contactAlerts, followUps)
+            getString(R.string.safety_emergency_preview_without_contact, personName, contactAlerts, followUps)
         }
         binding.safetyProfileMessage.text = reply
         binding.lastReplyValue.text = reply
         speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
+    }
+
+    private fun resolveEmergencyPersonName(): String {
+        val typedName = if (::binding.isInitialized) {
+            binding.safetyNameInput.text?.toString()?.trim().orEmpty()
+        } else {
+            ""
+        }
+        if (typedName.isNotBlank()) return typedName
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedName = prefs.getString(KEY_EMERGENCY_PROFILE_NAME, null).orEmpty().trim()
+        if (savedName.isNotBlank()) return savedName
+        if (currentUserName.isNotBlank()) return currentUserName.trim()
+        return getString(R.string.dex_user_fallback_name)
     }
 
     private fun requestDailyLesson() {
@@ -6052,6 +6073,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val result = getJson("$serverUrl/dex/preferences", token)
             result.onSuccess { response ->
                 val preferences = response.optJSONObject("preferences") ?: JSONObject()
+                val emergencyPersonName = preferences.optString("safety_person_name")
+                val emergencyBirthday = preferences.optString("safety_birthday")
                 val emergencyContact = preferences.optString("emergency_contact")
                 val comfortStyle = preferences.optString("comfort_style").ifBlank { "calm" }
                 val groundingPreference = preferences.optString("grounding_preference").ifBlank { "gentle" }
@@ -6060,20 +6083,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
                 getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                     .edit()
+                    .putString(KEY_EMERGENCY_PROFILE_NAME, emergencyPersonName)
+                    .putString(KEY_EMERGENCY_PROFILE_BIRTHDAY, emergencyBirthday)
                     .putString(KEY_EMERGENCY_CONTACT, emergencyContact)
                     .putBoolean(KEY_EMERGENCY_CONTACT_PERMISSION, contactPermission)
                     .apply()
+                binding.safetyNameInput.setText(emergencyPersonName)
+                binding.safetyBirthdayInput.setText(emergencyBirthday)
                 binding.safetyContactInput.setText(emergencyContact)
                 binding.safetyComfortInput.setText(comfortStyle)
                 binding.safetyGroundingInput.setText(groundingPreference)
                 binding.safetyNotifyTrustedContactSwitch.isChecked = contactPermission
                 binding.safetyFollowUpSwitch.isChecked = followUp
                 binding.safetyProfileSummary.text =
-                    if (emergencyContact.isBlank()) {
+                    if (emergencyPersonName.isBlank() && emergencyBirthday.isBlank() && emergencyContact.isBlank()) {
                         getString(R.string.safety_profile_default)
                     } else {
                         getString(
                             R.string.safety_profile_loaded,
+                            emergencyPersonName.ifBlank { resolveEmergencyPersonName() },
+                            emergencyBirthday.ifBlank { getString(R.string.safety_birthday_unknown) },
                             comfortStyle.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() },
                             groundingPreference.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() },
                             emergencyContact
@@ -9226,7 +9255,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-        val userName = currentUserName.ifBlank { getString(R.string.dex_user_fallback_name) }
+        val userName = resolveEmergencyPersonName()
         val shortMessage = triggerMessage.trim().replace(Regex("\\s+"), " ").take(72)
         val smsBody = getString(R.string.local_emergency_sms_body, userName, shortMessage)
         return sendLocalEmergencySmsWithStatus(
@@ -10717,6 +10746,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_CALL_MESSAGE_LOG = "call_message_log"
         const val KEY_LAST_SMS_EVENT_SIGNATURE = "last_sms_event_signature"
         const val KEY_LAST_SMS_EVENT_AT = "last_sms_event_at"
+        const val KEY_EMERGENCY_PROFILE_NAME = "emergency_profile_name"
+        const val KEY_EMERGENCY_PROFILE_BIRTHDAY = "emergency_profile_birthday"
         const val KEY_EMERGENCY_CONTACT = "emergency_contact"
         const val KEY_EMERGENCY_CONTACT_PERMISSION = "emergency_contact_permission"
         const val KEY_LOCAL_RELATIONSHIP_ALIASES = "local_relationship_aliases"

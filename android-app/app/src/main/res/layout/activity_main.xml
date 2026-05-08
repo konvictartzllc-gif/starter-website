@@ -1122,6 +1122,38 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
+                        android:hint="@string/safety_name_hint"
+                        app:boxBackgroundMode="outline">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/safetyNameInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPersonName"
+                            android:textColor="@android:color/white"
+                            android:textColorHint="@color/dex_text_secondary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:hint="@string/safety_birthday_hint"
+                        app:boxBackgroundMode="outline">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/safetyBirthdayInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="date"
+                            android:textColor="@android:color/white"
+                            android:textColorHint="@color/dex_text_secondary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
                         android:hint="@string/safety_contact_hint"
                         app:boxBackgroundMode="outline">
 
@@ -2899,7 +2931,6 @@
                         android:text="@string/dex_companion_visible" />
 
                     <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/dexCompanionNameLayout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
@@ -4358,7 +4389,6 @@
                     android:textStyle="bold" />
 
                 <LinearLayout
-                    android:id="@+id/dexCompanionStatusRow"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_horizontal"
