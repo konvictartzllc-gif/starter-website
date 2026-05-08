@@ -801,7 +801,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 promptForPendingSmsReply()
                 true
             }
-            normalized.contains("ignore") ||
+            isNegativeCommand(normalized) ||
+                normalized.contains("ignore") ||
                 normalized.contains("leave it") -> {
                 handleSmsIgnoreAction()
                 true
@@ -832,7 +833,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 handleNotificationReadAction()
                 true
             }
-            normalized.contains("ignore") ||
+            isNegativeCommand(normalized) ||
+                normalized.contains("ignore") ||
                 normalized.contains("leave it") -> {
                 handleNotificationIgnoreAction()
                 true
@@ -977,6 +979,19 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             normalized.contains("read that") ||
             normalized.contains("reply to it") ||
             normalized.contains("reply back")
+    }
+
+    private fun isNegativeCommand(normalized: String): Boolean {
+        return normalized == "no" ||
+            normalized.startsWith("no ") ||
+            normalized == "nope" ||
+            normalized.startsWith("nope ") ||
+            normalized == "nah" ||
+            normalized.startsWith("nah ") ||
+            normalized.contains("no thanks") ||
+            normalized.contains("not now") ||
+            normalized.contains("don't") ||
+            normalized.contains("do not")
     }
 
     private fun handleCallerMessage(transcript: String) {

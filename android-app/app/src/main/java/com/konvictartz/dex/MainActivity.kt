@@ -4125,7 +4125,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized == "ignore it" ||
                 normalized == "ignore the text" ||
                 normalized == "ignore the message" ||
-                normalized == "no" ||
+                isNegativeVoiceReply(normalized) ||
                 normalized == "cancel" -> {
                 val reply = getString(R.string.incoming_sms_ignored, sender)
                 pendingIncomingSmsReplyChoice = false
@@ -4701,7 +4701,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized == "ignore it" ||
                 normalized == "ignore the notification" ||
                 normalized == "ignore that" ||
-                normalized == "no" ||
+                isNegativeVoiceReply(normalized) ||
                 normalized == "cancel" -> {
                 val reply = getString(R.string.notification_ignored)
                 pendingNotificationReplyChoice = false
@@ -4764,6 +4764,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized.startsWith("okay ") ||
             normalized == "sure" ||
             normalized.startsWith("sure ")
+    }
+
+    private fun isNegativeVoiceReply(normalized: String): Boolean {
+        return normalized == "no" ||
+            normalized.startsWith("no ") ||
+            normalized == "nope" ||
+            normalized.startsWith("nope ") ||
+            normalized == "nah" ||
+            normalized.startsWith("nah ") ||
+            normalized.contains("no thanks") ||
+            normalized.contains("not now") ||
+            normalized.contains("don't") ||
+            normalized.contains("do not") ||
+            normalized.contains("leave it") ||
+            normalized.contains("ignore it")
     }
 
     private fun buildDashboardSectionIntent(message: String): Triple<String, String, String>? {
