@@ -14,5 +14,11 @@
     <color name="dex_metric_highlight">#2A4D69</color>
     <color name="dex_chip_start">#204A62</color>
     <color name="dex_chip_end">#162A39</color>
+    <color name="dex_user_signal">#6ED0FF</color>
+    <color name="dex_affiliate_signal">#66D19E</color>
+    <color name="dex_admin_signal">#FF8A66</color>
+    <color name="dex_user_chip_tint">#204A62</color>
+    <color name="dex_affiliate_chip_tint">#214538</color>
+    <color name="dex_admin_chip_tint">#4A2A26</color>
     <color name="dex_text_secondary">#B7C2D0</color>
 </resources>

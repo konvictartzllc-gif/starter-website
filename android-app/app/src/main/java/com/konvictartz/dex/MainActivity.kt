@@ -1106,14 +1106,67 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val name = currentUserName.ifBlank {
             binding.emailInput.text?.toString()?.substringBefore("@").orEmpty().ifBlank { "Dex user" }
         }
+        val roleKey = currentUserRole.lowercase(Locale.US)
         binding.dashboardWelcome.text = getString(R.string.dashboard_welcome, name)
         binding.dashboardRole.text = getString(R.string.dashboard_role, roleLabel(currentUserRole))
         binding.dashboardAccess.text = getString(R.string.dashboard_access, accessLabel(currentAccessType))
-        binding.dashboardSummary.text = when (currentUserRole.lowercase(Locale.US)) {
+        binding.dashboardSummary.text = when (roleKey) {
             "admin" -> getString(R.string.dashboard_summary_admin)
             "affiliate" -> getString(R.string.dashboard_summary_affiliate)
             else -> getString(R.string.dashboard_summary_user)
         }
+        binding.dashboardOverline.text = when (roleKey) {
+            "admin" -> getString(R.string.dashboard_overline_admin)
+            "affiliate" -> getString(R.string.dashboard_overline_affiliate)
+            else -> getString(R.string.dashboard_overline_user)
+        }
+        binding.dashboardCreativeFooter.text = when (roleKey) {
+            "admin" -> getString(R.string.dashboard_creative_footer_admin)
+            "affiliate" -> getString(R.string.dashboard_creative_footer_affiliate)
+            else -> getString(R.string.dashboard_creative_footer_user)
+        }
+        binding.dashboardHeroSurface.setBackgroundResource(
+            when (roleKey) {
+                "admin" -> R.drawable.dashboard_hero_surface_admin
+                "affiliate" -> R.drawable.dashboard_hero_surface_affiliate
+                else -> R.drawable.dashboard_hero_surface
+            }
+        )
+        val chipTint = when (roleKey) {
+            "admin" -> getColorCompat(R.color.dex_admin_chip_tint)
+            "affiliate" -> getColorCompat(R.color.dex_affiliate_chip_tint)
+            else -> getColorCompat(R.color.dex_user_chip_tint)
+        }
+        binding.dashboardRole.backgroundTintList = ColorStateList.valueOf(chipTint)
+        binding.dashboardAccess.backgroundTintList = ColorStateList.valueOf(chipTint)
+        binding.dashboardOverline.setTextColor(
+            when (roleKey) {
+                "admin" -> getColorCompat(R.color.dex_admin_signal)
+                "affiliate" -> getColorCompat(R.color.dex_affiliate_signal)
+                else -> getColorCompat(R.color.dex_user_signal)
+            }
+        )
+        binding.dashboardSignalTall.backgroundTintList = ColorStateList.valueOf(
+            when (roleKey) {
+                "admin" -> getColorCompat(R.color.dex_admin_signal)
+                "affiliate" -> getColorCompat(R.color.dex_affiliate_signal)
+                else -> getColorCompat(R.color.dex_user_signal)
+            }
+        )
+        binding.dashboardSignalMid.backgroundTintList = ColorStateList.valueOf(
+            when (roleKey) {
+                "admin" -> getColorCompat(R.color.dex_border_soft)
+                "affiliate" -> getColorCompat(R.color.dex_metric_highlight)
+                else -> getColorCompat(R.color.dex_metric_highlight)
+            }
+        )
+        binding.dashboardSignalShort.backgroundTintList = ColorStateList.valueOf(
+            when (roleKey) {
+                "admin" -> getColorCompat(R.color.dex_chip_end)
+                "affiliate" -> getColorCompat(R.color.dex_chip_end)
+                else -> getColorCompat(R.color.dex_border_soft)
+            }
+        )
         binding.adminBackendValue.text = currentServerUrl()
     }
 
@@ -1130,6 +1183,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         "expired" -> getString(R.string.dashboard_access_expired)
         else -> getString(R.string.dashboard_access_unknown)
     }
+
+    private fun getColorCompat(colorRes: Int): Int = ContextCompat.getColor(this, colorRes)
 
     private fun fetchDashboardData() {
         val token = authToken ?: return

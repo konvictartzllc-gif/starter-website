@@ -296,6 +296,7 @@
                     android:textStyle="bold" />
 
                 <LinearLayout
+                    android:id="@+id/dashboardHeroSurface"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
@@ -310,6 +311,7 @@
                         android:orientation="horizontal">
 
                         <TextView
+                            android:id="@+id/dashboardOverline"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/dashboard_overline"
@@ -329,17 +331,20 @@
                             android:orientation="horizontal">
 
                             <View
+                                android:id="@+id/dashboardSignalTall"
                                 android:layout_width="10dp"
                                 android:layout_height="20dp"
                                 android:background="@drawable/dashboard_signal_bar_tall" />
 
                             <View
+                                android:id="@+id/dashboardSignalMid"
                                 android:layout_width="10dp"
                                 android:layout_height="16dp"
                                 android:layout_marginStart="4dp"
                                 android:background="@drawable/dashboard_signal_bar_mid" />
 
                             <View
+                                android:id="@+id/dashboardSignalShort"
                                 android:layout_width="10dp"
                                 android:layout_height="12dp"
                                 android:layout_marginStart="4dp"
@@ -400,6 +405,7 @@
                     </LinearLayout>
 
                     <TextView
+                        android:id="@+id/dashboardCreativeFooter"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
