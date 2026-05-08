@@ -312,6 +312,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexCompanionIntroGreeted = false
     private var currentDexCompanionOffsetX = 0f
     private var currentDexCompanionOffsetY = 0f
+    private var currentDexCompanionTierStyleOverride: Int? = null
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
     private var dexCompanionBubbleOverride: String? = null
     private var dexCompanionRewardsPreviewLevel: Int? = null
@@ -1173,6 +1174,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionRewardsValue.setOnClickListener {
             cycleDexCompanionRewardsPreview()
         }
+        binding.dexCompanionRewardsValue.setOnLongClickListener {
+            pinDexCompanionRewardsLook()
+            true
+        }
         binding.dexCompanionCard.setOnTouchListener { view, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -1313,6 +1318,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexCompanionIntroGreeted = prefs.getBoolean(KEY_DEX_COMPANION_INTRO_GREETED, false)
         currentDexCompanionOffsetX = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_X, 0f)
         currentDexCompanionOffsetY = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_Y, 0f)
+        currentDexCompanionTierStyleOverride =
+            prefs.getInt(KEY_DEX_COMPANION_TIER_STYLE_OVERRIDE, -1).takeIf { it >= 0 }
         dexGamesPlayed = prefs.getInt(KEY_DEX_GAMES_PLAYED, 0)
         dexGamesCorrect = prefs.getInt(KEY_DEX_GAMES_CORRECT, 0)
         dexGamesCurrentStreak = prefs.getInt(KEY_DEX_GAMES_STREAK, 0)
@@ -3094,10 +3101,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val favorite = favoriteDexMiniGameLabel()
             ?: getString(R.string.dex_companion_rewards_favorite_none)
         val previewLevel = dexCompanionRewardsPreviewLevel
+        val styleLine = currentDexCompanionTierStyleOverride?.let {
+            if (it == dexGamesUnlockLevel()) {
+                getString(R.string.dex_companion_rewards_style_pinned_live, dexGamesUnlockTier(it))
+            } else {
+                getString(R.string.dex_companion_rewards_style_pinned, dexGamesUnlockTier(it))
+            }
+        } ?: getString(R.string.dex_companion_rewards_style_live)
         val body = if (previewLevel == null) {
             getString(
                 R.string.dex_companion_rewards_value,
                 dexGamesUnlockTier(),
+                styleLine,
                 dexGamesUnlockPerkLine(),
                 dexGamesChallengeClears,
                 favorite
@@ -3135,6 +3150,37 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DEX_COMPANION_STATE_EXCITED,
             bubbleOverride = bubble,
             revertAfterMs = 2200L
+        )
+    }
+
+    private fun pinDexCompanionRewardsLook() {
+        val previewLevel = dexCompanionRewardsPreviewLevel
+        val unlockedLevel = dexGamesUnlockLevel()
+        val bubble = when {
+            previewLevel == null && currentDexCompanionTierStyleOverride != null -> {
+                currentDexCompanionTierStyleOverride = null
+                getString(R.string.dex_companion_rewards_pin_cleared)
+            }
+            previewLevel == null -> {
+                currentDexCompanionTierStyleOverride = null
+                getString(R.string.dex_companion_rewards_pin_cleared)
+            }
+            previewLevel > unlockedLevel -> {
+                getString(R.string.dex_companion_rewards_pin_locked, dexGamesUnlockTier(previewLevel))
+            }
+            else -> {
+                currentDexCompanionTierStyleOverride =
+                    if (previewLevel == unlockedLevel) null else previewLevel
+                getString(R.string.dex_companion_rewards_pin_saved, dexGamesUnlockTier(previewLevel))
+            }
+        }
+        updateDexCompanionControls()
+        applyDexCompanionUi()
+        persistHomeLook()
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = bubble,
+            revertAfterMs = 2400L
         )
     }
 
@@ -3830,6 +3876,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putBoolean(KEY_DEX_COMPANION_INTRO_GREETED, dexCompanionIntroGreeted)
             .putFloat(KEY_DEX_COMPANION_OFFSET_X, currentDexCompanionOffsetX)
             .putFloat(KEY_DEX_COMPANION_OFFSET_Y, currentDexCompanionOffsetY)
+            .putInt(KEY_DEX_COMPANION_TIER_STYLE_OVERRIDE, currentDexCompanionTierStyleOverride ?: -1)
             .commit()
     }
 
@@ -4156,7 +4203,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val skinColors = dexCompanionSkinColors()
         val accentColor = skinColors.accent
         val bubbleTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.76f)
-        val unlockLevel = dexCompanionRewardsPreviewLevel ?: dexGamesUnlockLevel()
+        val unlockLevel = dexCompanionRewardsPreviewLevel ?: currentDexCompanionTierStyleOverride ?: dexGamesUnlockLevel()
         val unlockAccent = when (unlockLevel) {
             3 -> android.graphics.Color.parseColor("#D8C4FF")
             2 -> android.graphics.Color.parseColor("#7ED6FF")
@@ -4193,13 +4240,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionLabel.text = currentDexCompanionName
         val statusSpec = dexCompanionStatusSpec(activeState, accentColor)
         val previewingRewards = dexCompanionRewardsPreviewLevel != null
+        val pinnedRewards = !previewingRewards && currentDexCompanionTierStyleOverride != null
         val tierSuffix = when (unlockLevel) {
             3 -> if (previewingRewards) " | Legend preview" else " | Legend"
             2 -> if (previewingRewards) " | Star preview" else " | Star"
             1 -> if (previewingRewards) " | Spark preview" else " | Spark"
             else -> ""
         }
-        binding.dexCompanionStatusChip.text = getString(statusSpec.labelRes) + tierSuffix
+        val statusSuffix = if (pinnedRewards && tierSuffix.isNotBlank()) "$tierSuffix pinned" else tierSuffix
+        binding.dexCompanionStatusChip.text = getString(statusSpec.labelRes) + statusSuffix
         binding.dexCompanionStatusChip.backgroundTintList = ColorStateList.valueOf(statusSpec.chipColor)
         binding.dexCompanionStatusChip.setTextColor(statusSpec.textColor)
         binding.dexCompanionStatusDot.backgroundTintList = ColorStateList.valueOf(statusSpec.dotColor)
@@ -9830,6 +9879,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_INTRO_GREETED = "dex_companion_intro_greeted"
         const val KEY_DEX_COMPANION_OFFSET_X = "dex_companion_offset_x"
         const val KEY_DEX_COMPANION_OFFSET_Y = "dex_companion_offset_y"
+        const val KEY_DEX_COMPANION_TIER_STYLE_OVERRIDE = "dex_companion_tier_style_override"
         const val KEY_DEX_GAMES_PLAYED = "dex_games_played"
         const val KEY_DEX_GAMES_CORRECT = "dex_games_correct"
         const val KEY_DEX_GAMES_STREAK = "dex_games_streak"
