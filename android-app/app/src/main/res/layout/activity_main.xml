@@ -859,21 +859,57 @@
                         android:text="@string/start_learning_quiz" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/learningLessonPreview"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:textColor="@android:color/white"
-                    android:textSize="14sp" />
+                    android:background="@drawable/dashboard_metric_surface"
+                    android:minHeight="84dp"
+                    android:orientation="vertical"
+                    android:padding="12dp">
 
-                <TextView
-                    android:id="@+id/learningQuizPreview"
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/learning_lesson_output_tag"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/learningLessonPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:textColor="@color/dex_text_secondary"
-                    android:textSize="13sp" />
+                    android:background="@drawable/dashboard_metric_surface"
+                    android:minHeight="76dp"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/learning_quiz_output_tag"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/learningQuizPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -1179,15 +1215,31 @@
                         android:text="@string/test_emergency_sms" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/safetyProfileMessage"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:background="@drawable/dashboard_metric_surface"
-                    android:padding="12dp"
-                    android:textColor="@color/dex_text_secondary"
-                    android:textSize="13sp" />
+                    android:minHeight="74dp"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/safety_profile_message_tag"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/safetyProfileMessage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -1235,13 +1287,31 @@
                         android:textColor="@color/dex_text_secondary"
                         android:textSize="12sp" />
 
-                    <TextView
-                        android:id="@+id/safetyDiagnosticsValue"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:textColor="@color/dex_text_secondary"
-                        android:textSize="12sp" />
+                        android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="84dp"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/safety_diagnostics_value_tag"
+                            android:textColor="@color/dex_text_secondary"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/safetyDiagnosticsValue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textColor="@color/dex_text_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout
@@ -1391,13 +1461,31 @@
                         android:textColor="@android:color/white"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:id="@+id/activityLogValue"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:textColor="@color/dex_text_secondary"
-                        android:textSize="12sp" />
+                        android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="88dp"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/activity_log_value_tag"
+                            android:textColor="@color/dex_text_secondary"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/activityLogValue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textColor="@color/dex_text_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

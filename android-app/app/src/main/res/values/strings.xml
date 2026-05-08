@@ -182,6 +182,8 @@
     <string name="learning_quiz_failed">Dex could not build a quiz.</string>
     <string name="learning_quiz_spoken_title_only">I built your quiz, %1$s.</string>
     <string name="learning_quiz_spoken_intro">I built your quiz, %1$s. Here is the first question: %2$s</string>
+    <string name="learning_lesson_output_tag">Lesson output</string>
+    <string name="learning_quiz_output_tag">Quiz output</string>
     <string name="safety_profile_title">Emotions and safety</string>
     <string name="safety_profile_summary">Tell Dex how to support you when you are overwhelmed, what grounding style feels best, and whether a trusted contact can be notified in an emergency.</string>
     <string name="safety_snapshot_title">Safety profile</string>
@@ -199,6 +201,7 @@
     <string name="safety_diagnostics_label">Safety diagnostics</string>
     <string name="safety_diagnostics_tag">Signal check</string>
     <string name="safety_diagnostics_summary">Use these details to confirm the trusted-contact setup and last SMS result on this phone.</string>
+    <string name="safety_diagnostics_value_tag">Latest report</string>
     <string name="safety_contact_hint">Trusted emergency contact (phone or email)</string>
     <string name="safety_comfort_hint">Comfort style (calm, direct, faith)</string>
     <string name="safety_grounding_hint">Grounding style (gentle, step by step)</string>
@@ -207,6 +210,7 @@
     <string name="save_safety_profile">Save safety profile</string>
     <string name="safety_profile_saved">Safety profile saved.</string>
     <string name="safety_profile_failed">Dex could not save your safety profile.</string>
+    <string name="safety_profile_message_tag">Profile status</string>
     <string name="safety_contact_none">not set</string>
     <string name="test_safety_check_in">Test check-in</string>
     <string name="preview_emergency_plan">Preview emergency plan</string>
@@ -449,6 +453,7 @@
     <string name="alias_clear_done">Dex cleared your local aliases.</string>
     <string name="activity_log_title">Recent Dex activity</string>
     <string name="activity_log_tag">Recent signals</string>
+    <string name="activity_log_value_tag">Event stream</string>
     <string name="activity_log_empty">No recent safety or call events yet.</string>
     <string name="email_draft_opened">I opened the email draft for %1$s.</string>
     <string name="call_direct_started">Calling %1$s now.</string>
