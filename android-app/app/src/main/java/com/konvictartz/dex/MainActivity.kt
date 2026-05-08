@@ -1144,6 +1144,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun pulseDashboardValues(vararg views: View) {
         views.forEach { view ->
             view.animate().cancel()
+            view.clearAnimation()
             view.alpha = 0.82f
             view.scaleX = 0.985f
             view.scaleY = 0.985f
@@ -1156,30 +1157,57 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun startLoadingPulse(vararg views: TextView) {
+        views.forEach { view ->
+            val animation = android.view.animation.AlphaAnimation(0.5f, 1f).apply {
+                duration = 720L
+                repeatMode = android.view.animation.Animation.REVERSE
+                repeatCount = android.view.animation.Animation.INFINITE
+            }
+            view.clearAnimation()
+            view.startAnimation(animation)
+        }
+    }
+
     private fun showDashboardLoadingStates() {
         binding.userDashboardChatCount.text = getString(R.string.dashboard_loading_value)
         binding.userDashboardLessonCount.text = getString(R.string.dashboard_loading_value)
         binding.userDashboardQuizScore.text = getString(R.string.dashboard_loading_value)
         binding.learningQuizPreview.text = getString(R.string.dashboard_loading_detail)
+        startLoadingPulse(
+            binding.userDashboardChatCount,
+            binding.userDashboardLessonCount,
+            binding.userDashboardQuizScore,
+            binding.learningQuizPreview
+        )
         if (currentUserRole == "affiliate") {
             binding.affiliatePromoCode.text = getString(R.string.affiliate_dashboard_loading)
             binding.affiliateEarnings.text = getString(R.string.dashboard_loading_value)
             binding.affiliateSignups.text = getString(R.string.dashboard_loading_value)
             binding.affiliatePaidSubs.text = getString(R.string.dashboard_loading_value)
+            startLoadingPulse(
+                binding.affiliatePromoCode,
+                binding.affiliateEarnings,
+                binding.affiliateSignups,
+                binding.affiliatePaidSubs
+            )
         }
         if (currentUserRole == "admin") {
             binding.adminStatsValue.text = getString(R.string.admin_dashboard_loading)
+            startLoadingPulse(binding.adminStatsValue)
         }
     }
 
     private fun showBillingLoadingState() {
         binding.billingStatusText.text = getString(R.string.billing_status_loading)
         binding.billingDetailText.text = getString(R.string.billing_detail_loading)
+        startLoadingPulse(binding.billingStatusText, binding.billingDetailText)
     }
 
     private fun showLearningLoadingState() {
         binding.learningProfileSummary.text = getString(R.string.learning_profile_loading)
         binding.learningReminderSummary.text = getString(R.string.learning_reminder_loading)
+        startLoadingPulse(binding.learningProfileSummary, binding.learningReminderSummary)
     }
 
     private fun updateDashboardHeader() {
