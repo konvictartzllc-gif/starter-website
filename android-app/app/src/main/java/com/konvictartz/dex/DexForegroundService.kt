@@ -79,6 +79,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     @Suppress("DEPRECATION")
     private inner class LegacyCallStateListener : android.telephony.PhoneStateListener() {
+        @Deprecated("Deprecated in Java")
         override fun onCallStateChanged(state: Int, phoneNumber: String?) {
             super.onCallStateChanged(state, phoneNumber)
             handleCallStateChanged(state, phoneNumber)
@@ -100,6 +101,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 mainHandler.post { startPendingBackgroundListening() }
             }
 
+            @Suppress("OVERRIDE_DEPRECATION")
             @Deprecated("Deprecated in Java")
             override fun onError(utteranceId: String?) {
                 mainHandler.post { startPendingBackgroundListening() }
