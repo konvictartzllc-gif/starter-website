@@ -194,6 +194,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingSmsRecipient: ContactMatch? = null
     private var pendingSmsBodyDraft: String? = null
     private var pendingReminderSmsTriggerAt: LocalDateTime? = null
+    private var pendingReminderSmsTarget: ContactMatch? = null
+    private var pendingReminderSmsBody: String? = null
     private var pendingReminderCallTargetName: String? = null
     private var pendingIncomingSmsSender: String? = null
     private var pendingIncomingSmsValue: String? = null
@@ -958,6 +960,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingSmsRecipient = null
         pendingSmsBodyDraft = null
         pendingReminderSmsTriggerAt = null
+        pendingReminderSmsTarget = null
+        pendingReminderSmsBody = null
         pendingReminderCallTargetName = null
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
@@ -3564,6 +3568,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingSmsRecipient = null
         pendingSmsBodyDraft = null
         pendingReminderSmsTriggerAt = null
+        pendingReminderSmsTarget = null
+        pendingReminderSmsBody = null
         pendingReminderCallTargetName = null
         pendingIncomingSmsSender = null
         pendingIncomingSmsValue = null
@@ -3890,6 +3896,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (actionTaken) return true
         }
 
+        consumePendingReminderSmsTime(message)?.let { actionTaken ->
+            if (actionTaken) return true
+        }
+
         consumePendingSmsBody(message)?.let { actionTaken ->
             if (actionTaken) return true
         }
@@ -4125,6 +4135,54 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun consumePendingReminderSmsTime(message: String): Boolean? {
+        val target = pendingReminderSmsTarget ?: return null
+        val trimmed = message.trim()
+        if (trimmed.isBlank()) return false
+        val normalized = trimmed.lowercase(Locale.US)
+        return when (normalized) {
+            "cancel", "cancel it", "never mind", "stop" -> {
+                pendingReminderSmsTarget = null
+                pendingReminderSmsBody = null
+                pendingReminderSmsTriggerAt = null
+                val reply = getString(R.string.pending_action_canceled)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                true
+            }
+            else -> {
+                if (!hasExplicitReminderTime(trimmed)) {
+                    val reply = getString(R.string.text_reminder_time_prompt, target.displayName)
+                    binding.conversationStatus.text = reply
+                    binding.lastReplyValue.text = reply
+                    speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    true
+                } else {
+                    val reminderAt = inferDateTimeFromCommand(trimmed)
+                    val pendingBody = pendingReminderSmsBody
+                    pendingReminderSmsTarget = null
+                    pendingReminderSmsBody = null
+                    if (!pendingBody.isNullOrBlank()) {
+                        val reply = scheduleTextReminder(target, pendingBody, reminderAt)
+                        binding.conversationStatus.text = reply
+                        binding.lastReplyValue.text = reply
+                        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    } else {
+                        pendingSmsRecipient = target
+                        pendingSmsBodyDraft = null
+                        pendingReminderSmsTriggerAt = reminderAt
+                        val reply = getString(R.string.text_reminder_body_prompt, target.displayName, formatReminderDateTime(reminderAt))
+                        binding.conversationStatus.text = reply
+                        binding.lastReplyValue.text = reply
+                        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                    }
+                    true
+                }
+            }
+        }
+    }
+
     private fun handleCallReminderIntent(message: String): String? {
         val resolvedMessage = resolveAliasesInSentence(message.trim())
         val normalized = resolvedMessage.lowercase(Locale.US)
@@ -4181,7 +4239,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             Regex(".*(?:text|message)\\s+(.+?)\\s+(?:saying|that|message|tell)\\s+(.+)$", RegexOption.IGNORE_CASE),
             Regex(".*(?:text|message)\\s+(.+?)\\s+(.+)$", RegexOption.IGNORE_CASE)
         ).firstNotNullOfOrNull { it.find(resolvedMessage) }
-        val reminderAt = inferDateTimeFromCommand(resolvedMessage)
         detailedMatch?.let { match ->
             val rawTarget = match.groupValues[1].trim()
             val reminderBody = match.groupValues[2].trim().trimEnd('.', '!', '?')
@@ -4191,6 +4248,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 findExactPhoneContactByName(resolveContactAlias(rawTarget))
                     ?: findPhoneContactByName(resolveContactAlias(rawTarget))
                     ?: return null
+            if (!hasExplicitReminderTime(resolvedMessage)) {
+                pendingReminderSmsTarget = targetContact
+                pendingReminderSmsBody = reminderBody
+                return getString(R.string.text_reminder_time_prompt, targetContact.displayName)
+            }
+            val reminderAt = inferDateTimeFromCommand(resolvedMessage)
             return scheduleTextReminder(targetContact, reminderBody, reminderAt)
         }
 
@@ -4220,6 +4283,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             findExactPhoneContactByName(resolveContactAlias(rawTarget))
                 ?: findPhoneContactByName(resolveContactAlias(rawTarget))
                 ?: return null
+        if (!hasExplicitReminderTime(resolvedMessage)) {
+            pendingReminderSmsTarget = targetContact
+            pendingReminderSmsBody = null
+            return getString(R.string.text_reminder_time_prompt, targetContact.displayName)
+        }
+        val reminderAt = inferDateTimeFromCommand(resolvedMessage)
         pendingSmsRecipient = targetContact
         pendingSmsBodyDraft = null
         pendingReminderSmsTriggerAt = reminderAt
@@ -4581,6 +4650,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             pendingContactAction == null &&
             pendingSmsRecipient == null &&
             pendingReminderSmsTriggerAt == null &&
+            pendingReminderSmsTarget == null &&
+            pendingReminderSmsBody.isNullOrBlank() &&
             pendingReminderCallTargetName == null &&
             pendingSmsBodyDraft.isNullOrBlank() &&
             !listeningForQuizAnswer &&

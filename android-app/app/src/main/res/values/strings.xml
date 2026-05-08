@@ -315,6 +315,7 @@
     <string name="call_reminder_check_in_prompt">It is time to call %1$s. Do you want me to call now, or remind you again in ten minutes?</string>
     <string name="call_reminder_check_in_retry">I missed that. Say call now, remind me again, or no.</string>
     <string name="text_reminder_set">Okay. I will remind you to text %1$s at %2$s.</string>
+    <string name="text_reminder_time_prompt">When should I remind you to text %1$s?</string>
     <string name="text_reminder_title">Text %1$s</string>
     <string name="text_reminder_text">Reminder to text %1$s: %2$s.</string>
     <string name="text_reminder_body_prompt">What would you like me to text %1$s at %2$s?</string>
