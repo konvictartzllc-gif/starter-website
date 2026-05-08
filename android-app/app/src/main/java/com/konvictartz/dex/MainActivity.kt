@@ -290,6 +290,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexCompanionDragDownRawY = 0f
     private var dexCompanionDragStartX = 0f
     private var dexCompanionDragStartY = 0f
+    private var dexCompanionDraggedDuringTouch = false
     private var pendingDecorationPickTarget: DecorationPickTarget? = null
     private var currentTrialDaysLeft: Int? = null
     private var hasBillingCustomer = false
@@ -1078,18 +1079,38 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     dexCompanionDragDownRawY = event.rawY
                     dexCompanionDragStartX = currentDexCompanionOffsetX
                     dexCompanionDragStartY = currentDexCompanionOffsetY
+                    dexCompanionDraggedDuringTouch = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    currentDexCompanionOffsetX = dexCompanionDragStartX + (event.rawX - dexCompanionDragDownRawX)
-                    currentDexCompanionOffsetY = dexCompanionDragStartY + (event.rawY - dexCompanionDragDownRawY)
-                    applyDexCompanionDragPosition()
+                    val deltaX = event.rawX - dexCompanionDragDownRawX
+                    val deltaY = event.rawY - dexCompanionDragDownRawY
+                    if (!dexCompanionDraggedDuringTouch && (kotlin.math.abs(deltaX) > dpToPx(6) || kotlin.math.abs(deltaY) > dpToPx(6))) {
+                        dexCompanionDraggedDuringTouch = true
+                    }
+                    if (dexCompanionDraggedDuringTouch) {
+                        currentDexCompanionOffsetX = dexCompanionDragStartX + deltaX
+                        currentDexCompanionOffsetY = dexCompanionDragStartY + deltaY
+                        applyDexCompanionDragPosition()
+                    }
                     true
                 }
-                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_UP -> {
+                    if (dexCompanionDraggedDuringTouch) {
+                        applyDexCompanionDragPosition()
+                        persistHomeLook()
+                    } else {
+                        handleDexCompanionTap()
+                    }
+                    dexCompanionDraggedDuringTouch = false
+                    true
+                }
                 MotionEvent.ACTION_CANCEL -> {
-                    applyDexCompanionDragPosition()
-                    persistHomeLook()
+                    if (dexCompanionDraggedDuringTouch) {
+                        applyDexCompanionDragPosition()
+                        persistHomeLook()
+                    }
+                    dexCompanionDraggedDuringTouch = false
                     true
                 }
                 else -> false
@@ -3164,6 +3185,31 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 currentDexCompanionFaceStyle = DEX_COMPANION_FACE_CLASSIC
                 currentDexCompanionBubbleStyle = DEX_COMPANION_BUBBLE_BOLD
             }
+        }
+    }
+
+    private fun handleDexCompanionTap() {
+        if (binding.dexCompanionCard.visibility != View.VISIBLE) return
+        val message = when {
+            binding.dexCompanionIntroStrip.visibility == View.VISIBLE -> "You can drag me or tune my style below."
+            pendingAction != null -> "I have something ready for you below."
+            dexCompanionState == DEX_COMPANION_STATE_SLEEPING -> "Wake mode is resting right now."
+            else -> dexCompanionTapLine()
+        }
+        setDexCompanionState(DEX_COMPANION_STATE_EXCITED, bubbleOverride = message, revertAfterMs = 2600L)
+        if (binding.dexCompanionIntroStrip.visibility == View.VISIBLE || binding.themeCard.visibility == View.VISIBLE) {
+            binding.contentScrollView.post {
+                binding.contentScrollView.smoothScrollTo(0, binding.themeCard.top - dpToPx(16))
+            }
+        }
+    }
+
+    private fun dexCompanionTapLine(): String {
+        return when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> "Hey. Want to switch my vibe a little?"
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> "I am ready. Adjust anything you need."
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> "Want to tune my setup for focus?"
+            else -> "Want to fine-tune me a bit?"
         }
     }
 
