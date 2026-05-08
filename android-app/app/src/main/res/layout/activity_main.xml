@@ -2423,7 +2423,7 @@
                     android:layout_marginTop="6dp"
                     android:text="@string/permissions_summary"
                     android:textColor="@color/dex_text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -2439,7 +2439,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/permissions_account_access_label"
                         android:textColor="@android:color/white"
-                        android:textSize="14sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -2486,7 +2486,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/permissions_device_access_label"
                         android:textColor="@android:color/white"
-                        android:textSize="14sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -2564,7 +2564,7 @@
                     android:layout_marginTop="6dp"
                     android:text="@string/background_access_summary"
                     android:textColor="@color/dex_text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -2580,7 +2580,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/background_access_tools_label"
                         android:textColor="@android:color/white"
-                        android:textSize="14sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -2668,7 +2668,7 @@
                     android:layout_marginTop="6dp"
                     android:text="@string/call_monitor_summary"
                     android:textColor="@color/dex_text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <TextView
                     android:id="@+id/callMonitorStatus"
@@ -2772,7 +2772,7 @@
                     android:layout_marginTop="6dp"
                     android:text="@string/voice_summary"
                     android:textColor="@color/dex_text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <TextView
                     android:id="@+id/voiceStatus"
@@ -2849,7 +2849,7 @@
                     android:layout_marginTop="6dp"
                     android:text="@string/conversation_summary"
                     android:textColor="@color/dex_text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <TextView
                     android:id="@+id/conversationStatus"
@@ -2899,7 +2899,7 @@
                             android:layout_height="wrap_content"
                             android:text="@string/last_heard"
                             android:textColor="@android:color/white"
-                            android:textSize="14sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -2927,7 +2927,7 @@
                             android:layout_height="wrap_content"
                             android:text="@string/last_reply"
                             android:textColor="@android:color/white"
-                            android:textSize="14sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -2957,7 +2957,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/pending_action_title"
                         android:textColor="@android:color/white"
-                        android:textSize="14sp"
+                        android:textSize="13sp"
                         android:textStyle="bold" />
 
                     <TextView
