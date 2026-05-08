@@ -1116,6 +1116,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ?: lastIncomingNumber
             ?: getString(R.string.unknown_number_label)
         postCallEvent("message", "$caller: ${transcript.trim()}")
+        MainActivity.appendPersistentCallMessageLog(
+            context = this,
+            caller = caller,
+            message = transcript.trim()
+        )
         speakShortStatus(getString(R.string.call_message_saved, caller))
     }
 

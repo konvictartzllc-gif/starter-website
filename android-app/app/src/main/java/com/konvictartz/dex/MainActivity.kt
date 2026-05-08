@@ -583,6 +583,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onResume()
         clearStaleBackgroundState()
         refreshActivityLogFromPrefs()
+        refreshCallMessageLogFromPrefs()
         updateAndroidPermissionStatus()
         refreshCallMonitorState()
         autoStartWakeModeIfReady()
@@ -1471,6 +1472,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .remove(KEY_USER_NAME)
             .remove(KEY_ACCESS_TYPE)
             .remove(KEY_ACTIVITY_LOG)
+            .remove(KEY_CALL_MESSAGE_LOG)
             .putBoolean(KEY_LEARNING_REMINDER_ENABLED, false)
             .putString(KEY_LEARNING_REMINDER_TIME, "")
             .putBoolean(KEY_BACKGROUND_SERVICE_ENABLED, false)
@@ -1489,6 +1491,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.safetyDiagnosticsValue.text = ""
         binding.aliasSummaryValue.text = ""
         binding.activityLogValue.text = getString(R.string.activity_log_empty)
+        binding.callMessageLogValue.text = getString(R.string.call_message_log_empty)
         binding.learningLessonPreview.text = ""
         binding.learningQuizPreview.text = ""
         updatePendingActionUi()
@@ -6174,6 +6177,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             else activityLogEntries.joinToString("\n")
     }
 
+    private fun refreshCallMessageLogFromPrefs() {
+        if (!::binding.isInitialized) return
+        val messages = readPersistentCallMessageLog(this)
+        binding.callMessageLogValue.text =
+            if (messages.isEmpty()) getString(R.string.call_message_log_empty)
+            else messages.joinToString("\n")
+    }
+
     private fun updatePermissions(key: String, enabled: Boolean) {
         val token = authToken ?: return
         val serverUrl = currentServerUrl()
@@ -10488,6 +10499,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_PENDING_NOTIFICATION_TITLE = "pending_notification_title"
         const val KEY_PENDING_NOTIFICATION_TEXT = "pending_notification_text"
         const val KEY_ACTIVITY_LOG = "activity_log"
+        const val KEY_CALL_MESSAGE_LOG = "call_message_log"
         const val KEY_LAST_SMS_EVENT_SIGNATURE = "last_sms_event_signature"
         const val KEY_LAST_SMS_EVENT_AT = "last_sms_event_at"
         const val KEY_EMERGENCY_CONTACT = "emergency_contact"
@@ -10695,6 +10707,42 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         fun readPersistentActivityLog(context: Context): List<String> {
             val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getString(KEY_ACTIVITY_LOG, null)
+                .orEmpty()
+            if (raw.isBlank()) return emptyList()
+            return runCatching {
+                val entries = JSONArray(raw)
+                buildList {
+                    for (index in 0 until entries.length()) {
+                        val entry = entries.optString(index).trim()
+                        if (entry.isNotBlank()) add(entry)
+                    }
+                }
+            }.getOrElse { emptyList() }
+        }
+
+        fun appendPersistentCallMessageLog(context: Context, caller: String, message: String) {
+            val safeCaller = caller.trim().ifBlank { context.getString(R.string.unknown_number_label) }
+            val safeMessage = message.trim()
+            if (safeMessage.isBlank()) return
+            val time = LocalTime.now().format(DateTimeFormatter.ofPattern("h:mm a", Locale.US))
+            val entry = "[$time] " + context.getString(R.string.call_message_log_entry, safeCaller, safeMessage)
+            val entries = ArrayDeque(readPersistentCallMessageLog(context))
+            entries.addFirst(entry)
+            while (entries.size > 6) {
+                entries.removeLast()
+            }
+            val payload = JSONArray().apply {
+                entries.forEach { put(it) }
+            }
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_CALL_MESSAGE_LOG, payload.toString())
+                .apply()
+        }
+
+        fun readPersistentCallMessageLog(context: Context): List<String> {
+            val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_CALL_MESSAGE_LOG, null)
                 .orEmpty()
             if (raw.isBlank()) return emptyList()
             return runCatching {

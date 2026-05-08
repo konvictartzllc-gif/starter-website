@@ -683,6 +683,8 @@
     <string name="call_monitor_summary">When phone access is enabled and Android permissions are granted, Dex can watch for calls, block likely spam, and answer for you to take a message when the outside-the-app call rules are on.</string>
     <string name="call_monitor_waiting">Call monitoring is waiting for login, backend phone permission, and Android runtime access.</string>
     <string name="call_monitor_active">Dex call monitoring is active and ready to help with allowed calls on this device.</string>
+    <string name="call_message_log_title">Saved caller messages</string>
+    <string name="call_message_log_empty">No caller messages saved yet.</string>
     <string name="auto_answer_known_contacts">Auto-answer saved contacts and let Dex take a message outside the app</string>
     <string name="auto_answer_any_non_spam_calls">Auto-answer any non-spam caller and let Dex take a message outside the app</string>
     <string name="auto_decline_spam_calls">Auto-decline likely spam calls</string>
@@ -712,6 +714,7 @@
     <string name="call_speaker_unavailable">There is no active call for me to put on speaker.</string>
     <string name="call_message_unavailable">There is no ringing call for me to take a message from right now.</string>
     <string name="call_message_taking">Dex is answering for you and asking the caller for their message.</string>
+    <string name="call_message_log_entry">%1$s said: %2$s</string>
     <string name="call_message_taken">I declined the call from %1$s, saved a follow-up task, and drafted a text so you can ask for the message.</string>
     <string name="call_message_taken_no_number">I declined the call from %1$s and saved a follow-up task for you.</string>
     <string name="call_message_task_title">Follow up with %1$s</string>
