@@ -102,6 +102,7 @@
     <string name="home_style_picker_failed">Dex could not open your image picker right now.</string>
     <string name="learning_center_title">Language learning</string>
     <string name="learning_center_summary">Set your language profile, pull a fresh lesson, and quiz yourself right from your dashboard.</string>
+    <string name="learning_center_snapshot">Profile snapshot</string>
     <string name="learning_language_hint">Language to learn</string>
     <string name="learning_level_hint">Level (beginner, intermediate, advanced)</string>
     <string name="learning_focus_hint">Focus (conversation, grammar, travel)</string>
@@ -126,6 +127,7 @@
     <string name="learning_quiz_spoken_intro">I built your quiz, %1$s. Here is the first question: %2$s</string>
     <string name="safety_profile_title">Emotions and safety</string>
     <string name="safety_profile_summary">Tell Dex how to support you when you are overwhelmed, what grounding style feels best, and whether a trusted contact can be notified in an emergency.</string>
+    <string name="safety_snapshot_title">Safety profile</string>
     <string name="safety_profile_default">Dex can support you with a calm tone and gentle grounding when you are having a hard moment.</string>
     <string name="safety_profile_loaded">Comfort: %1$s | Grounding: %2$s | Trusted contact: %3$s</string>
     <string name="safety_contact_hint">Trusted emergency contact (phone or email)</string>
