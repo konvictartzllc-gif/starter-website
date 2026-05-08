@@ -336,6 +336,12 @@
     <string name="dex_games_challenge_done">Daily challenge complete: you already cleared %1$s today.</string>
     <string name="dex_games_challenge_reward">Daily challenge cleared: %1$s is done for today.</string>
     <string name="dex_games_challenge_reward_streak">Daily challenge cleared: %1$s is done for today, and your streak is now %2$d.</string>
+    <string name="dex_games_unlock_line">Challenge clears %1$d | Reward tier %2$s</string>
+    <string name="dex_games_unlock_tier_new">New player</string>
+    <string name="dex_games_unlock_tier_spark">Spark tier</string>
+    <string name="dex_games_unlock_tier_star">Star tier</string>
+    <string name="dex_games_unlock_tier_legend">Legend tier</string>
+    <string name="dex_games_unlock_reward">Unlock reward: Dex just opened %1$s energy for your play profile.</string>
     <string name="dex_games_answer_hint">Your answer</string>
     <string name="dex_game_submit">Submit</string>
     <string name="dex_game_share_answer">Share answer</string>

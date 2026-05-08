@@ -356,6 +356,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexMemoryPlays = 0
     private var dexWouldYouRatherPlays = 0
     private var dexGamesChallengeCompletedDate = ""
+    private var dexGamesChallengeClears = 0
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -1313,6 +1314,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexMemoryPlays = prefs.getInt(KEY_DEX_GAMES_MEMORY_PLAYS, 0)
         dexWouldYouRatherPlays = prefs.getInt(KEY_DEX_GAMES_WYR_PLAYS, 0)
         dexGamesChallengeCompletedDate = prefs.getString(KEY_DEX_GAMES_CHALLENGE_DONE_DATE, "").orEmpty()
+        dexGamesChallengeClears = prefs.getInt(KEY_DEX_GAMES_CHALLENGE_CLEARS, 0)
         updateAdvancedStyleUi(currentThemePreset == "custom")
         updateDexCompanionControls()
         loadDashboardSections()
@@ -3034,6 +3036,23 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun dexGamesUnlockTier(): String {
+        return when {
+            dexGamesChallengeClears >= 20 -> getString(R.string.dex_games_unlock_tier_legend)
+            dexGamesChallengeClears >= 10 -> getString(R.string.dex_games_unlock_tier_star)
+            dexGamesChallengeClears >= 5 -> getString(R.string.dex_games_unlock_tier_spark)
+            else -> getString(R.string.dex_games_unlock_tier_new)
+        }
+    }
+
+    private fun dexGamesUnlockLine(): String {
+        return getString(
+            R.string.dex_games_unlock_line,
+            dexGamesChallengeClears,
+            dexGamesUnlockTier()
+        )
+    }
+
     private fun dexGamesProfileLine(): String {
         val favorite = favoriteDexMiniGameLabel()
         return if (favorite.isNullOrBlank()) {
@@ -3044,7 +3063,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun dexGamesStatusSummary(base: String): String {
-        return "$base\n${dexGamesScoreLine()}\n${dexGamesProfileLine()}\n${dexGamesChallengeLine()}"
+        return "$base\n${dexGamesScoreLine()}\n${dexGamesProfileLine()}\n${dexGamesChallengeLine()}\n${dexGamesUnlockLine()}"
     }
 
     private fun saveDexGameStats() {
@@ -3060,6 +3079,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putInt(KEY_DEX_GAMES_MEMORY_PLAYS, dexMemoryPlays)
             .putInt(KEY_DEX_GAMES_WYR_PLAYS, dexWouldYouRatherPlays)
             .putString(KEY_DEX_GAMES_CHALLENGE_DONE_DATE, dexGamesChallengeCompletedDate)
+            .putInt(KEY_DEX_GAMES_CHALLENGE_CLEARS, dexGamesChallengeClears)
             .apply()
     }
 
@@ -3084,11 +3104,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun dexGamesUnlockRewardLine(): String? {
+        return when (dexGamesChallengeClears) {
+            5 -> getString(R.string.dex_games_unlock_reward, getString(R.string.dex_games_unlock_tier_spark))
+            10 -> getString(R.string.dex_games_unlock_reward, getString(R.string.dex_games_unlock_tier_star))
+            20 -> getString(R.string.dex_games_unlock_reward, getString(R.string.dex_games_unlock_tier_legend))
+            else -> null
+        }
+    }
+
     private fun recordDexChallengeCompletion(type: DexMiniGameType): String? {
         if (type != todaysDexChallengeGame() || isTodayDexChallengeComplete()) return null
         dexGamesChallengeCompletedDate = LocalDate.now().toString()
+        dexGamesChallengeClears += 1
         saveDexGameStats()
-        return dexGamesChallengeRewardLine(type)
+        return listOfNotNull(
+            dexGamesChallengeRewardLine(type),
+            dexGamesUnlockRewardLine()
+        ).joinToString(" ")
     }
 
     private fun recordDexGameResult(correct: Boolean, countsAsScoredRound: Boolean = true) {
@@ -9689,6 +9722,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_GAMES_MEMORY_PLAYS = "dex_games_memory_plays"
         const val KEY_DEX_GAMES_WYR_PLAYS = "dex_games_wyr_plays"
         const val KEY_DEX_GAMES_CHALLENGE_DONE_DATE = "dex_games_challenge_done_date"
+        const val KEY_DEX_GAMES_CHALLENGE_CLEARS = "dex_games_challenge_clears"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"
