@@ -3373,19 +3373,49 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun companionBubbleForState(state: String): String {
-        val base = when (state) {
-            DEX_COMPANION_STATE_LISTENING -> getString(R.string.dex_companion_bubble_listening)
-            DEX_COMPANION_STATE_EXCITED -> getString(R.string.dex_companion_bubble_excited)
-            DEX_COMPANION_STATE_TALKING -> getString(R.string.dex_companion_bubble_talking)
-            DEX_COMPANION_STATE_PENDING -> getString(R.string.dex_companion_bubble_pending)
-            DEX_COMPANION_STATE_ALERT -> getString(R.string.dex_companion_bubble_alert)
-            else -> when (currentDexCompanionMood.lowercase(Locale.US)) {
-                DEX_COMPANION_MOOD_PLAYFUL -> getString(R.string.dex_companion_bubble_playful)
-                DEX_COMPANION_MOOD_FOCUS -> getString(R.string.dex_companion_bubble_focus)
-                else -> getString(R.string.dex_companion_bubble_calm)
+        val base = companionBaseLineForState(state)
+        return companionVoiceCopy(base)
+    }
+
+    private fun companionBaseLineForState(state: String): String {
+        return when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> when (state) {
+                DEX_COMPANION_STATE_LISTENING -> "Tell me."
+                DEX_COMPANION_STATE_EXCITED -> "Okay, lets go."
+                DEX_COMPANION_STATE_TALKING -> "I am with you."
+                DEX_COMPANION_STATE_PENDING -> "I have it ready."
+                DEX_COMPANION_STATE_ALERT -> "Hey, this needs you."
+                else -> "I am right here."
+            }
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> when (state) {
+                DEX_COMPANION_STATE_LISTENING -> "I am listening carefully."
+                DEX_COMPANION_STATE_EXCITED -> "We are moving now."
+                DEX_COMPANION_STATE_TALKING -> "Stay with me."
+                DEX_COMPANION_STATE_PENDING -> "This is prepared."
+                DEX_COMPANION_STATE_ALERT -> "Attention needed."
+                else -> "I am here with you."
+            }
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> when (state) {
+                DEX_COMPANION_STATE_LISTENING -> "Go ahead."
+                DEX_COMPANION_STATE_EXCITED -> "Nice, lets work."
+                DEX_COMPANION_STATE_TALKING -> "Working through it."
+                DEX_COMPANION_STATE_PENDING -> "This is ready to review."
+                DEX_COMPANION_STATE_ALERT -> "Quick check."
+                else -> "Ready when you are."
+            }
+            else -> when (state) {
+                DEX_COMPANION_STATE_LISTENING -> "I am listening."
+                DEX_COMPANION_STATE_EXCITED -> "Okay, lets do it."
+                DEX_COMPANION_STATE_TALKING -> "Talking it through."
+                DEX_COMPANION_STATE_PENDING -> "I have this ready."
+                DEX_COMPANION_STATE_ALERT -> "Something needs you."
+                else -> when (currentDexCompanionMood.lowercase(Locale.US)) {
+                    DEX_COMPANION_MOOD_PLAYFUL -> getString(R.string.dex_companion_bubble_playful)
+                    DEX_COMPANION_MOOD_FOCUS -> getString(R.string.dex_companion_bubble_focus)
+                    else -> getString(R.string.dex_companion_bubble_calm)
+                }
             }
         }
-        return companionVoiceCopy(base)
     }
 
     private fun companionVoiceCopy(base: String): String {
