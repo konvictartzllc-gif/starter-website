@@ -151,6 +151,7 @@
     <string name="home_style_picker_failed">Dex could not open your image picker right now.</string>
     <string name="learning_center_title">Language learning</string>
     <string name="learning_center_summary">Set your language profile, pull a fresh lesson, and quiz yourself right from your dashboard.</string>
+    <string name="learning_snapshot_tag">Learning rhythm</string>
     <string name="learning_center_snapshot">Profile snapshot</string>
     <string name="learning_language_hint">Language to learn</string>
     <string name="learning_level_hint">Level (beginner, intermediate, advanced)</string>
@@ -187,12 +188,16 @@
     <string name="safety_profile_default">Dex can support you with a calm tone and gentle grounding when you are having a hard moment.</string>
     <string name="safety_profile_loaded">Comfort: %1$s | Grounding: %2$s | Trusted contact: %3$s</string>
     <string name="safety_preferences_label">Support preferences</string>
+    <string name="safety_preferences_tag">Support setup</string>
     <string name="safety_preferences_summary">Set the contact and support style Dex should use when things feel heavy.</string>
     <string name="safety_emergency_settings_label">Emergency settings</string>
+    <string name="safety_emergency_settings_tag">Response rules</string>
     <string name="safety_emergency_settings_summary">Choose whether Dex can notify a trusted contact and keep checking in after a distress moment.</string>
     <string name="safety_tools_label">Safety tools</string>
+    <string name="safety_tools_tag">Practice tools</string>
     <string name="safety_tools_summary">Run a safe practice check-in, preview the emergency plan, or test the trusted-contact text path.</string>
     <string name="safety_diagnostics_label">Safety diagnostics</string>
+    <string name="safety_diagnostics_tag">Signal check</string>
     <string name="safety_diagnostics_summary">Use these details to confirm the trusted-contact setup and last SMS result on this phone.</string>
     <string name="safety_contact_hint">Trusted emergency contact (phone or email)</string>
     <string name="safety_comfort_hint">Comfort style (calm, direct, faith)</string>
@@ -432,6 +437,7 @@
     <string name="diagnostic_missing">missing</string>
     <string name="diagnostic_none">none yet</string>
     <string name="alias_manager_title">Contact voice aliases</string>
+    <string name="alias_manager_tag">Name tuning</string>
     <string name="alias_manager_summary">Teach Dex nicknames and spoken shortcuts for your saved contacts.</string>
     <string name="alias_name_hint">Alias to say</string>
     <string name="alias_contact_hint">Saved contact name</string>
@@ -442,6 +448,7 @@
     <string name="alias_summary_none">No local aliases saved yet.</string>
     <string name="alias_clear_done">Dex cleared your local aliases.</string>
     <string name="activity_log_title">Recent Dex activity</string>
+    <string name="activity_log_tag">Recent signals</string>
     <string name="activity_log_empty">No recent safety or call events yet.</string>
     <string name="email_draft_opened">I opened the email draft for %1$s.</string>
     <string name="call_direct_started">Calling %1$s now.</string>
