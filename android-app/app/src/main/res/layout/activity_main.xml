@@ -510,6 +510,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
                     android:background="@drawable/dashboard_metric_surface"
+                    android:minHeight="92dp"
                     android:orientation="vertical"
                     android:padding="14dp">
 
@@ -542,6 +543,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="94dp"
                         android:orientation="vertical"
                         android:padding="14dp">
 
@@ -557,9 +559,9 @@
                             android:id="@+id/userDashboardChatCount"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:textColor="@android:color/white"
-                            android:textSize="16sp"
+                            android:textSize="17sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -569,6 +571,7 @@
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="94dp"
                         android:orientation="vertical"
                         android:padding="14dp">
 
@@ -584,9 +587,9 @@
                             android:id="@+id/userDashboardLessonCount"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:textColor="@android:color/white"
-                            android:textSize="16sp"
+                            android:textSize="17sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
@@ -596,6 +599,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:background="@drawable/dashboard_metric_surface"
+                    android:minHeight="94dp"
                     android:orientation="vertical"
                     android:padding="14dp">
 
@@ -611,9 +615,9 @@
                         android:id="@+id/userDashboardQuizScore"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="6dp"
                         android:textColor="@android:color/white"
-                        android:textSize="16sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
@@ -690,6 +694,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
                     android:background="@drawable/dashboard_metric_surface"
+                    android:minHeight="92dp"
                     android:orientation="vertical"
                     android:padding="14dp">
 
@@ -888,6 +893,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
                     android:background="@drawable/dashboard_metric_surface"
+                    android:minHeight="92dp"
                     android:orientation="vertical"
                     android:padding="14dp">
 
@@ -1596,6 +1602,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="94dp"
                         android:orientation="vertical"
                         android:padding="14dp">
 
@@ -1611,9 +1618,9 @@
                             android:id="@+id/affiliatePromoCode"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:textColor="@android:color/white"
-                            android:textSize="15sp"
+                            android:textSize="16sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -1623,6 +1630,7 @@
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="94dp"
                         android:orientation="vertical"
                         android:padding="14dp">
 
@@ -1638,9 +1646,9 @@
                             android:id="@+id/affiliateEarnings"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:textColor="@android:color/white"
-                            android:textSize="15sp"
+                            android:textSize="16sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
@@ -1656,6 +1664,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="94dp"
                         android:orientation="vertical"
                         android:padding="14dp">
 
@@ -1671,9 +1680,9 @@
                             android:id="@+id/affiliateSignups"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:textColor="@android:color/white"
-                            android:textSize="15sp"
+                            android:textSize="16sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -1683,6 +1692,7 @@
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="94dp"
                         android:orientation="vertical"
                         android:padding="14dp">
 
@@ -1698,9 +1708,9 @@
                             android:id="@+id/affiliatePaidSubs"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:textColor="@android:color/white"
-                            android:textSize="15sp"
+                            android:textSize="16sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
@@ -1841,6 +1851,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="94dp"
                         android:orientation="vertical"
                         android:padding="14dp">
 
@@ -1856,9 +1867,9 @@
                             android:id="@+id/adminBackendValue"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:textColor="@android:color/white"
-                            android:textSize="14sp"
+                            android:textSize="15sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -1868,6 +1879,7 @@
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:background="@drawable/dashboard_metric_surface"
+                        android:minHeight="94dp"
                         android:orientation="vertical"
                         android:padding="14dp">
 
@@ -1883,9 +1895,9 @@
                             android:id="@+id/adminStatsValue"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:textColor="@android:color/white"
-                            android:textSize="14sp"
+                            android:textSize="15sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
