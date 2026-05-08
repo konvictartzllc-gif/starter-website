@@ -568,7 +568,7 @@
     <string name="wake_mode_replying">Dex is replying.</string>
     <string name="wake_mode_fallback_reply">I had trouble reaching the Dex chat service just now.</string>
     <string name="wake_mode_command_retry">I missed that. Go ahead and say your question again.</string>
-    <string name="local_emergency_reply">Hey, I hear you and I want you to know you matter. Please call or text 988 right now. If you are in immediate danger, call 911 or your local emergency number. You are not alone.</string>
+    <string name="local_emergency_reply">%1$s, I hear you and I want you to know you matter. Please call or text 988 right now. If you are in immediate danger, call 911 or your local emergency number. You are not alone.</string>
     <string name="wake_mode_detected">Wake phrase detected.</string>
     <string name="notification_prompt">You just got a notification from %1$s. Do you want me to read it?</string>
     <string name="notification_prompt_title">Dex heard %1$s</string>

@@ -2675,6 +2675,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return getString(R.string.dex_user_fallback_name)
     }
 
+    private fun buildEmergencySpokenReply(baseReply: String? = null): String {
+        val assistedPersonName = resolveEmergencyPersonName()
+        val reply = baseReply?.trim().orEmpty()
+        if (reply.isBlank()) {
+            return getString(R.string.local_emergency_reply, assistedPersonName)
+        }
+        if (reply.contains(assistedPersonName, ignoreCase = true)) {
+            return reply
+        }
+        return "$assistedPersonName, $reply"
+    }
+
     private fun requestDailyLesson() {
         val token = authToken ?: return
         val serverUrl = currentServerUrl()
@@ -7723,7 +7735,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         val reply = listOfNotNull(
-            getString(R.string.local_emergency_reply),
+            buildEmergencySpokenReply(),
             sendLocalEmergencySmsIfNeeded(null, message, forceEmergency = true)
         ).joinToString(" ")
 
@@ -9179,8 +9191,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 val localEmergency = isHighRiskEmergencyMessage(message)
                 val serverEmergency = response.optBoolean("emergency", false)
                 val reply = when {
-                    serverEmergency -> response.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
-                    localEmergency -> getString(R.string.local_emergency_reply)
+                    serverEmergency -> buildEmergencySpokenReply(response.optString("reply"))
+                    localEmergency -> buildEmergencySpokenReply()
                     else -> response.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
                 }
                 maybeScheduleSafetyCheckIn(response, forceEmergency = localEmergency)
@@ -9197,7 +9209,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 val localEmergency = isHighRiskEmergencyMessage(message)
                 val spokenReply = if (localEmergency) {
                     listOfNotNull(
-                        getString(R.string.local_emergency_reply),
+                        buildEmergencySpokenReply(),
                         sendLocalEmergencySmsIfNeeded(null, message, forceEmergency = true)
                     ).joinToString(" ")
                 } else {
