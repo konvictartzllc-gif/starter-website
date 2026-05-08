@@ -1246,6 +1246,36 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         else -> null
     }
 
+    private fun hintLead(roleKey: String, tone: HintTone): String = when (roleKey) {
+        "admin" -> when (tone) {
+            HintTone.NEXT_STEP -> getString(R.string.hint_lead_admin_next)
+            HintTone.READY -> getString(R.string.hint_lead_admin_ready)
+            HintTone.HEALTHY -> getString(R.string.hint_lead_admin_healthy)
+        }
+        "affiliate" -> when (tone) {
+            HintTone.NEXT_STEP -> getString(R.string.hint_lead_affiliate_next)
+            HintTone.READY -> getString(R.string.hint_lead_affiliate_ready)
+            HintTone.HEALTHY -> getString(R.string.hint_lead_affiliate_healthy)
+        }
+        else -> when (tone) {
+            HintTone.NEXT_STEP -> getString(R.string.hint_lead_user_next)
+            HintTone.READY -> getString(R.string.hint_lead_user_ready)
+            HintTone.HEALTHY -> getString(R.string.hint_lead_user_healthy)
+        }
+    }
+
+    private fun sectionChipTint(roleKey: String, isLoading: Boolean): Int = when (roleKey) {
+        "admin" -> getColorCompat(if (isLoading) R.color.dex_admin_readout else R.color.dex_admin_chip_tint)
+        "affiliate" -> getColorCompat(if (isLoading) R.color.dex_affiliate_readout else R.color.dex_affiliate_chip_tint)
+        else -> getColorCompat(if (isLoading) R.color.dex_user_readout else R.color.dex_user_chip_tint)
+    }
+
+    private fun sectionStatusCopy(roleKey: String, isLoading: Boolean): String = when (roleKey) {
+        "admin" -> getString(if (isLoading) R.string.dashboard_status_loading_admin else R.string.dashboard_status_live_admin)
+        "affiliate" -> getString(if (isLoading) R.string.dashboard_status_loading_affiliate else R.string.dashboard_status_live_affiliate)
+        else -> getString(if (isLoading) R.string.dashboard_status_loading_user else R.string.dashboard_status_live_user)
+    }
+
     private fun setHintBand(view: TextView, message: String?, tone: HintTone = HintTone.NEXT_STEP) {
         val text = message?.trim().orEmpty()
         view.text = text
@@ -1253,6 +1283,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             view.visibility = View.GONE
             return
         }
+        val roleKey = currentUserRole.lowercase(Locale.US)
+        view.text = "${hintLead(roleKey, tone)}\n$text"
         val (backgroundColor, textColor) = when (tone) {
             HintTone.READY -> R.color.dex_hint_ready_bg to R.color.dex_hint_ready_text
             HintTone.HEALTHY -> R.color.dex_hint_healthy_bg to R.color.dex_hint_healthy_text
@@ -1330,8 +1362,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun beginSectionRefresh(label: TextView, card: MaterialCardView, roleKey: String) {
-        label.text = getString(R.string.dashboard_section_status_loading)
+        label.text = sectionStatusCopy(roleKey, isLoading = true)
         label.setTextColor(sectionSignalColor(roleKey))
+        label.backgroundTintList = ColorStateList.valueOf(sectionChipTint(roleKey, isLoading = true))
         label.alpha = 1f
         card.strokeColor = sectionSignalColor(roleKey)
         card.strokeWidth = strokeWidthDp(2)
@@ -1342,8 +1375,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         label.clearAnimation()
         label.animate().cancel()
         label.alpha = 0.84f
-        label.text = getString(R.string.dashboard_section_status_live)
+        label.text = sectionStatusCopy(roleKey, isLoading = false)
         label.setTextColor(sectionLiveColor(roleKey))
+        label.backgroundTintList = ColorStateList.valueOf(sectionChipTint(roleKey, isLoading = false))
         card.strokeColor = sectionLiveColor(roleKey)
         card.strokeWidth = strokeWidthDp(1)
     }
