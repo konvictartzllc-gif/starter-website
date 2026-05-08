@@ -3440,7 +3440,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return when (state) {
             DEX_COMPANION_STATE_EXCITED -> -2f
             DEX_COMPANION_STATE_PENDING -> -1f
-            else -> if (currentDexCompanionMood.lowercase(Locale.US) == DEX_COMPANION_MOOD_PLAYFUL) -1.5f else 0f
+            else -> {
+                val idleProfile = dexCompanionPersonalityIdleProfile()
+                if (state == DEX_COMPANION_STATE_IDLE) idleProfile.bubbleRotation
+                else if (currentDexCompanionMood.lowercase(Locale.US) == DEX_COMPANION_MOOD_PLAYFUL) -1.5f
+                else 0f
+            }
         }
     }
 
@@ -3449,7 +3454,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DEX_COMPANION_STATE_LISTENING -> 1.25f
             DEX_COMPANION_STATE_EXCITED -> 1.15f
             DEX_COMPANION_STATE_ALERT -> 0.85f
-            else -> 1f
+            else -> if (state == DEX_COMPANION_STATE_IDLE) dexCompanionPersonalityIdleProfile().eyeScale else 1f
         }
     }
 
@@ -3457,7 +3462,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return when (state) {
             DEX_COMPANION_STATE_EXCITED -> 1.05f
             DEX_COMPANION_STATE_PENDING -> 1.03f
-            else -> 1f
+            else -> if (state == DEX_COMPANION_STATE_IDLE) dexCompanionPersonalityIdleProfile().faceScale else 1f
         }
     }
 
@@ -3466,6 +3471,57 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val card: Int,
         val faceBase: Int,
     )
+
+    private data class DexCompanionIdleProfile(
+        val bobDistanceDp: Int,
+        val durationMs: Long,
+        val labelShiftDp: Int,
+        val bubbleRotation: Float,
+        val eyeScale: Float,
+        val faceScale: Float,
+        val blinkDelayMs: Long,
+    )
+
+    private fun dexCompanionPersonalityIdleProfile(): DexCompanionIdleProfile {
+        return when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> DexCompanionIdleProfile(
+                bobDistanceDp = 9,
+                durationMs = 1550L,
+                labelShiftDp = 3,
+                bubbleRotation = -2.2f,
+                eyeScale = 1.08f,
+                faceScale = 1.04f,
+                blinkDelayMs = 1600L
+            )
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> DexCompanionIdleProfile(
+                bobDistanceDp = 3,
+                durationMs = 2550L,
+                labelShiftDp = 0,
+                bubbleRotation = 0f,
+                eyeScale = 0.96f,
+                faceScale = 1.01f,
+                blinkDelayMs = 3400L
+            )
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> DexCompanionIdleProfile(
+                bobDistanceDp = 4,
+                durationMs = 2350L,
+                labelShiftDp = 1,
+                bubbleRotation = -0.5f,
+                eyeScale = 1.02f,
+                faceScale = 1.02f,
+                blinkDelayMs = 2800L
+            )
+            else -> DexCompanionIdleProfile(
+                bobDistanceDp = 5,
+                durationMs = 1950L,
+                labelShiftDp = 1,
+                bubbleRotation = -0.8f,
+                eyeScale = 1f,
+                faceScale = 1.03f,
+                blinkDelayMs = 2200L
+            )
+        }
+    }
 
     private fun dexCompanionSkinColors(): DexCompanionSkinColors {
         return when (currentDexCompanionSkin.lowercase(Locale.US)) {
@@ -3495,6 +3551,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun startDexCompanionAnimation() {
         stopDexCompanionAnimation()
+        val idleProfile = dexCompanionPersonalityIdleProfile()
         val motionKey = if (dexCompanionState == DEX_COMPANION_STATE_EXCITED || dexCompanionState == DEX_COMPANION_STATE_PENDING) {
             DEX_COMPANION_MOOD_PLAYFUL
         } else if (dexCompanionState == DEX_COMPANION_STATE_ALERT || dexCompanionState == DEX_COMPANION_STATE_LISTENING) {
@@ -3503,15 +3560,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             currentDexCompanionMood.lowercase(Locale.US)
         }
         val bobDistance = dpToPx(
-            when (motionKey) {
-                DEX_COMPANION_MOOD_PLAYFUL -> 8
-                DEX_COMPANION_MOOD_FOCUS -> 4
+            when {
+                dexCompanionState == DEX_COMPANION_STATE_IDLE -> idleProfile.bobDistanceDp
+                motionKey == DEX_COMPANION_MOOD_PLAYFUL -> 8
+                motionKey == DEX_COMPANION_MOOD_FOCUS -> 4
                 else -> 6
             }
         ).toFloat()
-        val duration = when (motionKey) {
-            DEX_COMPANION_MOOD_PLAYFUL -> 1700L
-            DEX_COMPANION_MOOD_FOCUS -> 2400L
+        val duration = when {
+            dexCompanionState == DEX_COMPANION_STATE_IDLE -> idleProfile.durationMs
+            motionKey == DEX_COMPANION_MOOD_PLAYFUL -> 1700L
+            motionKey == DEX_COMPANION_MOOD_FOCUS -> 2400L
             else -> 2100L
         }
         val faceAnimator = ObjectAnimator.ofFloat(binding.dexCompanionFace, View.TRANSLATION_Y, 0f, -bobDistance, 0f).apply {
@@ -3534,7 +3593,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.dexCompanionLabel,
             View.TRANSLATION_X,
             0f,
-            if (motionKey == DEX_COMPANION_MOOD_PLAYFUL) dpToPx(2).toFloat() else 0f,
+            when {
+                dexCompanionState == DEX_COMPANION_STATE_IDLE -> dpToPx(idleProfile.labelShiftDp).toFloat()
+                motionKey == DEX_COMPANION_MOOD_PLAYFUL -> dpToPx(2).toFloat()
+                else -> 0f
+            },
             0f
         ).apply {
             this.duration = duration
@@ -3559,9 +3622,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun scheduleDexCompanionBlink() {
         if (dexCompanionBlinkScheduled || binding.dexCompanionCard.visibility != View.VISIBLE) return
-        val delay = when (currentDexCompanionMood.lowercase(Locale.US)) {
-            DEX_COMPANION_MOOD_PLAYFUL -> 1800L
-            DEX_COMPANION_MOOD_FOCUS -> 3200L
+        val delay = when {
+            dexCompanionState == DEX_COMPANION_STATE_IDLE -> dexCompanionPersonalityIdleProfile().blinkDelayMs
+            currentDexCompanionMood.lowercase(Locale.US) == DEX_COMPANION_MOOD_PLAYFUL -> 1800L
+            currentDexCompanionMood.lowercase(Locale.US) == DEX_COMPANION_MOOD_FOCUS -> 3200L
             else -> 2500L
         }
         dexCompanionBlinkScheduled = true
