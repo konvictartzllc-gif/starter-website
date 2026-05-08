@@ -278,6 +278,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionVoice: String = DEX_COMPANION_VOICE_SUPPORTIVE
     private var currentDexCompanionPersonality: String = DEX_COMPANION_PERSONALITY_COACH
     private var dexCompanionIntroDismissed = false
+    private var dexCompanionIntroGreeted = false
     private var currentDexCompanionOffsetX = 0f
     private var currentDexCompanionOffsetY = 0f
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
@@ -1170,6 +1171,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .orEmpty()
             .ifBlank { DEX_COMPANION_PERSONALITY_COACH }
         dexCompanionIntroDismissed = prefs.getBoolean(KEY_DEX_COMPANION_INTRO_DISMISSED, false)
+        dexCompanionIntroGreeted = prefs.getBoolean(KEY_DEX_COMPANION_INTRO_GREETED, false)
         currentDexCompanionOffsetX = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_X, 0f)
         currentDexCompanionOffsetY = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_Y, 0f)
         updateAdvancedStyleUi(currentThemePreset == "custom")
@@ -3078,6 +3080,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_DEX_COMPANION_VOICE, currentDexCompanionVoice)
             .putString(KEY_DEX_COMPANION_PERSONALITY, currentDexCompanionPersonality)
             .putBoolean(KEY_DEX_COMPANION_INTRO_DISMISSED, dexCompanionIntroDismissed)
+            .putBoolean(KEY_DEX_COMPANION_INTRO_GREETED, dexCompanionIntroGreeted)
             .putFloat(KEY_DEX_COMPANION_OFFSET_X, currentDexCompanionOffsetX)
             .putFloat(KEY_DEX_COMPANION_OFFSET_Y, currentDexCompanionOffsetY)
             .commit()
@@ -3097,6 +3100,34 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 !currentUserRole.equals("admin", ignoreCase = true) &&
                 !dexCompanionIntroDismissed
         binding.dexCompanionIntroStrip.visibility = if (shouldShowIntro) View.VISIBLE else View.GONE
+        maybeShowDexCompanionIntroGreeting(shouldShowIntro)
+    }
+
+    private fun maybeShowDexCompanionIntroGreeting(showingIntro: Boolean) {
+        val canGreet =
+            showingIntro &&
+                currentDexCompanionVisible &&
+                !dexCompanionIntroGreeted &&
+                binding.dexCompanionCard.visibility == View.VISIBLE
+        if (!canGreet) return
+        dexCompanionIntroGreeted = true
+        dexCompanionBubbleOverride = dexCompanionIntroGreetingLine()
+        dexCompanionState = DEX_COMPANION_STATE_EXCITED
+        applyDexCompanionUi()
+        playDexCompanionEventAnimation(DEX_COMPANION_STATE_EXCITED)
+        mainHandler.removeCallbacks(dexCompanionStateResetRunnable)
+        mainHandler.postDelayed(dexCompanionStateResetRunnable, 3600L)
+        persistHomeLook()
+    }
+
+    private fun dexCompanionIntroGreetingLine(): String {
+        val name = currentDexCompanionName.ifBlank { "Dex" }
+        return when (currentDexCompanionPersonality.lowercase(Locale.US)) {
+            DEX_COMPANION_PERSONALITY_BESTIE -> "$name is here. Drag me around and make me cute."
+            DEX_COMPANION_PERSONALITY_GUARDIAN -> "$name is here. Place me where you want quick support."
+            DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> "$name is here. Set me up and lets build your space."
+            else -> "$name is here. Move me, style me, and make this yours."
+        }
     }
 
     private fun applyDexCompanionPersonalityPreset() {
@@ -3339,6 +3370,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.dexCompanionCard.layoutParams = params
         }
         applyDexCompanionDragPosition()
+        maybeShowDexCompanionIntroGreeting(binding.dexCompanionIntroStrip.visibility == View.VISIBLE)
 
         startDexCompanionAnimation()
         scheduleDexCompanionBlink()
@@ -8714,6 +8746,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_VOICE = "dex_companion_voice"
         const val KEY_DEX_COMPANION_PERSONALITY = "dex_companion_personality"
         const val KEY_DEX_COMPANION_INTRO_DISMISSED = "dex_companion_intro_dismissed"
+        const val KEY_DEX_COMPANION_INTRO_GREETED = "dex_companion_intro_greeted"
         const val KEY_DEX_COMPANION_OFFSET_X = "dex_companion_offset_x"
         const val KEY_DEX_COMPANION_OFFSET_Y = "dex_companion_offset_y"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
