@@ -997,29 +997,37 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun refreshLoggedInState() {
         val loggedIn = !authToken.isNullOrBlank()
+        val isAdmin = currentUserRole.equals("admin", ignoreCase = true)
+        val isAffiliate = currentUserRole.equals("affiliate", ignoreCase = true)
+        val isRegularUser = !isAdmin && !isAffiliate
+        val showRegularDashboard = loggedIn && isRegularUser
+        val showAffiliateDashboard = loggedIn && isAffiliate
+        val showAdminDashboard = loggedIn && isAdmin
+
         binding.logoutButton.visibility = if (loggedIn) View.VISIBLE else View.GONE
         binding.inviteCodeCard.visibility = if (loggedIn) View.GONE else View.VISIBLE
         binding.dashboardCard.visibility = if (loggedIn) View.VISIBLE else View.GONE
-        binding.userDashboardCard.visibility =
-            if (loggedIn && (currentUserRole == "user" || currentUserRole == "affiliate" || currentUserRole == "admin")) View.VISIBLE else View.GONE
-        binding.learningCenterCard.visibility =
-            if (loggedIn && (currentUserRole == "user" || currentUserRole == "affiliate" || currentUserRole == "admin")) View.VISIBLE else View.GONE
-        binding.safetyProfileCard.visibility =
-            if (loggedIn && (currentUserRole == "user" || currentUserRole == "affiliate" || currentUserRole == "admin")) View.VISIBLE else View.GONE
-        binding.lifeSectionsCard.visibility =
-            if (loggedIn && (currentUserRole == "user" || currentUserRole == "affiliate" || currentUserRole == "admin")) View.VISIBLE else View.GONE
-        binding.billingCard.visibility = if (loggedIn && currentUserRole != "admin") View.VISIBLE else View.GONE
-        binding.affiliateDashboardCard.visibility = if (loggedIn && currentUserRole == "affiliate") View.VISIBLE else View.GONE
-        binding.adminDashboardCard.visibility = if (loggedIn && currentUserRole == "admin") View.VISIBLE else View.GONE
-        binding.themeCard.visibility = if (loggedIn) View.VISIBLE else View.GONE
-        binding.serverCard.visibility = if (loggedIn && currentUserRole == "admin") View.VISIBLE else View.GONE
+        binding.userDashboardCard.visibility = if (showRegularDashboard || showAffiliateDashboard) View.VISIBLE else View.GONE
+        binding.learningCenterCard.visibility = if (showRegularDashboard || showAffiliateDashboard) View.VISIBLE else View.GONE
+        binding.safetyProfileCard.visibility = if (showRegularDashboard || showAdminDashboard) View.VISIBLE else View.GONE
+        binding.lifeSectionsCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
+        binding.billingCard.visibility = if (showRegularDashboard) View.VISIBLE else View.GONE
+        binding.affiliateDashboardCard.visibility = if (showAffiliateDashboard) View.VISIBLE else View.GONE
+        binding.adminDashboardCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
+        binding.themeCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
+        binding.serverCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
+        binding.permissionsCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
+        binding.backgroundAccessCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
+        binding.callMonitorCard.visibility = if (showAdminDashboard) View.VISIBLE else View.GONE
+        binding.voiceCard.visibility = if (showRegularDashboard || showAdminDashboard) View.VISIBLE else View.GONE
+        binding.conversationCard.visibility = if (showRegularDashboard || showAdminDashboard) View.VISIBLE else View.GONE
         binding.authModeToggle.visibility = if (loggedIn) View.GONE else View.VISIBLE
         binding.nameInput.visibility = if (!loggedIn && isRegisterMode) View.VISIBLE else View.GONE
         binding.affiliateInviteInput.visibility = if (!loggedIn && isRegisterMode) View.VISIBLE else View.GONE
         binding.emailInput.visibility = if (!loggedIn) View.VISIBLE else View.GONE
         binding.passwordInput.visibility = if (!loggedIn) View.VISIBLE else View.GONE
         binding.authActionButton.visibility = if (!loggedIn) View.VISIBLE else View.GONE
-        binding.permissionsCard.alpha = if (loggedIn) 1f else 0.55f
+        binding.permissionsCard.alpha = if (showAdminDashboard) 1f else 0.55f
         binding.phonePermissionSwitch.isEnabled = loggedIn
         binding.calendarPermissionSwitch.isEnabled = loggedIn
         binding.notificationsPermissionSwitch.isEnabled = loggedIn
@@ -1028,8 +1036,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.autoDeclineSpamSwitch.isEnabled = loggedIn
         binding.authMessage.text = if (loggedIn) getString(R.string.connected_as, binding.emailInput.text?.toString().orEmpty()) else getString(R.string.logged_out_message)
         if (loggedIn) {
-            binding.statusTitle.text = getString(R.string.dex_home_title)
-            binding.statusSummary.text = getString(R.string.dex_home_summary)
+            binding.statusTitle.text = when {
+                isAdmin -> getString(R.string.dex_home_title_admin)
+                isAffiliate -> getString(R.string.dex_home_title_affiliate)
+                else -> getString(R.string.dex_home_title_user)
+            }
+            binding.statusSummary.text = when {
+                isAdmin -> getString(R.string.dex_home_summary_admin)
+                isAffiliate -> getString(R.string.dex_home_summary_affiliate)
+                else -> getString(R.string.dex_home_summary_user)
+            }
         } else {
             binding.statusTitle.text = getString(R.string.dex_ready_title)
             binding.statusSummary.text = getString(R.string.dex_ready_summary)
@@ -1062,6 +1078,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dashboardWelcome.text = getString(R.string.dashboard_welcome, name)
         binding.dashboardRole.text = getString(R.string.dashboard_role, roleLabel(currentUserRole))
         binding.dashboardAccess.text = getString(R.string.dashboard_access, accessLabel(currentAccessType))
+        binding.dashboardSummary.text = when (currentUserRole.lowercase(Locale.US)) {
+            "admin" -> getString(R.string.dashboard_summary_admin)
+            "affiliate" -> getString(R.string.dashboard_summary_affiliate)
+            else -> getString(R.string.dashboard_summary_user)
+        }
         binding.adminBackendValue.text = currentServerUrl()
     }
 
@@ -1995,6 +2016,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.themeCard,
                 binding.serverCard,
                 binding.permissionsCard,
+                binding.backgroundAccessCard,
                 binding.callMonitorCard,
                 binding.voiceCard,
                 binding.conversationCard

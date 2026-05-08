@@ -5,6 +5,12 @@
     <string name="dex_ready_summary">Log in, create an account, or use an affiliate invite code to unlock your Dex dashboard.</string>
     <string name="dex_home_title">Dex is ready for you</string>
     <string name="dex_home_summary">Your dashboard, voice tools, lessons, plans, and assistant controls are all in one place.</string>
+    <string name="dex_home_title_user">Everyday dashboard</string>
+    <string name="dex_home_summary_user">Use Dex day to day without the extra setup and admin tools getting in the way.</string>
+    <string name="dex_home_title_affiliate">Affiliate dashboard</string>
+    <string name="dex_home_summary_affiliate">Focus on learning, referrals, and affiliate progress without the heavier control panels.</string>
+    <string name="dex_home_title_admin">Admin dashboard</string>
+    <string name="dex_home_summary_admin">Keep the operational tools, safety systems, and backend controls in one place.</string>
     <string name="server_title">Backend</string>
     <string name="server_hint">https://your-backend-url.com/api</string>
     <string name="server_help">Most people should leave this on the live Dex server. Hosted Dex backends should use https. For local testing, use http://10.0.2.2:3001/api in the emulator or http://YOUR_COMPUTER_IP:3001/api on a phone using the same Wi-Fi. Port 4000 is usually the wrong local URL for Dex.</string>
@@ -25,6 +31,9 @@
     <string name="dashboard_title">Your dashboard</string>
     <string name="dashboard_overline">Workspace overview</string>
     <string name="dashboard_professional_summary">Keep your account, voice tools, safety controls, and learning activity in one organized place.</string>
+    <string name="dashboard_summary_user">Your everyday Dex space for conversations, learning, and support.</string>
+    <string name="dashboard_summary_affiliate">Your affiliate workspace for learning progress, referrals, and business visibility.</string>
+    <string name="dashboard_summary_admin">Your admin workspace for operations, safety handling, and platform controls.</string>
     <string name="dashboard_welcome">Welcome back, %1$s</string>
     <string name="dashboard_role">Role: %1$s</string>
     <string name="dashboard_access">Plan: %1$s</string>
