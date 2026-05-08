@@ -246,6 +246,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var lastEmergencyTriggerReason = ""
     private var lastEmergencySmsStatus = ""
     private val activityLogEntries = ArrayDeque<String>()
+    private val animatedDashboardCards = mutableSetOf<Int>()
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -1082,6 +1083,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.statusSummary.text = getString(R.string.dex_ready_summary)
         }
         updateDashboardHeader()
+        animateVisibleDashboardCards(loggedIn)
         if (!loggedIn) {
             applyPermissions(emptyMap())
             autoWakeStarted = false
@@ -1100,6 +1102,43 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         refreshCallMonitorState()
         autoStartWakeModeIfReady()
+    }
+
+    private fun animateVisibleDashboardCards(loggedIn: Boolean) {
+        val dashboardCards = listOf(
+            binding.dashboardCard,
+            binding.userDashboardCard,
+            binding.learningCenterCard,
+            binding.safetyProfileCard,
+            binding.lifeSectionsCard,
+            binding.billingCard,
+            binding.affiliateDashboardCard,
+            binding.adminDashboardCard,
+            binding.themeCard,
+            binding.serverCard,
+            binding.permissionsCard,
+            binding.backgroundAccessCard,
+            binding.callMonitorCard,
+            binding.voiceCard,
+            binding.conversationCard
+        )
+        if (!loggedIn) {
+            animatedDashboardCards.clear()
+            dashboardCards.forEach { it.clearAnimation() }
+            return
+        }
+        dashboardCards.forEachIndexed { index, card ->
+            if (card.visibility == View.VISIBLE) {
+                if (animatedDashboardCards.add(card.id)) {
+                    val animation = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dashboard_section_in)
+                    animation.startOffset = (index * 24L).coerceAtMost(180L)
+                    card.startAnimation(animation)
+                }
+            } else {
+                animatedDashboardCards.remove(card.id)
+                card.clearAnimation()
+            }
+        }
     }
 
     private fun updateDashboardHeader() {
