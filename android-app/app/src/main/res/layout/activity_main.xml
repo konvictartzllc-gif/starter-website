@@ -860,6 +860,7 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/learningLessonOutputStrip"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
@@ -886,6 +887,7 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/learningQuizOutputStrip"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
@@ -1216,6 +1218,7 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/safetyProfileMessageStrip"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
@@ -1288,6 +1291,7 @@
                         android:textSize="12sp" />
 
                     <LinearLayout
+                        android:id="@+id/safetyDiagnosticsStrip"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
@@ -1462,6 +1466,7 @@
                         android:textStyle="bold" />
 
                     <LinearLayout
+                        android:id="@+id/activityLogStrip"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"

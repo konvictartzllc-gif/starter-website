@@ -1549,6 +1549,33 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             card.setCardBackgroundColor(panelColor)
             card.strokeColor = strokeColor
         }
+        applyRoleOutputStripMood(roleKey)
+    }
+
+    private fun applyRoleOutputStripMood(roleKey: String) {
+        val primaryTone = when (roleKey) {
+            "admin" -> getColorCompat(R.color.dex_admin_readout)
+            "affiliate" -> getColorCompat(R.color.dex_affiliate_readout)
+            else -> getColorCompat(R.color.dex_user_readout)
+        }
+        val secondaryTone = when (roleKey) {
+            "admin" -> getColorCompat(R.color.dex_admin_readout_alt)
+            "affiliate" -> getColorCompat(R.color.dex_affiliate_readout_alt)
+            else -> getColorCompat(R.color.dex_user_readout_alt)
+        }
+        listOf(
+            binding.learningLessonOutputStrip,
+            binding.safetyProfileMessageStrip,
+            binding.activityLogStrip
+        ).forEach { strip ->
+            strip.backgroundTintList = ColorStateList.valueOf(primaryTone)
+        }
+        listOf(
+            binding.learningQuizOutputStrip,
+            binding.safetyDiagnosticsStrip
+        ).forEach { strip ->
+            strip.backgroundTintList = ColorStateList.valueOf(secondaryTone)
+        }
     }
 
     private fun fetchDashboardData() {

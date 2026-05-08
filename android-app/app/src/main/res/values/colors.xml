@@ -22,10 +22,16 @@
     <color name="dex_admin_chip_tint">#4A2A26</color>
     <color name="dex_user_panel">#182331</color>
     <color name="dex_user_stroke">#46637E</color>
+    <color name="dex_user_readout">#213246</color>
+    <color name="dex_user_readout_alt">#1C2B3C</color>
     <color name="dex_affiliate_panel">#16251F</color>
     <color name="dex_affiliate_stroke">#4A7965</color>
+    <color name="dex_affiliate_readout">#1D3128</color>
+    <color name="dex_affiliate_readout_alt">#18291F</color>
     <color name="dex_admin_panel">#241A1A</color>
     <color name="dex_admin_stroke">#8A5B51</color>
+    <color name="dex_admin_readout">#342321</color>
+    <color name="dex_admin_readout_alt">#2B1E1C</color>
     <color name="dex_status_loading">#8EDCFF</color>
     <color name="dex_status_live">#90A0B3</color>
     <color name="dex_hint_next_bg">#243240</color>
