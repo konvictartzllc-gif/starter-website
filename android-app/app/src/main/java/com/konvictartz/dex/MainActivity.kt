@@ -2691,15 +2691,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun shouldRunBackgroundService(): Boolean {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val hasToken = !authToken.isNullOrBlank()
+        val hasToken = !prefs.getString(KEY_TOKEN, null).isNullOrBlank()
         val notificationsEnabled = prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, false)
+        val phoneBackendReady = prefs.getBoolean(KEY_PHONE_BACKEND_ENABLED, false)
         val wakeReady =
             hasToken &&
                 !prefs.getString(KEY_VOSK_MODEL_ASSET, DEFAULT_VOSK_MODEL_ASSET).isNullOrBlank() &&
                 !prefs.getString(KEY_VOSK_WAKE_PHRASE, DEFAULT_VOSK_WAKE_PHRASE).isNullOrBlank() &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val phoneReady =
-            phoneBackendEnabled &&
+            phoneBackendReady &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.ANSWER_PHONE_CALLS) == PackageManager.PERMISSION_GRANTED
         val smsReady =

@@ -146,15 +146,26 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
+        val shouldRestart = shouldKeepServiceAlive()
         stopCallMonitoring()
         stopBackgroundWakeWordListening()
         speechRecognizer?.destroy()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         super.onDestroy()
+        if (shouldRestart) {
+            ContextCompat.startForegroundService(this, Intent(this, DexForegroundService::class.java))
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        if (shouldKeepServiceAlive()) {
+            ContextCompat.startForegroundService(this, Intent(this, DexForegroundService::class.java))
+        }
+    }
 
     private fun setupSpeechRecognizer() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) return
@@ -298,6 +309,36 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun hasPermission(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun shouldKeepServiceAlive(): Boolean {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val backgroundEnabled = prefs.getBoolean(MainActivity.KEY_BACKGROUND_SERVICE_ENABLED, false)
+        val hasToken = !prefs.getString(MainActivity.KEY_TOKEN, null).isNullOrBlank()
+        val notificationsEnabled = prefs.getBoolean(MainActivity.KEY_NOTIFICATIONS_ENABLED, false)
+        val phoneBackendEnabled = prefs.getBoolean(MainActivity.KEY_PHONE_BACKEND_ENABLED, false)
+        val appInForeground = prefs.getBoolean(MainActivity.KEY_APP_IN_FOREGROUND, false)
+        val wakeReady =
+            hasToken &&
+                !prefs.getString(MainActivity.KEY_VOSK_MODEL_ASSET, MainActivity.DEFAULT_VOSK_MODEL_ASSET).isNullOrBlank() &&
+                !prefs.getString(MainActivity.KEY_VOSK_WAKE_PHRASE, MainActivity.DEFAULT_VOSK_WAKE_PHRASE).isNullOrBlank() &&
+                hasPermission(Manifest.permission.RECORD_AUDIO)
+        val phoneReady =
+            hasToken &&
+                phoneBackendEnabled &&
+                hasPermission(Manifest.permission.READ_PHONE_STATE) &&
+                hasPermission(Manifest.permission.READ_CALL_LOG) &&
+                hasPermission(Manifest.permission.ANSWER_PHONE_CALLS)
+        val smsReady =
+            hasToken &&
+                notificationsEnabled &&
+                hasPermission(Manifest.permission.RECEIVE_SMS) &&
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    hasPermission(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    true
+                }
+        return backgroundEnabled && !appInForeground && (wakeReady || phoneReady || smsReady)
     }
 
     @SuppressLint("MissingPermission")
