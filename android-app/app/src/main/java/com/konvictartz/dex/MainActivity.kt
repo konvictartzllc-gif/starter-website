@@ -314,6 +314,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionOffsetY = 0f
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
     private var dexCompanionBubbleOverride: String? = null
+    private var dexCompanionRewardsPreviewLevel: Int? = null
     private var dexCompanionFloatAnimator: AnimatorSet? = null
     private var dexCompanionEventAnimator: AnimatorSet? = null
     private var dexCompanionBlinkScheduled = false
@@ -1168,6 +1169,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             applyDexCompanionUi()
             persistHomeLook()
+        }
+        binding.dexCompanionRewardsValue.setOnClickListener {
+            cycleDexCompanionRewardsPreview()
         }
         binding.dexCompanionCard.setOnTouchListener { view, event ->
             when (event.actionMasked) {
@@ -3041,11 +3045,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun dexGamesUnlockTier(): String {
-        return when {
-            dexGamesChallengeClears >= 20 -> getString(R.string.dex_games_unlock_tier_legend)
-            dexGamesChallengeClears >= 10 -> getString(R.string.dex_games_unlock_tier_star)
-            dexGamesChallengeClears >= 5 -> getString(R.string.dex_games_unlock_tier_spark)
+    private fun dexGamesUnlockTier(level: Int = dexGamesUnlockLevel()): String {
+        return when (level) {
+            3 -> getString(R.string.dex_games_unlock_tier_legend)
+            2 -> getString(R.string.dex_games_unlock_tier_star)
+            1 -> getString(R.string.dex_games_unlock_tier_spark)
             else -> getString(R.string.dex_games_unlock_tier_new)
         }
     }
@@ -3077,8 +3081,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
-    private fun dexGamesUnlockPerkLine(): String {
-        return when (dexGamesUnlockLevel()) {
+    private fun dexGamesUnlockPerkLine(level: Int = dexGamesUnlockLevel()): String {
+        return when (level) {
             3 -> getString(R.string.dex_companion_rewards_perk_legend)
             2 -> getString(R.string.dex_companion_rewards_perk_star)
             1 -> getString(R.string.dex_companion_rewards_perk_spark)
@@ -3089,12 +3093,48 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun dexCompanionRewardsSummary(): String {
         val favorite = favoriteDexMiniGameLabel()
             ?: getString(R.string.dex_companion_rewards_favorite_none)
-        return getString(
-            R.string.dex_companion_rewards_value,
-            dexGamesUnlockTier(),
-            dexGamesUnlockPerkLine(),
-            dexGamesChallengeClears,
-            favorite
+        val previewLevel = dexCompanionRewardsPreviewLevel
+        val body = if (previewLevel == null) {
+            getString(
+                R.string.dex_companion_rewards_value,
+                dexGamesUnlockTier(),
+                dexGamesUnlockPerkLine(),
+                dexGamesChallengeClears,
+                favorite
+            )
+        } else {
+            getString(
+                R.string.dex_companion_rewards_value_preview,
+                dexGamesUnlockTier(),
+                dexGamesUnlockTier(previewLevel),
+                dexGamesUnlockPerkLine(previewLevel),
+                dexGamesChallengeClears,
+                favorite
+            )
+        }
+        return "$body\n${getString(R.string.dex_companion_rewards_tap_hint)}"
+    }
+
+    private fun cycleDexCompanionRewardsPreview() {
+        dexCompanionRewardsPreviewLevel = when (dexCompanionRewardsPreviewLevel) {
+            null -> 0
+            0 -> 1
+            1 -> 2
+            2 -> 3
+            else -> null
+        }
+        val previewLevel = dexCompanionRewardsPreviewLevel
+        val bubble = if (previewLevel == null) {
+            getString(R.string.dex_companion_rewards_preview_live, dexGamesUnlockTier())
+        } else {
+            getString(R.string.dex_companion_rewards_preview_switched, dexGamesUnlockTier(previewLevel))
+        }
+        updateDexCompanionControls()
+        applyDexCompanionUi()
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = bubble,
+            revertAfterMs = 2200L
         )
     }
 
@@ -4116,7 +4156,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val skinColors = dexCompanionSkinColors()
         val accentColor = skinColors.accent
         val bubbleTint = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.76f)
-        val unlockLevel = dexGamesUnlockLevel()
+        val unlockLevel = dexCompanionRewardsPreviewLevel ?: dexGamesUnlockLevel()
         val unlockAccent = when (unlockLevel) {
             3 -> android.graphics.Color.parseColor("#D8C4FF")
             2 -> android.graphics.Color.parseColor("#7ED6FF")
@@ -4152,10 +4192,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionLabel.setTextColor(labelTint)
         binding.dexCompanionLabel.text = currentDexCompanionName
         val statusSpec = dexCompanionStatusSpec(activeState, accentColor)
+        val previewingRewards = dexCompanionRewardsPreviewLevel != null
         val tierSuffix = when (unlockLevel) {
-            3 -> " | Legend"
-            2 -> " | Star"
-            1 -> " | Spark"
+            3 -> if (previewingRewards) " | Legend preview" else " | Legend"
+            2 -> if (previewingRewards) " | Star preview" else " | Star"
+            1 -> if (previewingRewards) " | Spark preview" else " | Spark"
             else -> ""
         }
         binding.dexCompanionStatusChip.text = getString(statusSpec.labelRes) + tierSuffix
