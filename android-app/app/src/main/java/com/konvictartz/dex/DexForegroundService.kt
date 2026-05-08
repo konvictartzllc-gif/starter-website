@@ -82,6 +82,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var callScreeningPhraseIndex = 0
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private data class ParsedCallerMessage(
+        val callerName: String?,
+        val message: String,
+    )
+
     private inner class DexCallStateCallback : TelephonyCallback(), TelephonyCallback.CallStateListener {
         override fun onCallStateChanged(state: Int) {
             handleCallStateChanged(state, null)
@@ -1155,21 +1160,22 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun handleCallerMessage(transcript: String) {
-        val cleanedMessage = normalizeCallerMessageTranscript(transcript)
-        if (cleanedMessage == null) {
+        val parsedMessage = normalizeCallerMessageTranscript(transcript)
+        if (parsedMessage == null) {
             callMessageCaptureAttempts += 1
             repromptBackgroundListenMode(BackgroundListenMode.CALLER_MESSAGE)
             return
         }
-        val caller = lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" }
+        val baseCaller = lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" }
             ?: lastIncomingNumber
             ?: getString(R.string.unknown_number_label)
-        postCallEvent("message", "$caller: $cleanedMessage")
+        val caller = chooseSavedCallerLabel(baseCaller, parsedMessage.callerName)
+        postCallEvent("message", "$caller: ${parsedMessage.message}")
         MainActivity.appendPersistentCallMessageLog(
             context = this,
             caller = caller,
             phoneNumber = lastIncomingNumber,
-            message = cleanedMessage
+            message = parsedMessage.message
         )
         callMessageCaptureAttempts = 0
         val savedReply = when (nextCallScreeningPhraseVariant()) {
@@ -1181,14 +1187,14 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
     }
 
-    private fun normalizeCallerMessageTranscript(transcript: String): String? {
+    private fun normalizeCallerMessageTranscript(transcript: String): ParsedCallerMessage? {
         val cleaned = transcript
             .trim()
             .replace(Regex("\\s+"), " ")
             .replace(Regex("^[,.;:!?\\-\\s]+|[,.;:!?\\-\\s]+$"), "")
         if (cleaned.length < MIN_CALL_MESSAGE_LENGTH) return null
 
-        val normalized = cleaned.lowercase(Locale.US)
+        var normalized = cleaned.lowercase(Locale.US)
         val junkPhrases = listOf(
             "hello",
             "hey",
@@ -1202,9 +1208,60 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             "testing"
         )
         if (normalized in junkPhrases) return null
+        var extractedCallerName: String? = null
+        extractCallerName(normalized)?.let { (name, remainder) ->
+            extractedCallerName = name
+            normalized = remainder
+        }
+
+        normalized = normalized
+            .replace(Regex("^(?:uh|um|hello|hi|hey|okay|ok|well|so)\\b[\\s,.-]*"), "")
+            .replace(Regex("\\b(?:thanks|thank you|bye|goodbye)\\s*$"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim(' ', ',', '.', ';', ':', '!', '?', '-')
+
+        if (normalized.length < MIN_CALL_MESSAGE_LENGTH) return null
         val wordCount = normalized.split(" ").count { it.isNotBlank() }
         if (wordCount < MIN_CALL_MESSAGE_WORDS && junkPhrases.any { normalized.contains(it) }) return null
-        return cleaned
+        val polished = normalized.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString()
+        }
+        return ParsedCallerMessage(extractedCallerName, polished)
+    }
+
+    private fun extractCallerName(normalizedTranscript: String): Pair<String, String>? {
+        val patterns = listOf(
+            Regex("^this is ([a-z][a-z ]{1,30}?)(?: calling| speaking| here| and|,|\\.|$)"),
+            Regex("^my name is ([a-z][a-z ]{1,30}?)(?: and|,|\\.|$)"),
+            Regex("^it is ([a-z][a-z ]{1,30}?)(?: calling| and|,|\\.|$)"),
+            Regex("^i am ([a-z][a-z ]{1,30}?)(?: and|,|\\.|$)")
+        )
+        for (pattern in patterns) {
+            val match = pattern.find(normalizedTranscript) ?: continue
+            val rawName = match.groupValues.getOrNull(1)?.trim().orEmpty()
+            val callerName = rawName
+                .split(" ")
+                .filter { it.isNotBlank() }
+                .take(3)
+                .joinToString(" ") { token ->
+                    token.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                }
+                .trim()
+            if (callerName.isBlank()) continue
+            val remainder = normalizedTranscript.removeRange(match.range).trim(' ', ',', '.', ';', ':', '!', '?', '-')
+            return callerName to remainder
+        }
+        return null
+    }
+
+    private fun chooseSavedCallerLabel(currentCaller: String, extractedCallerName: String?): String {
+        if (extractedCallerName.isNullOrBlank()) return currentCaller
+        val normalizedCurrent = currentCaller.lowercase(Locale.US)
+        val isWeakCurrent =
+            normalizedCurrent == getString(R.string.unknown_number_label).lowercase(Locale.US) ||
+                normalizedCurrent == getString(R.string.private_number_label).lowercase(Locale.US) ||
+                normalizedCurrent.all { it.isDigit() || it == '+' || it == '-' || it == ' ' || it == '(' || it == ')' }
+        return if (isWeakCurrent) extractedCallerName else currentCaller
     }
 
     private fun nextCallScreeningPhraseVariant(): Int {
