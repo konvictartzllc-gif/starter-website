@@ -39,6 +39,8 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
 import android.widget.TextView
+import android.animation.ArgbEvaluator
+import android.animation.ValueAnimator
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -1267,10 +1269,43 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         backgroundColor: Int,
         textColor: Int = android.graphics.Color.WHITE
     ) {
+        val previousTint = button.backgroundTintList?.defaultColor ?: backgroundColor
+        val previousTextColor = button.currentTextColor
+        val targetAlpha = if (enabled) 1f else 0.58f
+        val shouldAnimate =
+            previousTint != backgroundColor ||
+                previousTextColor != textColor ||
+                kotlin.math.abs(button.alpha - targetAlpha) > 0.02f
+
         button.isEnabled = enabled
-        button.alpha = if (enabled) 1f else 0.58f
-        button.backgroundTintList = ColorStateList.valueOf(backgroundColor)
-        button.setTextColor(textColor)
+        if (!shouldAnimate) {
+            button.alpha = targetAlpha
+            button.backgroundTintList = ColorStateList.valueOf(backgroundColor)
+            button.setTextColor(textColor)
+            return
+        }
+
+        button.animate().cancel()
+        button.animate()
+            .alpha(targetAlpha)
+            .setDuration(180L)
+            .start()
+
+        ValueAnimator.ofObject(ArgbEvaluator(), previousTint, backgroundColor).apply {
+            duration = 180L
+            addUpdateListener { animator ->
+                button.backgroundTintList = ColorStateList.valueOf(animator.animatedValue as Int)
+            }
+            start()
+        }
+
+        ValueAnimator.ofObject(ArgbEvaluator(), previousTextColor, textColor).apply {
+            duration = 180L
+            addUpdateListener { animator ->
+                button.setTextColor(animator.animatedValue as Int)
+            }
+            start()
+        }
     }
 
     private fun refreshInteractionStates() {
