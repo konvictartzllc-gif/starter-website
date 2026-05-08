@@ -221,6 +221,9 @@
     <string name="dex_companion_rewards_perk_legend">Full halo energy, sharper card edge, and Legend-ready status cues.</string>
     <string name="dex_companion_rewards_favorite_none">Still learning</string>
     <string name="dex_companion_rewards_owned_line">Unlocked premium looks: %1$d</string>
+    <string name="dex_shop_offer_item">%1$s %2$dc</string>
+    <string name="dex_shop_offer_owned_out">All featured looks owned</string>
+    <string name="dex_shop_offer_line">Shop: %1$s\nPaid play: %2$s</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>

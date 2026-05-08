@@ -3203,6 +3203,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun dexCoinsLine(): String = getString(R.string.dex_coins_line, dexCoins)
 
+    private fun dexShopOfferLine(): String {
+        val cosmeticOffers = listOf(
+            Triple(skinCosmeticKey(DEX_COMPANION_SKIN_SUNSET), dexSkinLabel(DEX_COMPANION_SKIN_SUNSET), dexSkinCost(DEX_COMPANION_SKIN_SUNSET)),
+            Triple(accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HALO), dexAccessoryLabel(DEX_COMPANION_ACCESSORY_HALO), dexAccessoryCost(DEX_COMPANION_ACCESSORY_HALO)),
+            Triple(faceStyleCosmeticKey(DEX_COMPANION_FACE_PIXEL), dexFaceStyleLabel(DEX_COMPANION_FACE_PIXEL), dexFaceStyleCost(DEX_COMPANION_FACE_PIXEL))
+        ).filterNot { ownedDexCosmetics.contains(it.first) }
+            .take(2)
+            .joinToString(" | ") { (_, label, cost) -> getString(R.string.dex_shop_offer_item, label, cost) }
+            .ifBlank { getString(R.string.dex_shop_offer_owned_out) }
+
+        val gameOffers = listOf(
+            DexMiniGameType.TRIVIA,
+            DexMiniGameType.MEMORY,
+            DexMiniGameType.WOULD_YOU_RATHER
+        ).joinToString(" | ") { type ->
+            getString(R.string.dex_shop_offer_item, dexMiniGameLabel(type), dexMiniGameCost(type))
+        }
+
+        return getString(R.string.dex_shop_offer_line, cosmeticOffers, gameOffers)
+    }
+
     private fun ensureDexCosmeticOwned(key: String, label: String, cost: Int): Boolean {
         if (cost <= 0 || ownedDexCosmetics.contains(key)) return true
         if (dexCoins < cost) {
@@ -3312,7 +3333,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 favorite
             )
         }
-        return "$body\n${dexCoinsLine()}\n${getString(R.string.dex_companion_rewards_owned_line, ownedPremiumDexCosmeticsCount())}"
+        return "$body\n${dexCoinsLine()}\n${getString(R.string.dex_companion_rewards_owned_line, ownedPremiumDexCosmeticsCount())}\n${dexShopOfferLine()}"
     }
 
     private fun dexCompanionRewardsSummary(): CharSequence {
