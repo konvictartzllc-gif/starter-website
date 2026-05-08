@@ -3370,7 +3370,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             R.string.dex_shop_section_looks_message,
                             featuredLooksShopItem()
                         ),
-                        buildDexShopLooksEntries()
+                        buildDexShopLooksEntries(),
+                        getString(R.string.dex_shop_bubble_looks, featuredLooksShopItem())
                     )
                     1 -> openDexShopSectionDialog(
                         getString(R.string.dex_shop_section_accessories),
@@ -3378,7 +3379,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             R.string.dex_shop_section_accessories_message,
                             featuredAccessoriesShopItem()
                         ),
-                        buildDexShopAccessoryEntries()
+                        buildDexShopAccessoryEntries(),
+                        getString(R.string.dex_shop_bubble_accessories, featuredAccessoriesShopItem())
                     )
                     else -> openDexShopSectionDialog(
                         getString(R.string.dex_shop_section_play),
@@ -3386,7 +3388,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             R.string.dex_shop_section_play_message,
                             featuredPlayShopItem()
                         ),
-                        buildDexShopPlayEntries()
+                        buildDexShopPlayEntries(),
+                        getString(R.string.dex_shop_bubble_play, featuredPlayShopItem())
                     )
                 }
             }
@@ -3441,7 +3444,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
-    private fun openDexShopSectionDialog(title: String, message: String, entries: List<DexShopEntry>) {
+    private fun openDexShopSectionDialog(
+        title: String,
+        message: String,
+        entries: List<DexShopEntry>,
+        bubble: String,
+    ) {
         val labels = entries.map { "${it.label}\n${it.detail}" }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle(title)
@@ -3451,6 +3459,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+        setDexCompanionState(
+            DEX_COMPANION_STATE_TALKING,
+            bubbleOverride = bubble,
+            revertAfterMs = 2200L
+        )
     }
 
     private fun buildDexShopLooksEntries(): List<DexShopEntry> {
