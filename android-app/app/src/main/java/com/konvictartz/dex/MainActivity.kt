@@ -49,6 +49,7 @@ import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.konvictartz.dex.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1402,6 +1403,43 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun applyRoleSwitchMood(switch: SwitchMaterial, roleKey: String) {
+        val active = sectionSignalColor(roleKey)
+        val activeTrack = ColorUtils.setAlphaComponent(active, 124)
+        val inactiveThumb = getColorCompat(R.color.dex_text_secondary)
+        val inactiveTrack = ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_border), 170)
+        val disabledThumb = ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_text_secondary), 118)
+        val disabledTrack = ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_border), 84)
+
+        val thumbStates = arrayOf(
+            intArrayOf(android.R.attr.state_enabled, android.R.attr.state_checked),
+            intArrayOf(android.R.attr.state_enabled),
+            intArrayOf()
+        )
+        val thumbColors = intArrayOf(
+            active,
+            inactiveThumb,
+            disabledThumb
+        )
+        val trackStates = arrayOf(
+            intArrayOf(android.R.attr.state_enabled, android.R.attr.state_checked),
+            intArrayOf(android.R.attr.state_enabled),
+            intArrayOf()
+        )
+        val trackColors = intArrayOf(
+            activeTrack,
+            inactiveTrack,
+            disabledTrack
+        )
+
+        switch.thumbTintList = ColorStateList(thumbStates, thumbColors)
+        switch.trackTintList = ColorStateList(trackStates, trackColors)
+        switch.setTextColor(
+            if (switch.isEnabled) getColorCompat(R.color.dex_text_secondary)
+            else ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_text_secondary), 148)
+        )
+    }
+
     private fun refreshInteractionStates() {
         val roleKey = currentUserRole.lowercase(Locale.US)
         val roleSignal = sectionSignalColor(roleKey)
@@ -1421,6 +1459,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         applyActionButtonState(binding.cancelActionButton, binding.cancelActionButton.isEnabled, warn)
         applyActionButtonState(binding.subscribeNowButton, binding.subscribeNowButton.visibility == View.VISIBLE, accent, android.graphics.Color.BLACK)
         applyActionButtonState(binding.manageBillingButton, binding.manageBillingButton.visibility == View.VISIBLE, muted)
+        listOf(
+            binding.safetyNotifyTrustedContactSwitch,
+            binding.safetyFollowUpSwitch,
+            binding.phonePermissionSwitch,
+            binding.calendarPermissionSwitch,
+            binding.notificationsPermissionSwitch,
+            binding.autoAnswerKnownContactsSwitch,
+            binding.autoAnswerAnyCallerSwitch,
+            binding.autoDeclineSpamSwitch
+        ).forEach { applyRoleSwitchMood(it, roleKey) }
     }
 
     private fun beginSectionRefresh(label: TextView, card: MaterialCardView, roleKey: String) {
