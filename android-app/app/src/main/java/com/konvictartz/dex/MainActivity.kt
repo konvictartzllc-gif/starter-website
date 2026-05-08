@@ -346,6 +346,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentMemoryRound = 0
     private var currentMemorySequence: List<String> = emptyList()
     private var currentWouldYouRatherIndex = -1
+    private var dexGamesPlayed = 0
+    private var dexGamesCorrect = 0
+    private var dexGamesCurrentStreak = 0
+    private var dexGamesBestStreak = 0
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -1293,6 +1297,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexCompanionIntroGreeted = prefs.getBoolean(KEY_DEX_COMPANION_INTRO_GREETED, false)
         currentDexCompanionOffsetX = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_X, 0f)
         currentDexCompanionOffsetY = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_Y, 0f)
+        dexGamesPlayed = prefs.getInt(KEY_DEX_GAMES_PLAYED, 0)
+        dexGamesCorrect = prefs.getInt(KEY_DEX_GAMES_CORRECT, 0)
+        dexGamesCurrentStreak = prefs.getInt(KEY_DEX_GAMES_STREAK, 0)
+        dexGamesBestStreak = prefs.getInt(KEY_DEX_GAMES_BEST_STREAK, 0)
         updateAdvancedStyleUi(currentThemePreset == "custom")
         updateDexCompanionControls()
         loadDashboardSections()
@@ -1472,13 +1480,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.userDashboardLessonCount.text = getString(R.string.lesson_history_count, 0)
             binding.userDashboardQuizScore.text = getString(R.string.quiz_score_summary, getString(R.string.quiz_score_empty))
             binding.learningProfileSummary.text = learningProfileMissingCopy()
-            binding.learningReminderSummary.text = getString(R.string.learning_reminder_off)
-            binding.learningLessonPreview.text = ""
-            binding.learningQuizPreview.text = dashboardActivityEmptyCopy()
-            binding.dexGamePrompt.text = getString(R.string.dex_games_prompt_default)
-            binding.dexGameStatus.text = getString(R.string.dex_games_status_default)
-            binding.dexGameInput.setText("")
-            activeDexMiniGame = DexMiniGameType.NONE
+        binding.learningReminderSummary.text = getString(R.string.learning_reminder_off)
+        binding.learningLessonPreview.text = ""
+        binding.learningQuizPreview.text = dashboardActivityEmptyCopy()
+        binding.dexGamePrompt.text = getString(R.string.dex_games_prompt_default)
+        binding.dexGameStatus.text = dexGamesStatusSummary(getString(R.string.dex_games_status_default))
+        binding.dexGameInput.setText("")
+        activeDexMiniGame = DexMiniGameType.NONE
             setHintBand(binding.userDashboardHint, null)
             setHintBand(binding.learningCenterHint, null)
             setHintBand(binding.billingHint, null)
@@ -2940,13 +2948,55 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .commit()
     }
 
+    private fun dexGamesScoreLine(): String {
+        return getString(
+            R.string.dex_games_score_line,
+            dexGamesCorrect,
+            dexGamesPlayed,
+            dexGamesCurrentStreak,
+            dexGamesBestStreak
+        )
+    }
+
+    private fun dexGamesStatusSummary(base: String): String {
+        return "$base\n${dexGamesScoreLine()}"
+    }
+
+    private fun saveDexGameStats() {
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_DEX_GAMES_PLAYED, dexGamesPlayed)
+            .putInt(KEY_DEX_GAMES_CORRECT, dexGamesCorrect)
+            .putInt(KEY_DEX_GAMES_STREAK, dexGamesCurrentStreak)
+            .putInt(KEY_DEX_GAMES_BEST_STREAK, dexGamesBestStreak)
+            .apply()
+    }
+
+    private fun recordDexGameResult(correct: Boolean, countsAsScoredRound: Boolean = true) {
+        dexGamesPlayed += 1
+        if (countsAsScoredRound && correct) {
+            dexGamesCorrect += 1
+            dexGamesCurrentStreak += 1
+            dexGamesBestStreak = max(dexGamesBestStreak, dexGamesCurrentStreak)
+        } else if (countsAsScoredRound) {
+            dexGamesCurrentStreak = 0
+        }
+        saveDexGameStats()
+    }
+
+    private fun breakDexGameStreak() {
+        if (dexGamesCurrentStreak == 0) return
+        dexGamesCurrentStreak = 0
+        saveDexGameStats()
+    }
+
     private fun startGuessNumberGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.GUESS_NUMBER
         dexGuessTarget = (1..20).random()
         dexGuessAttempts = 0
         binding.dexGameInput.setText("")
         val prompt = getString(R.string.dex_game_guess_prompt)
-        val status = getString(R.string.dex_game_guess_status)
+        val status = dexGamesStatusSummary(getString(R.string.dex_game_guess_status))
         binding.dexGamePrompt.text = prompt
         binding.dexGameStatus.text = status
         binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_submit)
@@ -2967,7 +3017,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val riddle = DEX_RIDDLES[currentRiddleIndex]
         binding.dexGameInput.setText("")
         binding.dexGamePrompt.text = riddle.prompt
-        binding.dexGameStatus.text = getString(R.string.dex_game_riddle_status)
+        binding.dexGameStatus.text = dexGamesStatusSummary(getString(R.string.dex_game_riddle_status))
         binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_submit)
         binding.nextDexGameRoundButton.text = getString(R.string.dex_game_next_riddle)
         setDexCompanionState(
@@ -2986,7 +3036,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val trivia = DEX_TRIVIA_QUESTIONS[currentTriviaIndex]
         binding.dexGameInput.setText("")
         binding.dexGamePrompt.text = trivia.prompt
-        binding.dexGameStatus.text = getString(R.string.dex_game_trivia_status)
+        binding.dexGameStatus.text = dexGamesStatusSummary(getString(R.string.dex_game_trivia_status))
         binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_submit)
         binding.nextDexGameRoundButton.text = getString(R.string.dex_game_next_trivia)
         setDexCompanionState(
@@ -3010,7 +3060,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val prompt = getString(R.string.dex_game_memory_prompt, currentMemorySequence.joinToString(", "))
         binding.dexGameInput.setText("")
         binding.dexGamePrompt.text = prompt
-        binding.dexGameStatus.text = getString(R.string.dex_game_memory_status, currentMemoryRound)
+        binding.dexGameStatus.text = dexGamesStatusSummary(getString(R.string.dex_game_memory_status, currentMemoryRound))
         binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_submit)
         binding.nextDexGameRoundButton.text = getString(R.string.dex_game_next_memory)
         setDexCompanionState(
@@ -3029,7 +3079,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val round = DEX_WOULD_YOU_RATHERS[currentWouldYouRatherIndex]
         binding.dexGameInput.setText("")
         binding.dexGamePrompt.text = round.prompt
-        binding.dexGameStatus.text = getString(R.string.dex_game_wyr_status)
+        binding.dexGameStatus.text = dexGamesStatusSummary(getString(R.string.dex_game_wyr_status))
         binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_share_answer)
         binding.nextDexGameRoundButton.text = getString(R.string.dex_game_next_round)
         setDexCompanionState(
@@ -3098,7 +3148,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             guess > dexGuessTarget -> getString(R.string.dex_game_guess_high, dexGuessAttempts)
             else -> getString(R.string.dex_game_guess_correct, dexGuessAttempts)
         }
-        binding.dexGameStatus.text = reply
+        if (guess == dexGuessTarget) recordDexGameResult(correct = true)
+        binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         binding.dexGameInput.setText("")
         setDexCompanionState(
             if (guess == dexGuessTarget) DEX_COMPANION_STATE_EXCITED else DEX_COMPANION_STATE_TALKING,
@@ -3117,7 +3168,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else {
             getString(R.string.dex_game_riddle_try_again)
         }
-        binding.dexGameStatus.text = reply
+        if (isCorrect) recordDexGameResult(correct = true) else breakDexGameStreak()
+        binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         if (isCorrect) {
             binding.dexGameInput.setText("")
         }
@@ -3140,7 +3192,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else {
             getString(R.string.dex_game_trivia_try_again)
         }
-        binding.dexGameStatus.text = reply
+        if (isCorrect) recordDexGameResult(correct = true) else breakDexGameStreak()
+        binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         if (isCorrect) {
             binding.dexGameInput.setText("")
         }
@@ -3174,7 +3227,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else {
             getString(R.string.dex_game_memory_try_again, currentMemorySequence.joinToString(", "))
         }
-        binding.dexGameStatus.text = reply
+        if (isCorrect) recordDexGameResult(correct = true) else breakDexGameStreak()
+        binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         if (isCorrect) {
             binding.dexGameInput.setText("")
         }
@@ -3190,7 +3244,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val round = DEX_WOULD_YOU_RATHERS.getOrNull(currentWouldYouRatherIndex) ?: return
         val trimmed = answer.trim()
         val reply = getString(R.string.dex_game_wyr_reply, trimmed, round.followUp)
-        binding.dexGameStatus.text = reply
+        recordDexGameResult(correct = true, countsAsScoredRound = false)
+        binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         binding.dexGameInput.setText("")
         setDexCompanionState(
             DEX_COMPANION_STATE_TALKING,
@@ -9432,6 +9487,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_INTRO_GREETED = "dex_companion_intro_greeted"
         const val KEY_DEX_COMPANION_OFFSET_X = "dex_companion_offset_x"
         const val KEY_DEX_COMPANION_OFFSET_Y = "dex_companion_offset_y"
+        const val KEY_DEX_GAMES_PLAYED = "dex_games_played"
+        const val KEY_DEX_GAMES_CORRECT = "dex_games_correct"
+        const val KEY_DEX_GAMES_STREAK = "dex_games_streak"
+        const val KEY_DEX_GAMES_BEST_STREAK = "dex_games_best_streak"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"
