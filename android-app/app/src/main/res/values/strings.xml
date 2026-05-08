@@ -334,6 +334,8 @@
     <string name="dex_games_profile_line_favorite">Play profile: you keep coming back to %1$s.</string>
     <string name="dex_games_challenge_open">Daily challenge: complete one round of %1$s today.</string>
     <string name="dex_games_challenge_done">Daily challenge complete: you already cleared %1$s today.</string>
+    <string name="dex_games_challenge_reward">Daily challenge cleared: %1$s is done for today.</string>
+    <string name="dex_games_challenge_reward_streak">Daily challenge cleared: %1$s is done for today, and your streak is now %2$d.</string>
     <string name="dex_games_answer_hint">Your answer</string>
     <string name="dex_game_submit">Submit</string>
     <string name="dex_game_share_answer">Share answer</string>

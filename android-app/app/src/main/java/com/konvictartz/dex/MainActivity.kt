@@ -3075,10 +3075,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         saveDexGameStats()
     }
 
-    private fun recordDexChallengeCompletion(type: DexMiniGameType) {
-        if (type != todaysDexChallengeGame() || isTodayDexChallengeComplete()) return
+    private fun dexGamesChallengeRewardLine(type: DexMiniGameType): String {
+        val label = dexMiniGameLabel(type)
+        return if (dexGamesCurrentStreak > 1) {
+            getString(R.string.dex_games_challenge_reward_streak, label, dexGamesCurrentStreak)
+        } else {
+            getString(R.string.dex_games_challenge_reward, label)
+        }
+    }
+
+    private fun recordDexChallengeCompletion(type: DexMiniGameType): String? {
+        if (type != todaysDexChallengeGame() || isTodayDexChallengeComplete()) return null
         dexGamesChallengeCompletedDate = LocalDate.now().toString()
         saveDexGameStats()
+        return dexGamesChallengeRewardLine(type)
     }
 
     private fun recordDexGameResult(correct: Boolean, countsAsScoredRound: Boolean = true) {
@@ -3257,15 +3267,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
         dexGuessAttempts += 1
-        val reply = when {
+        val baseReply = when {
             guess < dexGuessTarget -> getString(R.string.dex_game_guess_low, dexGuessAttempts)
             guess > dexGuessTarget -> getString(R.string.dex_game_guess_high, dexGuessAttempts)
             else -> getString(R.string.dex_game_guess_correct, dexGuessAttempts)
         }
-        if (guess == dexGuessTarget) {
+        val reward = if (guess == dexGuessTarget) {
             recordDexGameResult(correct = true)
             recordDexChallengeCompletion(DexMiniGameType.GUESS_NUMBER)
-        }
+        } else null
+        val reply = listOfNotNull(baseReply, reward).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         binding.dexGameInput.setText("")
         setDexCompanionState(
@@ -3280,15 +3291,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val riddle = DEX_RIDDLES.getOrNull(currentRiddleIndex) ?: return
         val normalized = answer.lowercase(Locale.US).trim()
         val isCorrect = normalized.contains(riddle.answer.lowercase(Locale.US))
-        val reply = if (isCorrect) {
+        val baseReply = if (isCorrect) {
             getString(R.string.dex_game_riddle_correct, riddle.answer)
         } else {
             getString(R.string.dex_game_riddle_try_again)
         }
-        if (isCorrect) {
+        val reward = if (isCorrect) {
             recordDexGameResult(correct = true)
             recordDexChallengeCompletion(DexMiniGameType.RIDDLE)
-        } else breakDexGameStreak()
+        } else {
+            breakDexGameStreak()
+            null
+        }
+        val reply = listOfNotNull(baseReply, reward).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         if (isCorrect) {
             binding.dexGameInput.setText("")
@@ -3307,15 +3322,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val isCorrect = trivia.answers.any { accepted ->
             normalized.contains(accepted.lowercase(Locale.US))
         }
-        val reply = if (isCorrect) {
+        val baseReply = if (isCorrect) {
             getString(R.string.dex_game_trivia_correct, trivia.reveal)
         } else {
             getString(R.string.dex_game_trivia_try_again)
         }
-        if (isCorrect) {
+        val reward = if (isCorrect) {
             recordDexGameResult(correct = true)
             recordDexChallengeCompletion(DexMiniGameType.TRIVIA)
-        } else breakDexGameStreak()
+        } else {
+            breakDexGameStreak()
+            null
+        }
+        val reply = listOfNotNull(baseReply, reward).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         if (isCorrect) {
             binding.dexGameInput.setText("")
@@ -3345,15 +3364,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .filter { it.isNotBlank() }
         val expected = currentMemorySequence.map { it.lowercase(Locale.US) }
         val isCorrect = guessed == expected
-        val reply = if (isCorrect) {
+        val baseReply = if (isCorrect) {
             getString(R.string.dex_game_memory_correct, currentMemoryRound + 1)
         } else {
             getString(R.string.dex_game_memory_try_again, currentMemorySequence.joinToString(", "))
         }
-        if (isCorrect) {
+        val reward = if (isCorrect) {
             recordDexGameResult(correct = true)
             recordDexChallengeCompletion(DexMiniGameType.MEMORY)
-        } else breakDexGameStreak()
+        } else {
+            breakDexGameStreak()
+            null
+        }
+        val reply = listOfNotNull(baseReply, reward).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         if (isCorrect) {
             binding.dexGameInput.setText("")
@@ -3369,9 +3392,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun handleWouldYouRatherAnswer(answer: String, announce: Boolean = false) {
         val round = DEX_WOULD_YOU_RATHERS.getOrNull(currentWouldYouRatherIndex) ?: return
         val trimmed = answer.trim()
-        val reply = getString(R.string.dex_game_wyr_reply, trimmed, round.followUp)
+        val baseReply = getString(R.string.dex_game_wyr_reply, trimmed, round.followUp)
         recordDexGameResult(correct = true, countsAsScoredRound = false)
-        recordDexChallengeCompletion(DexMiniGameType.WOULD_YOU_RATHER)
+        val reward = recordDexChallengeCompletion(DexMiniGameType.WOULD_YOU_RATHER)
+        val reply = listOfNotNull(baseReply, reward).joinToString(" ")
         binding.dexGameStatus.text = dexGamesStatusSummary(reply)
         binding.dexGameInput.setText("")
         setDexCompanionState(
