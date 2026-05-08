@@ -204,6 +204,13 @@
     <string name="dex_companion_bubble_talking">Talking it through.</string>
     <string name="dex_companion_bubble_pending">I have this ready.</string>
     <string name="dex_companion_bubble_alert">Something needs you.</string>
+    <string name="dex_companion_status_sleeping">Sleeping</string>
+    <string name="dex_companion_status_listening">Listening</string>
+    <string name="dex_companion_status_thinking">Thinking</string>
+    <string name="dex_companion_status_talking">Talking</string>
+    <string name="dex_companion_status_ready">Ready</string>
+    <string name="dex_companion_status_alert">Alert</string>
+    <string name="dex_companion_status_pending">Pending</string>
     <string name="home_background_image">Background image</string>
     <string name="home_clear_background">Clear background</string>
     <string name="home_left_sticker">Left sticker</string>

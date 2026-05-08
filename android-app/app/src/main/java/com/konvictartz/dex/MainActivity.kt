@@ -3239,6 +3239,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         ).toFloat()
         binding.dexCompanionLabel.setTextColor(labelTint)
         binding.dexCompanionLabel.text = currentDexCompanionName
+        val statusSpec = dexCompanionStatusSpec(activeState, accentColor)
+        binding.dexCompanionStatusChip.text = getString(statusSpec.labelRes)
+        binding.dexCompanionStatusChip.backgroundTintList = ColorStateList.valueOf(statusSpec.chipColor)
+        binding.dexCompanionStatusChip.setTextColor(statusSpec.textColor)
+        binding.dexCompanionStatusDot.backgroundTintList = ColorStateList.valueOf(statusSpec.dotColor)
         binding.dexCompanionBubble.setTextColor(
             if (bubbleStyle == DEX_COMPANION_BUBBLE_BOLD) android.graphics.Color.WHITE else getColorCompat(R.color.dex_background)
         )
@@ -3350,8 +3355,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return when {
             pendingAction != null -> DEX_COMPANION_STATE_PENDING
             shouldResumeCallListeningAfterSpeech || isListeningForCallCommand || lastCallState == TelephonyManager.CALL_STATE_RINGING -> DEX_COMPANION_STATE_ALERT
-            dexChatInFlight -> DEX_COMPANION_STATE_EXCITED
+            dexChatInFlight -> DEX_COMPANION_STATE_THINKING
             isListeningForDexCommand || awaitingWakeCommand || conversationActive -> DEX_COMPANION_STATE_LISTENING
+            !wakeModeEnabled -> DEX_COMPANION_STATE_SLEEPING
             else -> DEX_COMPANION_STATE_IDLE
         }
     }
@@ -3389,6 +3395,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val context = deriveDexCompanionContext()
         return when (currentDexCompanionPersonality.lowercase(Locale.US)) {
             DEX_COMPANION_PERSONALITY_BESTIE -> when (state) {
+                DEX_COMPANION_STATE_SLEEPING -> "Catch me when you need me."
                 DEX_COMPANION_STATE_LISTENING -> when (context) {
                     DexCompanionContext.TEXT -> "Tell me the message."
                     DexCompanionContext.CALL -> "Okay, what do you want to do with the call?"
@@ -3420,6 +3427,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> "I am right here."
             }
             DEX_COMPANION_PERSONALITY_GUARDIAN -> when (state) {
+                DEX_COMPANION_STATE_SLEEPING -> "I am standing by."
                 DEX_COMPANION_STATE_LISTENING -> when (context) {
                     DexCompanionContext.SAFETY -> "I am listening carefully."
                     DexCompanionContext.CALL -> "State the call action."
@@ -3450,6 +3458,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> "I am here with you."
             }
             DEX_COMPANION_PERSONALITY_STUDY_BUDDY -> when (state) {
+                DEX_COMPANION_STATE_SLEEPING -> "I will be ready."
                 DEX_COMPANION_STATE_LISTENING -> when (context) {
                     DexCompanionContext.LESSON -> "Go ahead, I am tracking it."
                     DexCompanionContext.TEXT -> "Go ahead with the reply."
@@ -3477,6 +3486,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> "Ready when you are."
             }
             else -> when (state) {
+                DEX_COMPANION_STATE_SLEEPING -> "I am resting until you need me."
                 DEX_COMPANION_STATE_LISTENING -> when (context) {
                     DexCompanionContext.CALL -> "I am listening for the call command."
                     DexCompanionContext.TEXT -> "I am listening for the reply."
@@ -3557,8 +3567,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun companionMouthWidthDp(state: String): Int {
         return when (state) {
+            DEX_COMPANION_STATE_SLEEPING -> 8
             DEX_COMPANION_STATE_LISTENING -> 10
             DEX_COMPANION_STATE_EXCITED -> 26
+            DEX_COMPANION_STATE_THINKING -> 12
             DEX_COMPANION_STATE_TALKING -> 20
             DEX_COMPANION_STATE_PENDING -> 22
             DEX_COMPANION_STATE_ALERT -> 14
@@ -3572,8 +3584,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun companionMouthAlpha(state: String): Float {
         return when (state) {
+            DEX_COMPANION_STATE_SLEEPING -> 0.65f
             DEX_COMPANION_STATE_EXCITED, DEX_COMPANION_STATE_PENDING -> 1f
-            DEX_COMPANION_STATE_LISTENING, DEX_COMPANION_STATE_ALERT -> 0.82f
+            DEX_COMPANION_STATE_LISTENING, DEX_COMPANION_STATE_ALERT, DEX_COMPANION_STATE_THINKING -> 0.82f
             else -> when (currentDexCompanionMood.lowercase(Locale.US)) {
                 DEX_COMPANION_MOOD_PLAYFUL -> 1f
                 DEX_COMPANION_MOOD_FOCUS -> 0.84f
@@ -3584,6 +3597,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun companionBubbleAlpha(state: String): Float {
         return when (state) {
+            DEX_COMPANION_STATE_SLEEPING -> 0.9f
+            DEX_COMPANION_STATE_THINKING -> 0.97f
             DEX_COMPANION_STATE_LISTENING, DEX_COMPANION_STATE_TALKING -> 1f
             DEX_COMPANION_STATE_PENDING -> 0.99f
             else -> when (currentDexCompanionMood.lowercase(Locale.US)) {
@@ -3596,6 +3611,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun companionBubbleRotation(state: String): Float {
         return when (state) {
+            DEX_COMPANION_STATE_THINKING -> -0.6f
             DEX_COMPANION_STATE_EXCITED -> -2f
             DEX_COMPANION_STATE_PENDING -> -1f
             else -> {
@@ -3609,8 +3625,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun companionEyeScale(state: String): Float {
         return when (state) {
+            DEX_COMPANION_STATE_SLEEPING -> 0.45f
             DEX_COMPANION_STATE_LISTENING -> 1.25f
             DEX_COMPANION_STATE_EXCITED -> 1.15f
+            DEX_COMPANION_STATE_THINKING -> 0.9f
             DEX_COMPANION_STATE_ALERT -> 0.85f
             else -> if (state == DEX_COMPANION_STATE_IDLE) dexCompanionPersonalityIdleProfile().eyeScale else 1f
         }
@@ -3639,6 +3657,61 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val faceScale: Float,
         val blinkDelayMs: Long,
     )
+
+    private data class DexCompanionStatusSpec(
+        val labelRes: Int,
+        val chipColor: Int,
+        val dotColor: Int,
+        val textColor: Int,
+    )
+
+    private fun dexCompanionStatusSpec(state: String, accentColor: Int): DexCompanionStatusSpec {
+        val textColor = android.graphics.Color.WHITE
+        return when (state) {
+            DEX_COMPANION_STATE_SLEEPING -> DexCompanionStatusSpec(
+                labelRes = R.string.dex_companion_status_sleeping,
+                chipColor = ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_button_muted), 228),
+                dotColor = ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_text_secondary), 170),
+                textColor = textColor
+            )
+            DEX_COMPANION_STATE_LISTENING -> DexCompanionStatusSpec(
+                labelRes = R.string.dex_companion_status_listening,
+                chipColor = ColorUtils.setAlphaComponent(accentColor, 210),
+                dotColor = accentColor,
+                textColor = textColor
+            )
+            DEX_COMPANION_STATE_THINKING -> DexCompanionStatusSpec(
+                labelRes = R.string.dex_companion_status_thinking,
+                chipColor = ColorUtils.setAlphaComponent(ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.2f), 220),
+                dotColor = ColorUtils.blendARGB(accentColor, android.graphics.Color.WHITE, 0.35f),
+                textColor = textColor
+            )
+            DEX_COMPANION_STATE_TALKING -> DexCompanionStatusSpec(
+                labelRes = R.string.dex_companion_status_talking,
+                chipColor = ColorUtils.setAlphaComponent(ColorUtils.blendARGB(accentColor, android.graphics.Color.BLACK, 0.2f), 230),
+                dotColor = accentColor,
+                textColor = textColor
+            )
+            DEX_COMPANION_STATE_PENDING -> DexCompanionStatusSpec(
+                labelRes = R.string.dex_companion_status_pending,
+                chipColor = ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_button_healthy), 230),
+                dotColor = getColorCompat(R.color.dex_button_healthy),
+                textColor = textColor
+            )
+            DEX_COMPANION_STATE_ALERT -> DexCompanionStatusSpec(
+                labelRes = R.string.dex_companion_status_alert,
+                chipColor = ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_button_warn), 235),
+                dotColor = getColorCompat(R.color.dex_admin_signal),
+                textColor = textColor
+            )
+            else -> DexCompanionStatusSpec(
+                labelRes = R.string.dex_companion_status_ready,
+                chipColor = ColorUtils.setAlphaComponent(getColorCompat(R.color.dex_hint_ready_bg), 220),
+                dotColor = accentColor,
+                textColor = textColor
+            )
+        }
+    }
 
     private fun dexCompanionPersonalityIdleProfile(): DexCompanionIdleProfile {
         return when (currentDexCompanionPersonality.lowercase(Locale.US)) {
@@ -8679,7 +8752,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_PERSONALITY_GUARDIAN = "guardian"
         private const val DEX_COMPANION_PERSONALITY_STUDY_BUDDY = "study_buddy"
         private const val DEX_COMPANION_STATE_IDLE = "idle"
+        private const val DEX_COMPANION_STATE_SLEEPING = "sleeping"
         private const val DEX_COMPANION_STATE_LISTENING = "listening"
+        private const val DEX_COMPANION_STATE_THINKING = "thinking"
         private const val DEX_COMPANION_STATE_EXCITED = "excited"
         private const val DEX_COMPANION_STATE_TALKING = "talking"
         private const val DEX_COMPANION_STATE_PENDING = "pending"
