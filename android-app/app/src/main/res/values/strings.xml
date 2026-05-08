@@ -350,6 +350,7 @@
     <string name="dex_game_wyr_bubble">This one should be fun.</string>
     <string name="dex_game_wyr_bubble_reply">I like that answer.</string>
     <string name="dex_game_wyr_reply">You picked: %1$s. %2$s</string>
+    <string name="dex_game_stopped">Okay, game time is over for now. Pick another one whenever you want.</string>
     <string name="build_daily_plan">Build daily plan</string>
     <string name="build_diet_plan">Build diet plan</string>
     <string name="build_workout_plan">Workout</string>

@@ -2921,13 +2921,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .commit()
     }
 
-    private fun startGuessNumberGame() {
+    private fun startGuessNumberGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.GUESS_NUMBER
         dexGuessTarget = (1..20).random()
         dexGuessAttempts = 0
         binding.dexGameInput.setText("")
-        binding.dexGamePrompt.text = getString(R.string.dex_game_guess_prompt)
-        binding.dexGameStatus.text = getString(R.string.dex_game_guess_status)
+        val prompt = getString(R.string.dex_game_guess_prompt)
+        val status = getString(R.string.dex_game_guess_status)
+        binding.dexGamePrompt.text = prompt
+        binding.dexGameStatus.text = status
         binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_submit)
         binding.nextDexGameRoundButton.text = getString(R.string.dex_game_new_round)
         setDexCompanionState(
@@ -2935,9 +2937,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             bubbleOverride = getString(R.string.dex_game_guess_bubble),
             revertAfterMs = 2600L
         )
+        if (announce) {
+            announceDexMiniGameReply(prompt)
+        }
     }
 
-    private fun startRiddleGame() {
+    private fun startRiddleGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.RIDDLE
         currentRiddleIndex = (currentRiddleIndex + 1).mod(DEX_RIDDLES.size)
         val riddle = DEX_RIDDLES[currentRiddleIndex]
@@ -2951,9 +2956,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             bubbleOverride = getString(R.string.dex_game_riddle_bubble),
             revertAfterMs = 2600L
         )
+        if (announce) {
+            announceDexMiniGameReply(riddle.prompt)
+        }
     }
 
-    private fun startWouldYouRatherGame() {
+    private fun startWouldYouRatherGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.WOULD_YOU_RATHER
         currentWouldYouRatherIndex = (currentWouldYouRatherIndex + 1).mod(DEX_WOULD_YOU_RATHERS.size)
         val round = DEX_WOULD_YOU_RATHERS[currentWouldYouRatherIndex]
@@ -2967,39 +2975,55 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             bubbleOverride = getString(R.string.dex_game_wyr_bubble),
             revertAfterMs = 2600L
         )
+        if (announce) {
+            announceDexMiniGameReply(round.prompt)
+        }
     }
 
-    private fun submitDexGameAnswer() {
-        val answer = binding.dexGameInput.text?.toString()?.trim().orEmpty()
+    private fun submitDexGameAnswer(answerOverride: String? = null, announce: Boolean = false) {
+        val answer = answerOverride?.trim().orEmpty().ifBlank {
+            binding.dexGameInput.text?.toString()?.trim().orEmpty()
+        }
         if (activeDexMiniGame == DexMiniGameType.NONE) {
-            binding.dexGameStatus.text = getString(R.string.dex_game_pick_one_first)
+            val reply = getString(R.string.dex_game_pick_one_first)
+            binding.dexGameStatus.text = reply
+            if (announce) announceDexMiniGameReply(reply)
             return
         }
         if (answer.isBlank()) {
-            binding.dexGameStatus.text = getString(R.string.dex_game_answer_needed)
+            val reply = getString(R.string.dex_game_answer_needed)
+            binding.dexGameStatus.text = reply
+            if (announce) announceDexMiniGameReply(reply)
             return
         }
         when (activeDexMiniGame) {
-            DexMiniGameType.GUESS_NUMBER -> handleGuessNumberAnswer(answer)
-            DexMiniGameType.RIDDLE -> handleRiddleAnswer(answer)
-            DexMiniGameType.WOULD_YOU_RATHER -> handleWouldYouRatherAnswer(answer)
+            DexMiniGameType.GUESS_NUMBER -> handleGuessNumberAnswer(answer, announce)
+            DexMiniGameType.RIDDLE -> handleRiddleAnswer(answer, announce)
+            DexMiniGameType.WOULD_YOU_RATHER -> handleWouldYouRatherAnswer(answer, announce)
             DexMiniGameType.NONE -> Unit
         }
     }
 
-    private fun playNextDexMiniGameRound() {
+    private fun playNextDexMiniGameRound(announce: Boolean = false) {
         when (activeDexMiniGame) {
-            DexMiniGameType.GUESS_NUMBER -> startGuessNumberGame()
-            DexMiniGameType.RIDDLE -> startRiddleGame()
-            DexMiniGameType.WOULD_YOU_RATHER -> startWouldYouRatherGame()
-            DexMiniGameType.NONE -> binding.dexGameStatus.text = getString(R.string.dex_game_pick_one_first)
+            DexMiniGameType.GUESS_NUMBER -> startGuessNumberGame(announce)
+            DexMiniGameType.RIDDLE -> startRiddleGame(announce)
+            DexMiniGameType.WOULD_YOU_RATHER -> startWouldYouRatherGame(announce)
+            DexMiniGameType.NONE -> {
+                val reply = getString(R.string.dex_game_pick_one_first)
+                binding.dexGameStatus.text = reply
+                if (announce) announceDexMiniGameReply(reply)
+            }
         }
     }
 
-    private fun handleGuessNumberAnswer(answer: String) {
+    private fun handleGuessNumberAnswer(answer: String, announce: Boolean = false) {
         val guess = answer.toIntOrNull()
+            ?: Regex("(\\d{1,2})").find(answer)?.groupValues?.getOrNull(1)?.toIntOrNull()
         if (guess == null) {
-            binding.dexGameStatus.text = getString(R.string.dex_game_guess_number_needed)
+            val reply = getString(R.string.dex_game_guess_number_needed)
+            binding.dexGameStatus.text = reply
+            if (announce) announceDexMiniGameReply(reply)
             return
         }
         dexGuessAttempts += 1
@@ -3015,9 +3039,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             bubbleOverride = reply,
             revertAfterMs = 2600L
         )
+        if (announce) announceDexMiniGameReply(reply)
     }
 
-    private fun handleRiddleAnswer(answer: String) {
+    private fun handleRiddleAnswer(answer: String, announce: Boolean = false) {
         val riddle = DEX_RIDDLES.getOrNull(currentRiddleIndex) ?: return
         val normalized = answer.lowercase(Locale.US).trim()
         val isCorrect = normalized.contains(riddle.answer.lowercase(Locale.US))
@@ -3035,9 +3060,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             bubbleOverride = reply,
             revertAfterMs = 2800L
         )
+        if (announce) announceDexMiniGameReply(reply)
     }
 
-    private fun handleWouldYouRatherAnswer(answer: String) {
+    private fun handleWouldYouRatherAnswer(answer: String, announce: Boolean = false) {
         val round = DEX_WOULD_YOU_RATHERS.getOrNull(currentWouldYouRatherIndex) ?: return
         val trimmed = answer.trim()
         val reply = getString(R.string.dex_game_wyr_reply, trimmed, round.followUp)
@@ -3048,6 +3074,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             bubbleOverride = getString(R.string.dex_game_wyr_bubble_reply),
             revertAfterMs = 2400L
         )
+        if (announce) announceDexMiniGameReply(reply)
+    }
+
+    private fun announceDexMiniGameReply(reply: String) {
+        binding.conversationStatus.text = reply
+        binding.lastReplyValue.text = reply
+        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
     }
 
     private fun loadDashboardSections() {
@@ -5744,6 +5777,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingIncomingSmsSender?.let { phrases += it }
         pendingNotificationTitle?.let { phrases += it }
         lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" }?.let { phrases += it }
+        phrases += "play a game"
+        phrases += "guess my number"
+        phrases += "tell me a riddle"
+        phrases += "would you rather"
+        phrases += "next round"
+        phrases += "new round"
+        phrases += "stop game"
         return phrases.toList()
     }
 
@@ -6018,6 +6058,116 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return true
         }
         return false
+    }
+
+    private fun handleDexMiniGameIntent(message: String): Boolean {
+        val trimmed = message.trim()
+        val normalized = trimmed.lowercase(Locale.US)
+        if (normalized.isBlank()) return false
+
+        if (
+            normalized.contains("guess my number") ||
+            normalized.contains("number game") ||
+            normalized == "play guess my number"
+        ) {
+            startGuessNumberGame(announce = true)
+            return true
+        }
+
+        if (
+            normalized.contains("tell me a riddle") ||
+            normalized.contains("start a riddle") ||
+            normalized == "play riddle" ||
+            normalized == "riddle me"
+        ) {
+            startRiddleGame(announce = true)
+            return true
+        }
+
+        if (
+            normalized.contains("would you rather") ||
+            normalized.contains("play would you rather")
+        ) {
+            startWouldYouRatherGame(announce = true)
+            return true
+        }
+
+        if (
+            normalized == "play a game" ||
+            normalized == "play with dex" ||
+            normalized == "lets play a game" ||
+            normalized == "let's play a game"
+        ) {
+            startGuessNumberGame(announce = true)
+            return true
+        }
+
+        if (activeDexMiniGame == DexMiniGameType.NONE) return false
+
+        if (
+            normalized == "next round" ||
+            normalized == "new round" ||
+            normalized == "next game" ||
+            normalized == "another one"
+        ) {
+            playNextDexMiniGameRound(announce = true)
+            return true
+        }
+
+        if (
+            normalized == "stop game" ||
+            normalized == "end game" ||
+            normalized == "cancel game" ||
+            normalized == "quit game"
+        ) {
+            activeDexMiniGame = DexMiniGameType.NONE
+            val reply = getString(R.string.dex_game_stopped)
+            binding.dexGameStatus.text = reply
+            announceDexMiniGameReply(reply)
+            restoreDexCompanionState()
+            return true
+        }
+
+        if (shouldTreatAsDexMiniGameAnswer(trimmed, normalized)) {
+            submitDexGameAnswer(answerOverride = trimmed, announce = true)
+            return true
+        }
+
+        return false
+    }
+
+    private fun shouldTreatAsDexMiniGameAnswer(raw: String, normalized: String): Boolean {
+        if (activeDexMiniGame == DexMiniGameType.NONE) return false
+        if (activeDexMiniGame == DexMiniGameType.GUESS_NUMBER) {
+            val digitsOnly = raw.filter { it.isDigit() }
+            return digitsOnly.isNotBlank() || normalized.startsWith("my guess is ")
+        }
+        val commandPrefixes = listOf(
+            "open ",
+            "call ",
+            "text ",
+            "email ",
+            "remind ",
+            "set ",
+            "create ",
+            "make ",
+            "what ",
+            "what's ",
+            "whats ",
+            "who ",
+            "where ",
+            "when ",
+            "read ",
+            "answer ",
+            "decline ",
+            "approve ",
+            "cancel ",
+            "play ",
+            "start "
+        )
+        if (commandPrefixes.any { normalized.startsWith(it) }) return false
+        if (normalized.length <= 2) return false
+        return true
     }
 
     private fun openYoutube(query: String?) {
@@ -6409,6 +6559,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         consumePendingContactTarget(normalized)?.let { actionTaken ->
             if (actionTaken) return true
         }
+
+        if (handleDexMiniGameIntent(message)) return true
 
         if (
             normalized.contains("read my notifications") ||
