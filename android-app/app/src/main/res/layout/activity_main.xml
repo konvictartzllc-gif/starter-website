@@ -2693,6 +2693,21 @@
                         android:layout_marginTop="10dp"
                         android:text="@string/dex_companion_visible" />
 
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/dexCompanionNameLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="@string/dex_companion_name_label">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/dexCompanionNameInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapWords"
+                            android:maxLines="1" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -2971,6 +2986,45 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/dex_companion_accessory_halo" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/dex_companion_voice_label"
+                        android:textColor="@color/dex_text_secondary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/dexCompanionVoiceToggle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        app:selectionRequired="true"
+                        app:singleSelection="true">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/dexCompanionVoiceSupportiveButton"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dex_companion_voice_supportive" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/dexCompanionVoicePlayfulButton"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dex_companion_voice_playful" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/dexCompanionVoiceDirectButton"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dex_companion_voice_direct" />
                     </com.google.android.material.button.MaterialButtonToggleGroup>
                 </LinearLayout>
 

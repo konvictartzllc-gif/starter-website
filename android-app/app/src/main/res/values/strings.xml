@@ -156,6 +156,7 @@
     <string name="dex_companion_title">On-screen Dex</string>
     <string name="dex_companion_summary">Keep a small Dex companion on screen and tune the mood, side, and size to your liking.</string>
     <string name="dex_companion_visible">Show my Dex companion on screen</string>
+    <string name="dex_companion_name_label">Companion name</string>
     <string name="dex_companion_mood_label">Mood</string>
     <string name="dex_companion_mood_calm">Calm</string>
     <string name="dex_companion_mood_playful">Playful</string>
@@ -185,6 +186,10 @@
     <string name="dex_companion_accessory_headphones">Headphones</string>
     <string name="dex_companion_accessory_glasses">Glasses</string>
     <string name="dex_companion_accessory_halo">Halo</string>
+    <string name="dex_companion_voice_label">Bubble voice</string>
+    <string name="dex_companion_voice_supportive">Supportive</string>
+    <string name="dex_companion_voice_playful">Playful</string>
+    <string name="dex_companion_voice_direct">Direct</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>

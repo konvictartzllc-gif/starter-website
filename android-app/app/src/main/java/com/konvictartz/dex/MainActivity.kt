@@ -52,6 +52,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.button.MaterialButton
@@ -264,6 +265,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var currentDexCompanionBubbleStyle: String = DEX_COMPANION_BUBBLE_SOFT
     private var currentDexCompanionSkin: String = DEX_COMPANION_SKIN_SKY
     private var currentDexCompanionAccessory: String = DEX_COMPANION_ACCESSORY_NONE
+    private var currentDexCompanionName: String = "Dex"
+    private var currentDexCompanionVoice: String = DEX_COMPANION_VOICE_SUPPORTIVE
     private var currentDexCompanionOffsetX = 0f
     private var currentDexCompanionOffsetY = 0f
     private var dexCompanionState: String = DEX_COMPANION_STATE_IDLE
@@ -949,6 +952,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             applyDexCompanionUi()
             persistHomeLook()
         }
+        binding.dexCompanionNameInput.doAfterTextChanged {
+            currentDexCompanionName = it?.toString()?.trim().orEmpty().ifBlank { "Dex" }
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
         binding.dexCompanionMoodToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             currentDexCompanionMood = when (checkedId) {
@@ -1018,6 +1026,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 R.id.dexCompanionAccessoryGlassesButton -> DEX_COMPANION_ACCESSORY_GLASSES
                 R.id.dexCompanionAccessoryHaloButton -> DEX_COMPANION_ACCESSORY_HALO
                 else -> DEX_COMPANION_ACCESSORY_NONE
+            }
+            applyDexCompanionUi()
+            persistHomeLook()
+        }
+        binding.dexCompanionVoiceToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            currentDexCompanionVoice = when (checkedId) {
+                R.id.dexCompanionVoicePlayfulButton -> DEX_COMPANION_VOICE_PLAYFUL
+                R.id.dexCompanionVoiceDirectButton -> DEX_COMPANION_VOICE_DIRECT
+                else -> DEX_COMPANION_VOICE_SUPPORTIVE
             }
             applyDexCompanionUi()
             persistHomeLook()
@@ -1112,6 +1130,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentDexCompanionAccessory = prefs.getString(KEY_DEX_COMPANION_ACCESSORY, DEX_COMPANION_ACCESSORY_NONE)
             .orEmpty()
             .ifBlank { DEX_COMPANION_ACCESSORY_NONE }
+        currentDexCompanionName = prefs.getString(KEY_DEX_COMPANION_NAME, "Dex")
+            .orEmpty()
+            .ifBlank { "Dex" }
+        currentDexCompanionVoice = prefs.getString(KEY_DEX_COMPANION_VOICE, DEX_COMPANION_VOICE_SUPPORTIVE)
+            .orEmpty()
+            .ifBlank { DEX_COMPANION_VOICE_SUPPORTIVE }
         currentDexCompanionOffsetX = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_X, 0f)
         currentDexCompanionOffsetY = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_Y, 0f)
         updateAdvancedStyleUi(currentThemePreset == "custom")
@@ -3016,6 +3040,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_DEX_COMPANION_BUBBLE_STYLE, currentDexCompanionBubbleStyle)
             .putString(KEY_DEX_COMPANION_SKIN, currentDexCompanionSkin)
             .putString(KEY_DEX_COMPANION_ACCESSORY, currentDexCompanionAccessory)
+            .putString(KEY_DEX_COMPANION_NAME, currentDexCompanionName)
+            .putString(KEY_DEX_COMPANION_VOICE, currentDexCompanionVoice)
             .putFloat(KEY_DEX_COMPANION_OFFSET_X, currentDexCompanionOffsetX)
             .putFloat(KEY_DEX_COMPANION_OFFSET_Y, currentDexCompanionOffsetY)
             .commit()
@@ -3032,6 +3058,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun updateDexCompanionControls() {
         if (binding.dexCompanionVisibleSwitch.isChecked != currentDexCompanionVisible) {
             binding.dexCompanionVisibleSwitch.isChecked = currentDexCompanionVisible
+        }
+        val companionName = binding.dexCompanionNameInput.text?.toString().orEmpty()
+        if (companionName != currentDexCompanionName) {
+            binding.dexCompanionNameInput.setText(currentDexCompanionName)
+            binding.dexCompanionNameInput.setSelection(binding.dexCompanionNameInput.text?.length ?: 0)
         }
         binding.dexCompanionMoodToggle.check(
             when (currentDexCompanionMood.lowercase(Locale.US)) {
@@ -3083,6 +3114,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> R.id.dexCompanionAccessoryNoneButton
             }
         )
+        binding.dexCompanionVoiceToggle.check(
+            when (currentDexCompanionVoice.lowercase(Locale.US)) {
+                DEX_COMPANION_VOICE_PLAYFUL -> R.id.dexCompanionVoicePlayfulButton
+                DEX_COMPANION_VOICE_DIRECT -> R.id.dexCompanionVoiceDirectButton
+                else -> R.id.dexCompanionVoiceSupportiveButton
+            }
+        )
     }
 
     private fun applyDexCompanionUi() {
@@ -3127,6 +3165,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         ).toFloat()
         binding.dexCompanionLabel.setTextColor(labelTint)
+        binding.dexCompanionLabel.text = currentDexCompanionName
         binding.dexCompanionBubble.setTextColor(
             if (bubbleStyle == DEX_COMPANION_BUBBLE_BOLD) android.graphics.Color.WHITE else getColorCompat(R.color.dex_background)
         )
@@ -3266,7 +3305,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun companionBubbleForState(state: String): String {
-        return when (state) {
+        val base = when (state) {
             DEX_COMPANION_STATE_LISTENING -> getString(R.string.dex_companion_bubble_listening)
             DEX_COMPANION_STATE_EXCITED -> getString(R.string.dex_companion_bubble_excited)
             DEX_COMPANION_STATE_TALKING -> getString(R.string.dex_companion_bubble_talking)
@@ -3277,6 +3316,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 DEX_COMPANION_MOOD_FOCUS -> getString(R.string.dex_companion_bubble_focus)
                 else -> getString(R.string.dex_companion_bubble_calm)
             }
+        }
+        return companionVoiceCopy(base)
+    }
+
+    private fun companionVoiceCopy(base: String): String {
+        val name = currentDexCompanionName.ifBlank { "Dex" }
+        return when (currentDexCompanionVoice.lowercase(Locale.US)) {
+            DEX_COMPANION_VOICE_PLAYFUL -> "$base $name is in."
+            DEX_COMPANION_VOICE_DIRECT -> when {
+                base.equals(getString(R.string.dex_companion_bubble_listening), true) -> "$name is listening."
+                base.equals(getString(R.string.dex_companion_bubble_pending), true) -> "$name has this ready."
+                base.equals(getString(R.string.dex_companion_bubble_alert), true) -> "$name needs your attention."
+                else -> "$name: $base"
+            }
+            else -> "$name says: $base"
         }
     }
 
@@ -8204,6 +8258,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_COMPANION_BUBBLE_STYLE = "dex_companion_bubble_style"
         const val KEY_DEX_COMPANION_SKIN = "dex_companion_skin"
         const val KEY_DEX_COMPANION_ACCESSORY = "dex_companion_accessory"
+        const val KEY_DEX_COMPANION_NAME = "dex_companion_name"
+        const val KEY_DEX_COMPANION_VOICE = "dex_companion_voice"
         const val KEY_DEX_COMPANION_OFFSET_X = "dex_companion_offset_x"
         const val KEY_DEX_COMPANION_OFFSET_Y = "dex_companion_offset_y"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
@@ -8252,6 +8308,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_COMPANION_ACCESSORY_HEADPHONES = "headphones"
         private const val DEX_COMPANION_ACCESSORY_GLASSES = "glasses"
         private const val DEX_COMPANION_ACCESSORY_HALO = "halo"
+        private const val DEX_COMPANION_VOICE_SUPPORTIVE = "supportive"
+        private const val DEX_COMPANION_VOICE_PLAYFUL = "playful"
+        private const val DEX_COMPANION_VOICE_DIRECT = "direct"
         private const val DEX_COMPANION_STATE_IDLE = "idle"
         private const val DEX_COMPANION_STATE_LISTENING = "listening"
         private const val DEX_COMPANION_STATE_EXCITED = "excited"
