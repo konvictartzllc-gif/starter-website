@@ -54,6 +54,8 @@
     <string name="dashboard_access_unknown">Unknown</string>
     <string name="user_dashboard_title">Your activity</string>
     <string name="user_dashboard_summary">Track your Dex chats, language lessons, and quiz progress here.</string>
+    <string name="user_dashboard_focus_label">Creative pulse</string>
+    <string name="user_dashboard_focus_copy">Keep your everyday rhythm visible so Dex feels more like a companion than a control panel.</string>
     <string name="dashboard_metric_chat">Chat history</string>
     <string name="dashboard_metric_lessons">Lessons</string>
     <string name="dashboard_metric_quiz">Quiz progress</string>
@@ -63,6 +65,12 @@
     <string name="quiz_score_empty">No quiz score yet</string>
     <string name="affiliate_dashboard_title">Affiliate earnings</string>
     <string name="affiliate_dashboard_summary">See your promo code, commissions, and referrals in one place.</string>
+    <string name="affiliate_dashboard_focus_label">Momentum view</string>
+    <string name="affiliate_dashboard_focus_copy">A cleaner growth strip for watching reach, revenue, and conversion at a glance.</string>
+    <string name="affiliate_dashboard_code_label">Promo code</string>
+    <string name="affiliate_dashboard_earnings_label">Revenue</string>
+    <string name="affiliate_dashboard_signups_label">Signups</string>
+    <string name="affiliate_dashboard_paid_label">Paid subs</string>
     <string name="affiliate_promo_code">Promo code: %1$s</string>
     <string name="affiliate_earnings">Earnings: $%1$s</string>
     <string name="affiliate_signups">Signups: %1$d</string>
@@ -70,6 +78,8 @@
     <string name="affiliate_withdraw_note">Withdrawals will use your Stripe verification once payout setup is live.</string>
     <string name="admin_dashboard_title">Admin portal</string>
     <string name="admin_dashboard_summary">Manage backend access, affiliate codes, and platform health from here.</string>
+    <string name="admin_dashboard_focus_label">Operations lane</string>
+    <string name="admin_dashboard_focus_copy">Critical systems first, with backend reach and platform health framed like live command data.</string>
     <string name="admin_backend_label">Backend</string>
     <string name="admin_stats_label">Platform snapshot</string>
     <string name="admin_invite_name">Affiliate name (optional)</string>
