@@ -371,6 +371,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexWouldYouRatherPlays = 0
     private var dexGamesChallengeCompletedDate = ""
     private var dexGamesChallengeClears = 0
+    private var dexCoins = 12
+    private var ownedDexCosmetics = mutableSetOf<String>()
 
     private val resetWakeWindowRunnable = Runnable {
         awaitingWakeCommand = false
@@ -1133,43 +1135,63 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         binding.dexCompanionFaceStyleToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
-            currentDexCompanionFaceStyle = when (checkedId) {
+            val faceStyle = when (checkedId) {
                 R.id.dexCompanionFaceStyleWinkButton -> DEX_COMPANION_FACE_WINK
                 R.id.dexCompanionFaceStylePixelButton -> DEX_COMPANION_FACE_PIXEL
                 else -> DEX_COMPANION_FACE_CLASSIC
             }
+            if (!ensureDexCosmeticOwned(faceStyleCosmeticKey(faceStyle), dexFaceStyleLabel(faceStyle), dexFaceStyleCost(faceStyle))) {
+                updateDexCompanionControls()
+                return@addOnButtonCheckedListener
+            }
+            currentDexCompanionFaceStyle = faceStyle
             applyDexCompanionUi()
             persistHomeLook()
         }
         binding.dexCompanionBubbleStyleToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
-            currentDexCompanionBubbleStyle = when (checkedId) {
+            val bubbleStyle = when (checkedId) {
                 R.id.dexCompanionBubbleStyleGlowButton -> DEX_COMPANION_BUBBLE_GLOW
                 R.id.dexCompanionBubbleStyleBoldButton -> DEX_COMPANION_BUBBLE_BOLD
                 else -> DEX_COMPANION_BUBBLE_SOFT
             }
+            if (!ensureDexCosmeticOwned(bubbleStyleCosmeticKey(bubbleStyle), dexBubbleStyleLabel(bubbleStyle), dexBubbleStyleCost(bubbleStyle))) {
+                updateDexCompanionControls()
+                return@addOnButtonCheckedListener
+            }
+            currentDexCompanionBubbleStyle = bubbleStyle
             applyDexCompanionUi()
             persistHomeLook()
         }
         binding.dexCompanionSkinToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
-            currentDexCompanionSkin = when (checkedId) {
+            val skin = when (checkedId) {
                 R.id.dexCompanionSkinMintButton -> DEX_COMPANION_SKIN_MINT
                 R.id.dexCompanionSkinSunsetButton -> DEX_COMPANION_SKIN_SUNSET
                 R.id.dexCompanionSkinVioletButton -> DEX_COMPANION_SKIN_VIOLET
                 else -> DEX_COMPANION_SKIN_SKY
             }
+            if (!ensureDexCosmeticOwned(skinCosmeticKey(skin), dexSkinLabel(skin), dexSkinCost(skin))) {
+                updateDexCompanionControls()
+                return@addOnButtonCheckedListener
+            }
+            currentDexCompanionSkin = skin
             applyDexCompanionUi()
             persistHomeLook()
         }
         binding.dexCompanionAccessoryToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
-            currentDexCompanionAccessory = when (checkedId) {
+            val accessory = when (checkedId) {
                 R.id.dexCompanionAccessoryHeadphonesButton -> DEX_COMPANION_ACCESSORY_HEADPHONES
                 R.id.dexCompanionAccessoryGlassesButton -> DEX_COMPANION_ACCESSORY_GLASSES
                 R.id.dexCompanionAccessoryHaloButton -> DEX_COMPANION_ACCESSORY_HALO
                 else -> DEX_COMPANION_ACCESSORY_NONE
             }
+            if (!ensureDexCosmeticOwned(accessoryCosmeticKey(accessory), dexAccessoryLabel(accessory), dexAccessoryCost(accessory))) {
+                updateDexCompanionControls()
+                return@addOnButtonCheckedListener
+            }
+            currentDexCompanionAccessory = accessory
             applyDexCompanionUi()
             persistHomeLook()
         }
@@ -1332,6 +1354,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         currentDexCompanionOffsetY = prefs.getFloat(KEY_DEX_COMPANION_OFFSET_Y, 0f)
         currentDexCompanionTierStyleOverride =
             prefs.getInt(KEY_DEX_COMPANION_TIER_STYLE_OVERRIDE, -1).takeIf { it >= 0 }
+        dexCoins = prefs.getInt(KEY_DEX_COINS, 12)
+        ownedDexCosmetics =
+            (prefs.getStringSet(KEY_DEX_COMPANION_OWNED_COSMETICS, emptySet()) ?: emptySet()).toMutableSet()
+        ownedDexCosmetics.addAll(defaultDexCosmetics())
         dexGamesPlayed = prefs.getInt(KEY_DEX_GAMES_PLAYED, 0)
         dexGamesCorrect = prefs.getInt(KEY_DEX_GAMES_CORRECT, 0)
         dexGamesCurrentStreak = prefs.getInt(KEY_DEX_GAMES_STREAK, 0)
@@ -3109,6 +3135,130 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun defaultDexCosmetics(): Set<String> = setOf(
+        skinCosmeticKey(DEX_COMPANION_SKIN_SKY),
+        skinCosmeticKey(DEX_COMPANION_SKIN_MINT),
+        accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_NONE),
+        faceStyleCosmeticKey(DEX_COMPANION_FACE_CLASSIC),
+        bubbleStyleCosmeticKey(DEX_COMPANION_BUBBLE_SOFT)
+    )
+
+    private fun skinCosmeticKey(value: String) = "skin:$value"
+    private fun accessoryCosmeticKey(value: String) = "accessory:$value"
+    private fun faceStyleCosmeticKey(value: String) = "face:$value"
+    private fun bubbleStyleCosmeticKey(value: String) = "bubble:$value"
+
+    private fun dexSkinCost(value: String): Int = when (value.lowercase(Locale.US)) {
+        DEX_COMPANION_SKIN_SUNSET -> 6
+        DEX_COMPANION_SKIN_VIOLET -> 8
+        else -> 0
+    }
+
+    private fun dexAccessoryCost(value: String): Int = when (value.lowercase(Locale.US)) {
+        DEX_COMPANION_ACCESSORY_HEADPHONES -> 4
+        DEX_COMPANION_ACCESSORY_GLASSES -> 6
+        DEX_COMPANION_ACCESSORY_HALO -> 10
+        else -> 0
+    }
+
+    private fun dexFaceStyleCost(value: String): Int = when (value.lowercase(Locale.US)) {
+        DEX_COMPANION_FACE_WINK -> 3
+        DEX_COMPANION_FACE_PIXEL -> 5
+        else -> 0
+    }
+
+    private fun dexBubbleStyleCost(value: String): Int = when (value.lowercase(Locale.US)) {
+        DEX_COMPANION_BUBBLE_GLOW -> 4
+        DEX_COMPANION_BUBBLE_BOLD -> 4
+        else -> 0
+    }
+
+    private fun dexSkinLabel(value: String): String = when (value.lowercase(Locale.US)) {
+        DEX_COMPANION_SKIN_MINT -> getString(R.string.dex_companion_skin_mint)
+        DEX_COMPANION_SKIN_SUNSET -> getString(R.string.dex_companion_skin_sunset)
+        DEX_COMPANION_SKIN_VIOLET -> getString(R.string.dex_companion_skin_violet)
+        else -> getString(R.string.dex_companion_skin_sky)
+    }
+
+    private fun dexAccessoryLabel(value: String): String = when (value.lowercase(Locale.US)) {
+        DEX_COMPANION_ACCESSORY_HEADPHONES -> getString(R.string.dex_companion_accessory_headphones)
+        DEX_COMPANION_ACCESSORY_GLASSES -> getString(R.string.dex_companion_accessory_glasses)
+        DEX_COMPANION_ACCESSORY_HALO -> getString(R.string.dex_companion_accessory_halo)
+        else -> getString(R.string.dex_companion_accessory_none)
+    }
+
+    private fun dexFaceStyleLabel(value: String): String = when (value.lowercase(Locale.US)) {
+        DEX_COMPANION_FACE_WINK -> getString(R.string.dex_companion_face_style_wink)
+        DEX_COMPANION_FACE_PIXEL -> getString(R.string.dex_companion_face_style_pixel)
+        else -> getString(R.string.dex_companion_face_style_classic)
+    }
+
+    private fun dexBubbleStyleLabel(value: String): String = when (value.lowercase(Locale.US)) {
+        DEX_COMPANION_BUBBLE_GLOW -> getString(R.string.dex_companion_bubble_style_glow)
+        DEX_COMPANION_BUBBLE_BOLD -> getString(R.string.dex_companion_bubble_style_bold)
+        else -> getString(R.string.dex_companion_bubble_style_soft)
+    }
+
+    private fun ownedPremiumDexCosmeticsCount(): Int = ownedDexCosmetics.count { it !in defaultDexCosmetics() }
+
+    private fun dexCoinsLine(): String = getString(R.string.dex_coins_line, dexCoins)
+
+    private fun ensureDexCosmeticOwned(key: String, label: String, cost: Int): Boolean {
+        if (cost <= 0 || ownedDexCosmetics.contains(key)) return true
+        if (dexCoins < cost) {
+            binding.homeStyleMessage.text =
+                getString(R.string.dex_cosmetic_need_coins, label, cost, dexCoins)
+            setDexCompanionState(
+                DEX_COMPANION_STATE_PENDING,
+                bubbleOverride = getString(R.string.dex_cosmetic_need_coins_bubble, cost),
+                revertAfterMs = 2200L
+            )
+            return false
+        }
+        dexCoins -= cost
+        ownedDexCosmetics.add(key)
+        saveDexGameStats()
+        persistHomeLook()
+        binding.homeStyleMessage.text =
+            getString(R.string.dex_cosmetic_unlocked, label, cost, dexCoins)
+        setDexCompanionState(
+            DEX_COMPANION_STATE_EXCITED,
+            bubbleOverride = getString(R.string.dex_cosmetic_unlocked_bubble, label),
+            revertAfterMs = 2200L
+        )
+        return true
+    }
+
+    private fun dexMiniGameCost(type: DexMiniGameType): Int = when (type) {
+        DexMiniGameType.TRIVIA -> 2
+        DexMiniGameType.MEMORY -> 3
+        DexMiniGameType.WOULD_YOU_RATHER -> 1
+        else -> 0
+    }
+
+    private fun maybeChargeDexGameEntry(type: DexMiniGameType, announce: Boolean): Boolean {
+        val cost = dexMiniGameCost(type)
+        if (cost <= 0) return true
+        val label = dexMiniGameLabel(type)
+        if (dexCoins < cost) {
+            val reply = getString(R.string.dex_game_cost_locked, label, cost, dexCoins)
+            binding.dexGameStatus.text = dexGamesStatusSummary(reply)
+            setDexCompanionState(
+                DEX_COMPANION_STATE_PENDING,
+                bubbleOverride = getString(R.string.dex_game_cost_locked_bubble, cost),
+                revertAfterMs = 2200L
+            )
+            if (announce) announceDexMiniGameReply(reply)
+            return false
+        }
+        dexCoins -= cost
+        saveDexGameStats()
+        binding.dexGameStatus.text = dexGamesStatusSummary(
+            getString(R.string.dex_game_cost_paid, label, cost, dexCoins)
+        )
+        return true
+    }
+
     private fun dexCompanionShelfBadge(level: Int): String {
         val tier = dexGamesUnlockTier(level)
         return when {
@@ -3162,7 +3312,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 favorite
             )
         }
-        return body
+        return "$body\n${dexCoinsLine()}\n${getString(R.string.dex_companion_rewards_owned_line, ownedPremiumDexCosmeticsCount())}"
     }
 
     private fun dexCompanionRewardsSummary(): CharSequence {
@@ -3311,7 +3461,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun dexGamesStatusSummary(base: String): String {
-        return "$base\n${dexGamesScoreLine()}\n${dexGamesProfileLine()}\n${dexGamesChallengeLine()}\n${dexGamesUnlockLine()}"
+        return "$base\n${dexCoinsLine()}\n${dexGamesScoreLine()}\n${dexGamesProfileLine()}\n${dexGamesChallengeLine()}\n${dexGamesUnlockLine()}"
     }
 
     private fun saveDexGameStats() {
@@ -3328,6 +3478,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putInt(KEY_DEX_GAMES_WYR_PLAYS, dexWouldYouRatherPlays)
             .putString(KEY_DEX_GAMES_CHALLENGE_DONE_DATE, dexGamesChallengeCompletedDate)
             .putInt(KEY_DEX_GAMES_CHALLENGE_CLEARS, dexGamesChallengeClears)
+            .putInt(KEY_DEX_COINS, dexCoins)
+            .putStringSet(KEY_DEX_COMPANION_OWNED_COSMETICS, ownedDexCosmetics)
             .apply()
     }
 
@@ -3374,6 +3526,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (type != todaysDexChallengeGame() || isTodayDexChallengeComplete()) return null
         dexGamesChallengeCompletedDate = LocalDate.now().toString()
         dexGamesChallengeClears += 1
+        dexCoins += 5
         saveDexGameStats()
         val unlockedLevel = dexGamesUnlockLevel()
         if (dexGamesUnlockBubbleLine() != null) {
@@ -3382,6 +3535,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return DexChallengeReward(
             reply = listOfNotNull(
             dexGamesChallengeRewardLine(type),
+            getString(R.string.dex_coins_earned_challenge, 5, dexCoins),
             dexGamesUnlockRewardLine()
             ).joinToString(" "),
             bubble = dexGamesUnlockBubbleLine()
@@ -3394,6 +3548,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             dexGamesCorrect += 1
             dexGamesCurrentStreak += 1
             dexGamesBestStreak = max(dexGamesBestStreak, dexGamesCurrentStreak)
+            dexCoins += 2
+        } else if (correct) {
+            dexCoins += 1
         } else if (countsAsScoredRound) {
             dexGamesCurrentStreak = 0
         }
@@ -3449,6 +3606,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun startTriviaGame(announce: Boolean = false) {
+        if (!maybeChargeDexGameEntry(DexMiniGameType.TRIVIA, announce)) return
         activeDexMiniGame = DexMiniGameType.TRIVIA
         recordDexMiniGameStart(DexMiniGameType.TRIVIA)
         currentTriviaIndex = (currentTriviaIndex + 1).mod(DEX_TRIVIA_QUESTIONS.size)
@@ -3469,6 +3627,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun startMemoryGame(announce: Boolean = false) {
+        if (!maybeChargeDexGameEntry(DexMiniGameType.MEMORY, announce)) return
         val continuing = activeDexMiniGame == DexMiniGameType.MEMORY && currentMemoryRound > 0
         activeDexMiniGame = DexMiniGameType.MEMORY
         recordDexMiniGameStart(DexMiniGameType.MEMORY)
@@ -3494,6 +3653,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun startWouldYouRatherGame(announce: Boolean = false) {
+        if (!maybeChargeDexGameEntry(DexMiniGameType.WOULD_YOU_RATHER, announce)) return
         activeDexMiniGame = DexMiniGameType.WOULD_YOU_RATHER
         recordDexMiniGameStart(DexMiniGameType.WOULD_YOU_RATHER)
         currentWouldYouRatherIndex = (currentWouldYouRatherIndex + 1).mod(DEX_WOULD_YOU_RATHERS.size)
@@ -10017,6 +10177,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_DEX_GAMES_WYR_PLAYS = "dex_games_wyr_plays"
         const val KEY_DEX_GAMES_CHALLENGE_DONE_DATE = "dex_games_challenge_done_date"
         const val KEY_DEX_GAMES_CHALLENGE_CLEARS = "dex_games_challenge_clears"
+        const val KEY_DEX_COINS = "dex_coins"
+        const val KEY_DEX_COMPANION_OWNED_COSMETICS = "dex_companion_owned_cosmetics"
         const val KEY_DASHBOARD_SECTIONS = "dashboard_sections"
         const val ACTION_LOCAL_EMERGENCY_SMS_SENT = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_SENT"
         const val ACTION_LOCAL_EMERGENCY_SMS_DELIVERED = "com.konvictartz.dex.LOCAL_EMERGENCY_SMS_DELIVERED"

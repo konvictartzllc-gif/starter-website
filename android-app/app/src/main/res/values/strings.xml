@@ -220,6 +220,7 @@
     <string name="dex_companion_rewards_perk_star">Brighter halo, stronger card edge, and Star status shine.</string>
     <string name="dex_companion_rewards_perk_legend">Full halo energy, sharper card edge, and Legend-ready status cues.</string>
     <string name="dex_companion_rewards_favorite_none">Still learning</string>
+    <string name="dex_companion_rewards_owned_line">Unlocked premium looks: %1$d</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>
@@ -403,6 +404,15 @@
     <string name="dex_game_wyr_bubble_reply">I like that answer.</string>
     <string name="dex_game_wyr_reply">You picked: %1$s. %2$s</string>
     <string name="dex_game_stopped">Okay, game time is over for now. Pick another one whenever you want.</string>
+    <string name="dex_coins_line">Dex coins: %1$d</string>
+    <string name="dex_coins_earned_challenge">Daily challenge reward: +%1$d Dex coins. Balance: %2$d.</string>
+    <string name="dex_game_cost_paid">%1$s started for %2$d Dex coins. Balance: %3$d.</string>
+    <string name="dex_game_cost_locked">%1$s costs %2$d Dex coins. You have %3$d right now.</string>
+    <string name="dex_game_cost_locked_bubble">Need %1$d Dex coins first.</string>
+    <string name="dex_cosmetic_unlocked">Unlocked %1$s for %2$d Dex coins. Balance: %3$d.</string>
+    <string name="dex_cosmetic_unlocked_bubble">%1$s is yours now.</string>
+    <string name="dex_cosmetic_need_coins">%1$s costs %2$d Dex coins. You have %3$d right now.</string>
+    <string name="dex_cosmetic_need_coins_bubble">Need %1$d coins for that look.</string>
     <string name="build_daily_plan">Build daily plan</string>
     <string name="build_diet_plan">Build diet plan</string>
     <string name="build_workout_plan">Workout</string>
