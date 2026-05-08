@@ -3531,11 +3531,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     ): DexShopEntry {
         val owned = ownedDexCosmetics.contains(key)
         val finalCost = discountedDexCost(key, cost)
-        val detail = if (owned) {
+        val baseDetail = if (owned) {
             getString(R.string.dex_shop_equip_suffix)
         } else {
             getString(R.string.dex_shop_buy_suffix, finalCost)
         }
+        val detail = decorateShopDetail(baseDetail, cosmeticShopHint(key))
         return DexShopEntry(label, detail) {
             if (!ensureDexCosmeticOwned(key, label, cost)) return@DexShopEntry
             equip()
@@ -3550,8 +3551,41 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun gameShopEntry(type: DexMiniGameType, start: () -> Unit): DexShopEntry {
         val label = dexMiniGameLabel(type)
         val cost = discountedDexCost("game:${type.name}", dexMiniGameCost(type))
-        return DexShopEntry(label, getString(R.string.dex_shop_play_suffix, cost)) {
+        val baseDetail = getString(R.string.dex_shop_play_suffix, cost)
+        val detail = decorateShopDetail(
+            baseDetail,
+            when {
+                favoriteDexMiniGame() == type -> getString(R.string.dex_shop_hint_your_favorite)
+                todaysDexChallengeGame() == type -> getString(R.string.dex_shop_hint_challenge_pick)
+                else -> null
+            }
+        )
+        return DexShopEntry(label, detail) {
             start()
+        }
+    }
+
+    private fun decorateShopDetail(baseDetail: String, hint: String?): String {
+        return if (hint.isNullOrBlank()) baseDetail
+        else getString(R.string.dex_shop_hint_format, baseDetail, hint)
+    }
+
+    private fun cosmeticShopHint(key: String): String? {
+        val personality = currentDexCompanionPersonality.lowercase(Locale.US)
+        return when {
+            key == accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HALO) &&
+                personality == DEX_COMPANION_PERSONALITY_GUARDIAN ->
+                getString(R.string.dex_shop_hint_matches_your_vibe)
+            key == accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_HEADPHONES) &&
+                personality == DEX_COMPANION_PERSONALITY_STUDY_BUDDY ->
+                getString(R.string.dex_shop_hint_matches_your_vibe)
+            key == accessoryCosmeticKey(DEX_COMPANION_ACCESSORY_GLASSES) &&
+                personality == DEX_COMPANION_PERSONALITY_BESTIE ->
+                getString(R.string.dex_shop_hint_matches_your_vibe)
+            key == bubbleStyleCosmeticKey(DEX_COMPANION_BUBBLE_BOLD) &&
+                personality == DEX_COMPANION_PERSONALITY_COACH ->
+                getString(R.string.dex_shop_hint_matches_your_vibe)
+            else -> null
         }
     }
 

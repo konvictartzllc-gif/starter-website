@@ -239,6 +239,10 @@
     <string name="dex_shop_equip_suffix">tap to equip</string>
     <string name="dex_shop_buy_suffix">%1$dc to unlock</string>
     <string name="dex_shop_play_suffix">%1$dc to play now</string>
+    <string name="dex_shop_hint_format">%1$s | %2$s</string>
+    <string name="dex_shop_hint_your_favorite">your favorite</string>
+    <string name="dex_shop_hint_challenge_pick">challenge pick</string>
+    <string name="dex_shop_hint_matches_your_vibe">matches your vibe</string>
     <string name="dex_companion_label">Dex</string>
     <string name="dex_companion_bubble_calm">Here if you need me.</string>
     <string name="dex_companion_bubble_playful">Ready to hang.</string>
