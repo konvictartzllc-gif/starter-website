@@ -201,6 +201,7 @@ private enum class DexMiniGameType {
     GUESS_NUMBER,
     RIDDLE,
     TRIVIA,
+    MEMORY,
     WOULD_YOU_RATHER,
 }
 
@@ -342,6 +343,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexGuessAttempts = 0
     private var currentRiddleIndex = -1
     private var currentTriviaIndex = -1
+    private var currentMemoryRound = 0
+    private var currentMemorySequence: List<String> = emptyList()
     private var currentWouldYouRatherIndex = -1
 
     private val resetWakeWindowRunnable = Runnable {
@@ -960,6 +963,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         binding.startTriviaButton.setOnClickListener {
             startTriviaGame()
+        }
+
+        binding.startMemoryGameButton.setOnClickListener {
+            startMemoryGame()
         }
 
         binding.startWouldYouRatherButton.setOnClickListener {
@@ -2170,7 +2177,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             strip.backgroundTintList = ColorStateList.valueOf(primaryTone)
         }
         listOf(
-            binding.learningQuizOutputStrip,
+            binding.learningQuizPreview.parent as View,
             binding.safetyDiagnosticsStrip
         ).forEach { strip ->
             strip.backgroundTintList = ColorStateList.valueOf(secondaryTone)
@@ -2992,6 +2999,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun startMemoryGame(announce: Boolean = false) {
+        val continuing = activeDexMiniGame == DexMiniGameType.MEMORY && currentMemoryRound > 0
+        activeDexMiniGame = DexMiniGameType.MEMORY
+        currentMemoryRound = if (continuing) currentMemoryRound + 1 else 1
+        val sequenceLength = minOf(2 + currentMemoryRound, 5)
+        currentMemorySequence = List(sequenceLength) {
+            DEX_MEMORY_TOKENS.random()
+        }
+        val prompt = getString(R.string.dex_game_memory_prompt, currentMemorySequence.joinToString(", "))
+        binding.dexGameInput.setText("")
+        binding.dexGamePrompt.text = prompt
+        binding.dexGameStatus.text = getString(R.string.dex_game_memory_status, currentMemoryRound)
+        binding.submitDexGameAnswerButton.text = getString(R.string.dex_game_submit)
+        binding.nextDexGameRoundButton.text = getString(R.string.dex_game_next_memory)
+        setDexCompanionState(
+            DEX_COMPANION_STATE_THINKING,
+            bubbleOverride = getString(R.string.dex_game_memory_bubble),
+            revertAfterMs = 2600L
+        )
+        if (announce) {
+            announceDexMiniGameReply(prompt)
+        }
+    }
+
     private fun startWouldYouRatherGame(announce: Boolean = false) {
         activeDexMiniGame = DexMiniGameType.WOULD_YOU_RATHER
         currentWouldYouRatherIndex = (currentWouldYouRatherIndex + 1).mod(DEX_WOULD_YOU_RATHERS.size)
@@ -3031,6 +3062,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DexMiniGameType.GUESS_NUMBER -> handleGuessNumberAnswer(answer, announce)
             DexMiniGameType.RIDDLE -> handleRiddleAnswer(answer, announce)
             DexMiniGameType.TRIVIA -> handleTriviaAnswer(answer, announce)
+            DexMiniGameType.MEMORY -> handleMemoryAnswer(answer, announce)
             DexMiniGameType.WOULD_YOU_RATHER -> handleWouldYouRatherAnswer(answer, announce)
             DexMiniGameType.NONE -> Unit
         }
@@ -3041,6 +3073,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             DexMiniGameType.GUESS_NUMBER -> startGuessNumberGame(announce)
             DexMiniGameType.RIDDLE -> startRiddleGame(announce)
             DexMiniGameType.TRIVIA -> startTriviaGame(announce)
+            DexMiniGameType.MEMORY -> startMemoryGame(announce)
             DexMiniGameType.WOULD_YOU_RATHER -> startWouldYouRatherGame(announce)
             DexMiniGameType.NONE -> {
                 val reply = getString(R.string.dex_game_pick_one_first)
@@ -3106,6 +3139,40 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             getString(R.string.dex_game_trivia_correct, trivia.reveal)
         } else {
             getString(R.string.dex_game_trivia_try_again)
+        }
+        binding.dexGameStatus.text = reply
+        if (isCorrect) {
+            binding.dexGameInput.setText("")
+        }
+        setDexCompanionState(
+            if (isCorrect) DEX_COMPANION_STATE_EXCITED else DEX_COMPANION_STATE_THINKING,
+            bubbleOverride = reply,
+            revertAfterMs = 2800L
+        )
+        if (announce) announceDexMiniGameReply(reply)
+    }
+
+    private fun handleMemoryAnswer(answer: String, announce: Boolean = false) {
+        if (currentMemorySequence.isEmpty()) {
+            val reply = getString(R.string.dex_game_pick_one_first)
+            binding.dexGameStatus.text = reply
+            if (announce) announceDexMiniGameReply(reply)
+            return
+        }
+        val normalizedAnswer = answer
+            .lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9,\\s]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        val guessed = normalizedAnswer
+            .split(Regex("[,\\s]+"))
+            .filter { it.isNotBlank() }
+        val expected = currentMemorySequence.map { it.lowercase(Locale.US) }
+        val isCorrect = guessed == expected
+        val reply = if (isCorrect) {
+            getString(R.string.dex_game_memory_correct, currentMemoryRound + 1)
+        } else {
+            getString(R.string.dex_game_memory_try_again, currentMemorySequence.joinToString(", "))
         }
         binding.dexGameStatus.text = reply
         if (isCorrect) {
@@ -5838,6 +5905,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         phrases += "tell me a riddle"
         phrases += "play trivia"
         phrases += "ask me trivia"
+        phrases += "memory game"
+        phrases += "play memory"
         phrases += "would you rather"
         phrases += "next round"
         phrases += "new round"
@@ -6153,6 +6222,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         if (
+            normalized.contains("memory game") ||
+            normalized.contains("play memory") ||
+            normalized.contains("start memory")
+        ) {
+            startMemoryGame(announce = true)
+            return true
+        }
+
+        if (
             normalized.contains("would you rather") ||
             normalized.contains("play would you rather")
         ) {
@@ -6189,6 +6267,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized == "quit game"
         ) {
             activeDexMiniGame = DexMiniGameType.NONE
+            currentMemoryRound = 0
+            currentMemorySequence = emptyList()
             val reply = getString(R.string.dex_game_stopped)
             binding.dexGameStatus.text = reply
             announceDexMiniGameReply(reply)
@@ -9442,6 +9522,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 listOf("snail", "a snail"),
                 "A snail carries its shell like a home."
             ),
+        )
+        private val DEX_MEMORY_TOKENS = listOf(
+            "moon",
+            "star",
+            "cloud",
+            "river",
+            "peach",
+            "drum",
+            "candle",
+            "leaf"
         )
         private val DEX_WOULD_YOU_RATHERS = listOf(
             DexWouldYouRather(

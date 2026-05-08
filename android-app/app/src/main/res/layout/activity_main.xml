@@ -985,7 +985,6 @@
                 </LinearLayout>
 
                 <LinearLayout
-                    android:id="@+id/learningQuizOutputStrip"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
@@ -1663,6 +1662,14 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:text="@string/dex_games_trivia" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/startMemoryGameButton"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/dex_games_memory" />
 
                 <LinearLayout
                     android:layout_width="match_parent"

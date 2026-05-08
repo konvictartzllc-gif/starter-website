@@ -324,6 +324,7 @@
     <string name="dex_games_riddle">Riddle me</string>
     <string name="dex_games_would_you_rather">Would you rather</string>
     <string name="dex_games_trivia">Trivia</string>
+    <string name="dex_games_memory">Memory match</string>
     <string name="dex_games_prompt_tag">Game prompt</string>
     <string name="dex_games_status_tag">Dex says</string>
     <string name="dex_games_prompt_default">Pick a game and Dex will set the round.</string>
@@ -334,6 +335,7 @@
     <string name="dex_game_new_round">New round</string>
     <string name="dex_game_next_riddle">Next riddle</string>
     <string name="dex_game_next_trivia">Next trivia</string>
+    <string name="dex_game_next_memory">Next sequence</string>
     <string name="dex_game_next_round">Next round</string>
     <string name="dex_game_pick_one_first">Pick a Dex game first.</string>
     <string name="dex_game_answer_needed">Give Dex an answer first.</string>
@@ -352,6 +354,11 @@
     <string name="dex_game_trivia_bubble">Okay, trivia brain on.</string>
     <string name="dex_game_trivia_correct">You got it. %1$s</string>
     <string name="dex_game_trivia_try_again">Not quite. Try again or ask for the next trivia question.</string>
+    <string name="dex_game_memory_status">Round %1$d. Repeat the sequence back in the same order.</string>
+    <string name="dex_game_memory_prompt">Memory time. Repeat this sequence: %1$s</string>
+    <string name="dex_game_memory_bubble">Hold onto this one.</string>
+    <string name="dex_game_memory_correct">Nice memory. Ready for round %1$d?</string>
+    <string name="dex_game_memory_try_again">Not quite. The sequence was: %1$s. Try again or ask for the next sequence.</string>
     <string name="dex_game_wyr_status">Tell Dex which one you would pick and why if you want.</string>
     <string name="dex_game_wyr_bubble">This one should be fun.</string>
     <string name="dex_game_wyr_bubble_reply">I like that answer.</string>
