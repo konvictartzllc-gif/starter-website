@@ -293,6 +293,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var pendingReminderCallTriggerAt: LocalDateTime? = null
     private var awaitingReminderCallContact = false
     private var pendingReminderCallTargetName: String? = null
+    private var recentCallReminderTargetName: String? = null
+    private var recentCallReminderScheduledAt = 0L
     private var pendingReminderContactChoices: List<ContactMatch> = emptyList()
     private var pendingReminderContactDisambiguationMode: ReminderContactDisambiguationMode? = null
     private var pendingIncomingSmsSender: String? = null
@@ -8670,6 +8672,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val title = getString(R.string.call_reminder_title, reminderTarget)
         val text = getString(R.string.call_reminder_text, reminderTarget)
         val triggerAtMillis = reminderAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        rememberRecentCallReminder(reminderTarget)
         DexSafetyCheckInScheduler.scheduleOneTimeCheckInAt(
             context = this,
             triggerAtMillis = triggerAtMillis,
@@ -8680,6 +8683,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         val spokenDateTime = formatReminderDateTime(reminderAt)
         return getString(R.string.call_reminder_set, reminderTarget, spokenDateTime)
+    }
+
+    private fun rememberRecentCallReminder(reminderTarget: String) {
+        recentCallReminderTargetName = normalizeCompactContactText(reminderTarget)
+        recentCallReminderScheduledAt = SystemClock.elapsedRealtime()
+    }
+
+    private fun shouldSuppressImmediateCallAfterReminder(request: DirectCallRequest): Boolean {
+        val scheduledAt = recentCallReminderScheduledAt
+        val reminderTarget = recentCallReminderTargetName ?: return false
+        if (scheduledAt == 0L || SystemClock.elapsedRealtime() - scheduledAt > RECENT_CALL_REMINDER_GUARD_MS) {
+            return false
+        }
+        return normalizeCompactContactText(request.displayName) == reminderTarget
     }
 
     private fun handleTextReminderIntent(message: String): String? {
@@ -9637,6 +9654,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun buildDirectCallRequest(message: String): DirectCallRequest? {
         val normalized = message.trim()
+        if (looksLikeReminderCommand(normalized)) return null
         val patterns = listOf(
             Regex("^(?:call|dial|ring|phone)\\s+(.+)$", RegexOption.IGNORE_CASE),
             Regex("^(?:can you\\s+)?call\\s+(.+)$", RegexOption.IGNORE_CASE),
@@ -9667,6 +9685,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun buildHeuristicCallRequest(message: String): DirectCallRequest? {
         val normalized = message.lowercase(Locale.US)
+        if (looksLikeReminderCommand(normalized)) return null
         val soundsLikeCallRequest =
             normalized.contains("call") ||
                 normalized.contains("dial") ||
@@ -9679,6 +9698,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             displayName = contact.displayName,
             phoneNumber = contact.value,
         )
+    }
+
+    private fun looksLikeReminderCommand(message: String): Boolean {
+        val normalized = message.trim().lowercase(Locale.US)
+        if (normalized.isBlank()) return false
+        val reminderIntent =
+            normalized.contains("remind me") ||
+                normalized.contains("set a reminder") ||
+                normalized.contains("create a reminder") ||
+                normalized.contains("make a reminder")
+        return reminderIntent && normalized.contains("call ")
     }
 
     private fun detectContactOnlyIntent(message: String): ContactMatch? {
@@ -10369,6 +10399,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun placeVoiceRequestedCall(request: DirectCallRequest) {
+        if (shouldSuppressImmediateCallAfterReminder(request)) {
+            val reply = getString(R.string.call_reminder_no_immediate_call, request.displayName)
+            binding.conversationStatus.text = reply
+            binding.lastReplyValue.text = reply
+            speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+            return
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
             val reply = getString(R.string.call_phone_permission_missing)
             binding.conversationStatus.text = reply
@@ -10840,6 +10877,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_LEARNING_REMINDER_TIME = "learning_reminder_time"
         const val KEY_LEARNING_REMINDER_TITLE = "learning_reminder_title"
         const val KEY_LEARNING_REMINDER_TEXT = "learning_reminder_text"
+        private const val RECENT_CALL_REMINDER_GUARD_MS = 8000L
         const val KEY_THEME_PRESET = "theme_preset"
         const val KEY_HOME_TITLE = "home_title"
         const val KEY_HOME_SUBTITLE = "home_subtitle"
