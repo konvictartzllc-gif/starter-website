@@ -6304,13 +6304,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .apply()
     }
 
-    private fun recordContactActionPreference(displayName: String, action: PendingContactAction) {
+    private fun recordContactActionPreference(displayName: String, action: PendingContactAction, weight: Int = 1) {
         val contactKey = normalizeCompactContactText(displayName)
         if (contactKey.isBlank()) return
         val preferences = loadLocalContactActionPreferences().toMutableMap()
         val counts = preferences[contactKey]?.toMutableMap() ?: mutableMapOf()
         val actionKey = actionPreferenceKey(action)
-        counts[actionKey] = (counts[actionKey] ?: 0) + 1
+        counts[actionKey] = (counts[actionKey] ?: 0) + max(1, weight)
         preferences[contactKey] = counts
         persistLocalContactActionPreferences(preferences)
     }
@@ -9973,12 +9973,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         return when {
             normalized == "call" || normalized == "call them" || normalized == "call her" || normalized == "call him" -> {
+                recordContactActionPreference(contact.displayName, PendingContactAction.CALL, weight = 3)
                 pendingContactTarget = null
                 pendingDetectedContactPhrase = null
                 placeVoiceRequestedCall(DirectCallRequest(contact.displayName, contact.value))
                 true
             }
             normalized == "text" || normalized == "text them" || normalized == "message them" || normalized == "text her" || normalized == "text him" -> {
+                recordContactActionPreference(contact.displayName, PendingContactAction.TEXT, weight = 3)
                 pendingContactTarget = null
                 pendingDetectedContactPhrase = null
                 queuePendingAction(
@@ -9994,6 +9996,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 true
             }
             normalized == "email" || normalized == "email them" || normalized == "email her" || normalized == "email him" -> {
+                recordContactActionPreference(contact.displayName, PendingContactAction.EMAIL, weight = 3)
                 pendingContactTarget = null
                 pendingDetectedContactPhrase = null
                 val emailContact = findEmailContactByName(contact.displayName)
