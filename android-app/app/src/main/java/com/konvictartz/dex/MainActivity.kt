@@ -6212,6 +6212,55 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         refreshRelationshipAliasSummary()
     }
 
+    private fun tryAutoLearnRelationshipAlias(spokenPhrase: String, contactName: String) {
+        val alias = normalizeAutoLearnedAlias(spokenPhrase)
+        if (!shouldAutoLearnAlias(alias, contactName)) return
+
+        val existing = relationshipAliases[alias]
+        if (!existing.isNullOrBlank() && normalizeContactLookupText(existing) == normalizeContactLookupText(contactName)) {
+            return
+        }
+
+        val localAliases = loadLocalRelationshipAliases().toMutableMap()
+        if (normalizeContactLookupText(localAliases[alias].orEmpty()) == normalizeContactLookupText(contactName)) {
+            return
+        }
+
+        localAliases[alias] = contactName
+        persistLocalRelationshipAliases(localAliases)
+        relationshipAliases = relationshipAliases.toMutableMap().apply { put(alias, contactName) }
+        refreshRelationshipAliasSummary()
+        appendActivityLog("Learning", "Learned \"$alias\" as $contactName")
+    }
+
+    private fun normalizeAutoLearnedAlias(spokenPhrase: String): String {
+        return spokenPhrase
+            .trim()
+            .lowercase(Locale.US)
+            .replace(Regex("^(?:to\\s+|my\\s+|the\\s+)"), "")
+            .replace(Regex("\\s+(?:for me|please)$"), "")
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun shouldAutoLearnAlias(alias: String, contactName: String): Boolean {
+        if (alias.isBlank() || alias.length < 3) return false
+        if (alias.all { it.isDigit() }) return false
+        if (alias.split(" ").size > 4) return false
+        if (normalizeContactLookupText(alias) == normalizeContactLookupText(contactName)) return false
+        return alias !in setOf(
+            "someone",
+            "somebody",
+            "person",
+            "contact",
+            "him",
+            "her",
+            "them",
+            "that person"
+        )
+    }
+
     private fun clearLocalRelationshipAliases() {
         persistLocalRelationshipAliases(emptyMap())
         fetchRelationshipAliases()
@@ -8388,6 +8437,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     true
                 } else {
                     awaitingReminderCallContact = false
+                    tryAutoLearnRelationshipAlias(trimmed, contact.displayName)
                     val pendingTime = pendingReminderCallTriggerAt
                     pendingReminderCallTriggerAt = null
                     if (pendingTime != null) {
@@ -8585,6 +8635,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     true
                 } else {
                     awaitingReminderSmsContact = false
+                    tryAutoLearnRelationshipAlias(trimmed, contact.displayName)
                     val pendingBody = pendingReminderSmsBody
                     val pendingTime = pendingReminderSmsTriggerAt
                     pendingReminderSmsBody = null
@@ -8659,6 +8710,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             pendingReminderCallTriggerAt = if (hasExplicitReminderTime(resolvedMessage)) inferDateTimeFromCommand(resolvedMessage) else null
             return getString(R.string.call_reminder_contact_prompt)
         }
+        tryAutoLearnRelationshipAlias(rawTarget, reminderTarget)
         if (!hasExplicitReminderTime(resolvedMessage)) {
             pendingReminderCallTargetName = reminderTarget
             return getString(R.string.call_reminder_time_prompt, reminderTarget)
@@ -8735,6 +8787,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 pendingReminderSmsTriggerAt = if (hasExplicitReminderTime(resolvedMessage)) inferDateTimeFromCommand(resolvedMessage) else null
                 return getString(R.string.text_reminder_contact_prompt)
             }
+            tryAutoLearnRelationshipAlias(rawTarget, targetContact.displayName)
             if (!hasExplicitReminderTime(resolvedMessage)) {
                 pendingReminderSmsTarget = targetContact
                 pendingReminderSmsBody = reminderBody
@@ -9591,6 +9644,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
             return null
         }
+        tryAutoLearnRelationshipAlias(match.groupValues[1].trim(), contact.displayName)
         return PendingAction(
             kind = PendingActionKind.SMS_DRAFT,
             summary = getString(R.string.sms_draft_summary, contact.displayName),
@@ -9632,6 +9686,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         ).firstNotNullOfOrNull { it.find(message.trim()) } ?: return null
         val contactName = resolveContactAlias(match.groupValues[1].trim())
         val contact = findPhoneContactByName(contactName) ?: return null
+        tryAutoLearnRelationshipAlias(match.groupValues[1].trim(), contact.displayName)
         pendingSmsRecipient = contact
         return getString(R.string.ask_what_to_text, contact.displayName)
     }
@@ -9677,6 +9732,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
             return null
         }
+        tryAutoLearnRelationshipAlias(match.groupValues[1].trim(), contact.displayName)
         return DirectCallRequest(
             displayName = contact.displayName,
             phoneNumber = contact.value,
