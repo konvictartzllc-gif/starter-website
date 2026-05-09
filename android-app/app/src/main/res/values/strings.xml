@@ -631,6 +631,7 @@
     <string name="contact_not_found_email">I could not find an email contact for %1$s.</string>
     <string name="contact_target_confirmed">I found %1$s in your contacts. Say call, text, or email.</string>
     <string name="contact_target_corrected">Okay, I will use %1$s instead. Say call, text, or email.</string>
+    <string name="contact_target_confirmed_preferred">I found %1$s in your contacts. You usually %2$s this contact. Say %3$s.</string>
     <string name="ask_who_to_call">Who would you like me to call?</string>
     <string name="ask_who_to_text">Who would you like me to text?</string>
     <string name="ask_who_to_email">Who would you like me to email?</string>

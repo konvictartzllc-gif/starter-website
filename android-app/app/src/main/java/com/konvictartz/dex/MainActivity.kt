@@ -6268,6 +6268,95 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.safetyProfileMessage.text = getString(R.string.alias_clear_done)
     }
 
+    private fun loadLocalContactActionPreferences(): Map<String, Map<String, Int>> {
+        val raw = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_CONTACT_ACTION_PREFERENCES, null)
+            .orEmpty()
+        if (raw.isBlank()) return emptyMap()
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyMap()
+        val map = mutableMapOf<String, Map<String, Int>>()
+        json.keys().forEach { contactKey ->
+            val countsObject = json.optJSONObject(contactKey) ?: return@forEach
+            val counts = mutableMapOf<String, Int>()
+            countsObject.keys().forEach { actionKey ->
+                val count = countsObject.optInt(actionKey, 0)
+                if (count > 0) counts[actionKey] = count
+            }
+            if (counts.isNotEmpty()) {
+                map[contactKey] = counts
+            }
+        }
+        return map
+    }
+
+    private fun persistLocalContactActionPreferences(preferences: Map<String, Map<String, Int>>) {
+        val json = JSONObject()
+        preferences.toSortedMap().forEach { (contactKey, counts) ->
+            val countsObject = JSONObject()
+            counts.toSortedMap().forEach { (actionKey, count) ->
+                if (count > 0) countsObject.put(actionKey, count)
+            }
+            json.put(contactKey, countsObject)
+        }
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_CONTACT_ACTION_PREFERENCES, json.toString())
+            .apply()
+    }
+
+    private fun recordContactActionPreference(displayName: String, action: PendingContactAction) {
+        val contactKey = normalizeCompactContactText(displayName)
+        if (contactKey.isBlank()) return
+        val preferences = loadLocalContactActionPreferences().toMutableMap()
+        val counts = preferences[contactKey]?.toMutableMap() ?: mutableMapOf()
+        val actionKey = actionPreferenceKey(action)
+        counts[actionKey] = (counts[actionKey] ?: 0) + 1
+        preferences[contactKey] = counts
+        persistLocalContactActionPreferences(preferences)
+    }
+
+    private fun preferredContactAction(displayName: String): PendingContactAction? {
+        val contactKey = normalizeCompactContactText(displayName)
+        if (contactKey.isBlank()) return null
+        val counts = loadLocalContactActionPreferences()[contactKey].orEmpty()
+        if (counts.isEmpty()) return null
+        val ranked = counts.entries.sortedByDescending { it.value }
+        val top = ranked.firstOrNull() ?: return null
+        val second = ranked.getOrNull(1)?.value ?: 0
+        val total = counts.values.sum()
+        if (total < 3 || top.value < 2 || top.value < second + 2) return null
+        return actionPreferenceFromKey(top.key)
+    }
+
+    private fun actionPreferenceKey(action: PendingContactAction): String =
+        when (action) {
+            PendingContactAction.CALL -> "call"
+            PendingContactAction.TEXT -> "text"
+            PendingContactAction.EMAIL -> "email"
+        }
+
+    private fun actionPreferenceFromKey(actionKey: String): PendingContactAction? =
+        when (actionKey) {
+            "call" -> PendingContactAction.CALL
+            "text" -> PendingContactAction.TEXT
+            "email" -> PendingContactAction.EMAIL
+            else -> null
+        }
+
+    private fun preferredContactActionLabel(action: PendingContactAction): String =
+        when (action) {
+            PendingContactAction.CALL -> "call"
+            PendingContactAction.TEXT -> "text"
+            PendingContactAction.EMAIL -> "email"
+        }
+
+    private fun preferredContactActionOptions(action: PendingContactAction): String =
+        when (action) {
+            PendingContactAction.CALL -> "call, text, or email"
+            PendingContactAction.TEXT -> "text, call, or email"
+            PendingContactAction.EMAIL -> "email, call, or text"
+        }
+
     private fun refreshRelationshipAliasSummary() {
         if (!::binding.isInitialized) return
         val localAliases = loadLocalRelationshipAliases()
@@ -9209,7 +9298,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         pendingDetectedContactPhrase?.let { tryAutoLearnRelationshipAlias(it, contact.displayName) }
         pendingContactTarget = contact
-        val reply = getString(R.string.contact_target_confirmed, contact.displayName)
+        val preferredAction = preferredContactAction(contact.displayName)
+        val reply = if (preferredAction != null) {
+            getString(
+                R.string.contact_target_confirmed_preferred,
+                contact.displayName,
+                preferredContactActionLabel(preferredAction),
+                preferredContactActionOptions(preferredAction)
+            )
+        } else {
+            getString(R.string.contact_target_confirmed, contact.displayName)
+        }
         binding.conversationStatus.text = reply
         binding.lastReplyValue.text = reply
         speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
@@ -9217,6 +9316,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun queuePendingAction(action: PendingAction) {
         pendingAction = action
+        when (action.kind) {
+            PendingActionKind.SMS_DRAFT -> action.targetName?.let { recordContactActionPreference(it, PendingContactAction.TEXT) }
+            PendingActionKind.EMAIL_DRAFT -> action.targetName?.let { recordContactActionPreference(it, PendingContactAction.EMAIL) }
+            else -> Unit
+        }
         updatePendingActionUi()
         binding.conversationStatus.text = getString(R.string.pending_action_ready)
         binding.lastReplyValue.text = action.summary
@@ -10514,6 +10618,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         try {
             startActivity(intent)
+            recordContactActionPreference(request.displayName, PendingContactAction.CALL)
             val reply = getString(R.string.call_direct_started, request.displayName)
             binding.conversationStatus.text = reply
             binding.lastReplyValue.text = reply
@@ -10967,6 +11072,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_EMERGENCY_CONTACT = "emergency_contact"
         const val KEY_EMERGENCY_CONTACT_PERMISSION = "emergency_contact_permission"
         const val KEY_LOCAL_RELATIONSHIP_ALIASES = "local_relationship_aliases"
+        const val KEY_CONTACT_ACTION_PREFERENCES = "contact_action_preferences"
         const val KEY_VOSK_MODEL_ASSET = "vosk_model_asset"
         const val KEY_VOSK_WAKE_PHRASE = "vosk_wake_phrase"
         const val KEY_LEARNING_REMINDER_ENABLED = "learning_reminder_enabled"
