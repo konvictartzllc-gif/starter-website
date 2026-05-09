@@ -284,6 +284,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var lastWakeListenStartedAt = 0L
     private var pendingContactTarget: ContactMatch? = null
     private var pendingContactAction: PendingContactAction? = null
+    private var pendingDetectedContactPhrase: String? = null
     private var pendingSmsRecipient: ContactMatch? = null
     private var pendingSmsBodyDraft: String? = null
     private var pendingReminderSmsTriggerAt: LocalDateTime? = null
@@ -7578,6 +7579,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (handleImmediateEmergencyCommand(message)) return true
         if (handleTaskIntent(message)) return true
         detectContactOnlyIntent(message)?.let { contact ->
+            pendingDetectedContactPhrase = message.trim()
             handleDetectedContactTarget(contact)
             return true
         }
@@ -9168,6 +9170,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun handleDetectedContactTarget(contact: ContactMatch) {
         val pendingAction = pendingContactAction
         if (pendingAction != null) {
+            pendingDetectedContactPhrase?.let { tryAutoLearnRelationshipAlias(it, contact.displayName) }
+            pendingDetectedContactPhrase = null
             pendingContactAction = null
             when (pendingAction) {
                 PendingContactAction.CALL -> placeVoiceRequestedCall(DirectCallRequest(contact.displayName, contact.value))
@@ -9203,6 +9207,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
 
+        pendingDetectedContactPhrase?.let { tryAutoLearnRelationshipAlias(it, contact.displayName) }
         pendingContactTarget = contact
         val reply = getString(R.string.contact_target_confirmed, contact.displayName)
         binding.conversationStatus.text = reply
@@ -9781,6 +9786,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         clearPendingNotification()
         pendingContactTarget = null
         pendingContactAction = null
+        pendingDetectedContactPhrase = null
     }
 
     private fun shouldResetPromptStateForFreshCommand(message: String): Boolean {
@@ -9847,14 +9853,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun consumePendingContactTarget(normalized: String): Boolean? {
         val contact = pendingContactTarget ?: return null
+        extractCorrectedContactPhrase(normalized)?.let { correctedPhrase ->
+            val correctedContact = findExactPhoneContactByName(resolveContactAlias(correctedPhrase))
+                ?: findPhoneContactByName(resolveContactAlias(correctedPhrase))
+            if (correctedContact != null) {
+                pendingDetectedContactPhrase?.let { tryAutoLearnRelationshipAlias(it, correctedContact.displayName) }
+                pendingDetectedContactPhrase = correctedPhrase
+                pendingContactTarget = correctedContact
+                val reply = getString(R.string.contact_target_corrected, correctedContact.displayName)
+                binding.conversationStatus.text = reply
+                binding.lastReplyValue.text = reply
+                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                return true
+            }
+        }
         return when {
             normalized == "call" || normalized == "call them" || normalized == "call her" || normalized == "call him" -> {
                 pendingContactTarget = null
+                pendingDetectedContactPhrase = null
                 placeVoiceRequestedCall(DirectCallRequest(contact.displayName, contact.value))
                 true
             }
             normalized == "text" || normalized == "text them" || normalized == "message them" || normalized == "text her" || normalized == "text him" -> {
                 pendingContactTarget = null
+                pendingDetectedContactPhrase = null
                 queuePendingAction(
                     PendingAction(
                         kind = PendingActionKind.SMS_DRAFT,
@@ -9869,6 +9891,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             normalized == "email" || normalized == "email them" || normalized == "email her" || normalized == "email him" -> {
                 pendingContactTarget = null
+                pendingDetectedContactPhrase = null
                 val emailContact = findEmailContactByName(contact.displayName)
                 if (emailContact == null) {
                     val reply = getString(R.string.contact_not_found_email, contact.displayName)
@@ -9892,6 +9915,23 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             else -> false
         }
+    }
+
+    private fun extractCorrectedContactPhrase(normalized: String): String? {
+        val trimmed = normalized.trim()
+        val correctionPrefixes = listOf(
+            "no ",
+            "no, ",
+            "i meant ",
+            "no i meant ",
+            "not ",
+            "wrong person ",
+            "wrong one ",
+        )
+        val corrected = correctionPrefixes.firstNotNullOfOrNull { prefix ->
+            trimmed.takeIf { it.startsWith(prefix) }?.removePrefix(prefix)?.trim()
+        } ?: return null
+        return corrected.takeIf { it.isNotBlank() }
     }
 
     private fun consumePendingActionOnlyIntent(normalized: String): Boolean? {
