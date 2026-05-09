@@ -4905,8 +4905,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun applyDexCompanionUi() {
         val loggedIn = !authToken.isNullOrBlank()
-        val isAdmin = currentUserRole.equals("admin", ignoreCase = true)
-        val shouldShowCompanion = loggedIn && !isAdmin && currentDexCompanionVisible
+        val shouldShowCompanion = loggedIn && currentDexCompanionVisible
         binding.dexCompanionCard.visibility = if (shouldShowCompanion) View.VISIBLE else View.GONE
         if (!shouldShowCompanion) {
             stopDexCompanionAnimation()
@@ -4915,6 +4914,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             dexCompanionBlinkScheduled = false
             return
         }
+
+        binding.dexCompanionCard.bringToFront()
 
         val skinColors = dexCompanionSkinColors()
         val accentColor = skinColors.accent
