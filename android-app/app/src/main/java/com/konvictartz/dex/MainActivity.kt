@@ -2515,12 +2515,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val emergencyBirthday = binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty()
         val emergencyContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
         val contactPermission = binding.safetyNotifyTrustedContactSwitch.isChecked
+        val comfortStyle = binding.safetyComfortInput.text?.toString()?.trim().orEmpty()
+        val groundingStyle = binding.safetyGroundingInput.text?.toString()?.trim().orEmpty()
+        val followUpOptIn = binding.safetyFollowUpSwitch.isChecked
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_EMERGENCY_PROFILE_NAME, emergencyPersonName)
             .putString(KEY_EMERGENCY_PROFILE_BIRTHDAY, emergencyBirthday)
             .putString(KEY_EMERGENCY_CONTACT, emergencyContact)
             .putBoolean(KEY_EMERGENCY_CONTACT_PERMISSION, contactPermission)
+            .putString(KEY_SAFETY_COMFORT_STYLE, comfortStyle)
+            .putString(KEY_SAFETY_GROUNDING_STYLE, groundingStyle)
+            .putBoolean(KEY_SAFETY_FOLLOW_UP_OPT_IN, followUpOptIn)
             .apply()
         val confirmedName = emergencyPersonName.ifBlank { resolveEmergencyPersonName() }
         val confirmedBirthday = emergencyBirthday.ifBlank { getString(R.string.safety_birthday_unknown) }
@@ -2579,7 +2585,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             context = this,
             delayMinutes = 1,
             title = getString(R.string.safety_check_in_title),
-            text = getString(R.string.safety_check_in_text)
+            text = buildSafetyCheckInMessage(SAFETY_MOOD_GENERAL, emergency = false),
+            voiceCheckIn = true,
+            kind = "safety",
+            mood = SAFETY_MOOD_GENERAL
         )
         binding.safetyProfileMessage.text = reply
         binding.lastReplyValue.text = reply
@@ -6143,6 +6152,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     .putString(KEY_EMERGENCY_PROFILE_BIRTHDAY, emergencyBirthday)
                     .putString(KEY_EMERGENCY_CONTACT, emergencyContact)
                     .putBoolean(KEY_EMERGENCY_CONTACT_PERMISSION, contactPermission)
+                    .putString(KEY_SAFETY_COMFORT_STYLE, comfortStyle)
+                    .putString(KEY_SAFETY_GROUNDING_STYLE, groundingPreference)
+                    .putBoolean(KEY_SAFETY_FOLLOW_UP_OPT_IN, followUp)
                     .apply()
                 binding.safetyNameInput.setText(emergencyPersonName)
                 binding.safetyBirthdayInput.setText(emergencyBirthday)
@@ -7922,7 +7934,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             sendLocalEmergencySmsIfNeeded(null, message, forceEmergency = true)
         ).joinToString(" ")
 
-        maybeScheduleSafetyCheckIn(null, forceEmergency = true)
+        maybeScheduleSafetyCheckIn(null, message, forceEmergency = true)
         binding.lastHeardValue.text = message
         binding.conversationStatus.text = reply
         binding.lastReplyValue.text = reply
@@ -9487,7 +9499,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     localEmergency -> buildEmergencySpokenReply()
                     else -> response.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
                 }
-                maybeScheduleSafetyCheckIn(response, forceEmergency = localEmergency)
+                maybeScheduleSafetyCheckIn(response, message, forceEmergency = localEmergency)
                 val localSmsStatus = sendLocalEmergencySmsIfNeeded(response, message, forceEmergency = localEmergency)
                 val spokenReply = listOfNotNull(reply, localSmsStatus).joinToString(" ")
                 binding.lastReplyValue.text = spokenReply
@@ -9506,6 +9518,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 }
                 val localEmergency = isHighRiskEmergencyMessage(message)
                 val spokenReply = if (localEmergency) {
+                    maybeScheduleSafetyCheckIn(null, message, forceEmergency = true)
                     listOfNotNull(
                         buildEmergencySpokenReply(),
                         sendLocalEmergencySmsIfNeeded(null, message, forceEmergency = true)
@@ -9523,17 +9536,76 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun maybeScheduleSafetyCheckIn(response: JSONObject?, forceEmergency: Boolean = false) {
-        if (!forceEmergency && !(response?.optBoolean("followUpSuggested", false) == true)) return
-        val delayMinutes = response?.optInt("followUpDelayMinutes", 15)?.coerceAtLeast(1) ?: 15
-        val title = response?.optString("followUpTitle").orEmpty().ifBlank { getString(R.string.safety_check_in_title) }
-        val text = response?.optString("followUpMessage").orEmpty().ifBlank { getString(R.string.safety_check_in_text) }
+    private fun maybeScheduleSafetyCheckIn(response: JSONObject?, triggerMessage: String, forceEmergency: Boolean = false) {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val followUpOptIn = prefs.getBoolean(KEY_SAFETY_FOLLOW_UP_OPT_IN, binding.safetyFollowUpSwitch.isChecked)
+        if (!followUpOptIn) return
+        val localMood = detectSupportMood(triggerMessage, emergency = forceEmergency)
+        if (!forceEmergency && localMood == SAFETY_MOOD_NONE && !(response?.optBoolean("followUpSuggested", false) == true)) return
+        val delayMinutes = when {
+            forceEmergency -> 5
+            response?.optBoolean("followUpSuggested", false) == true -> response.optInt("followUpDelayMinutes", 15).coerceAtLeast(1)
+            localMood == SAFETY_MOOD_ANGER -> 8
+            localMood == SAFETY_MOOD_STRESS -> 12
+            localMood == SAFETY_MOOD_SADNESS -> 15
+            else -> 15
+        }
+        val mood = if (forceEmergency) SAFETY_MOOD_CRISIS else localMood.takeUnless { it == SAFETY_MOOD_NONE } ?: SAFETY_MOOD_GENERAL
+        val title = response?.optString("followUpTitle").orEmpty().ifBlank { buildSafetyCheckInTitle(mood, emergency = forceEmergency) }
+        val text = response?.optString("followUpMessage").orEmpty().ifBlank { buildSafetyCheckInMessage(mood, emergency = forceEmergency) }
         DexSafetyCheckInScheduler.scheduleOneTimeCheckIn(
             context = this,
             delayMinutes = delayMinutes,
             title = title,
-            text = text
+            text = text,
+            voiceCheckIn = true,
+            kind = "safety",
+            mood = mood,
+            emergencyFollowUp = forceEmergency || response?.optBoolean("emergency", false) == true
         )
+    }
+
+    private fun detectSupportMood(message: String, emergency: Boolean = false): String {
+        if (emergency || isHighRiskEmergencyMessage(message)) return SAFETY_MOOD_CRISIS
+        val normalized = message.trim().lowercase(Locale.US)
+        if (normalized.isBlank()) return SAFETY_MOOD_NONE
+        val angerPhrases = listOf("angry", "mad", "pissed", "furious", "rage", "irritated", "annoyed", "frustrated")
+        val sadnessPhrases = listOf("sad", "down", "depressed", "lonely", "hurt", "heartbroken", "crying", "grief", "hopeless")
+        val stressPhrases = listOf("stressed", "overwhelmed", "anxious", "panic", "panicking", "tense", "burned out", "burnt out", "too much")
+        return when {
+            angerPhrases.any { normalized.contains(it) } -> SAFETY_MOOD_ANGER
+            sadnessPhrases.any { normalized.contains(it) } -> SAFETY_MOOD_SADNESS
+            stressPhrases.any { normalized.contains(it) } -> SAFETY_MOOD_STRESS
+            else -> SAFETY_MOOD_NONE
+        }
+    }
+
+    private fun buildSafetyCheckInTitle(mood: String, emergency: Boolean): String {
+        return when {
+            emergency -> getString(R.string.safety_check_in_title_crisis)
+            mood == SAFETY_MOOD_ANGER -> getString(R.string.safety_check_in_title_anger)
+            mood == SAFETY_MOOD_SADNESS -> getString(R.string.safety_check_in_title_sadness)
+            mood == SAFETY_MOOD_STRESS -> getString(R.string.safety_check_in_title_stress)
+            else -> getString(R.string.safety_check_in_title)
+        }
+    }
+
+    private fun buildSafetyCheckInMessage(mood: String, emergency: Boolean): String {
+        val name = resolveEmergencyPersonName()
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val comfortStyle = prefs.getString(KEY_SAFETY_COMFORT_STYLE, binding.safetyComfortInput.text?.toString()?.trim().orEmpty())
+            .orEmpty()
+            .ifBlank { "calm" }
+        val groundingStyle = prefs.getString(KEY_SAFETY_GROUNDING_STYLE, binding.safetyGroundingInput.text?.toString()?.trim().orEmpty())
+            .orEmpty()
+            .ifBlank { "gentle" }
+        return when {
+            emergency -> getString(R.string.safety_check_in_text_crisis, name)
+            mood == SAFETY_MOOD_ANGER -> getString(R.string.safety_check_in_text_anger, name, groundingStyle)
+            mood == SAFETY_MOOD_SADNESS -> getString(R.string.safety_check_in_text_sadness, name, comfortStyle)
+            mood == SAFETY_MOOD_STRESS -> getString(R.string.safety_check_in_text_stress, name, groundingStyle)
+            else -> getString(R.string.safety_check_in_text_friend, name, comfortStyle)
+        }
     }
 
     private fun sendLocalEmergencySmsIfNeeded(response: JSONObject?, triggerMessage: String, forceEmergency: Boolean = false): String? {
@@ -11125,6 +11197,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_EMERGENCY_PROFILE_BIRTHDAY = "emergency_profile_birthday"
         const val KEY_EMERGENCY_CONTACT = "emergency_contact"
         const val KEY_EMERGENCY_CONTACT_PERMISSION = "emergency_contact_permission"
+        const val KEY_SAFETY_COMFORT_STYLE = "safety_comfort_style"
+        const val KEY_SAFETY_GROUNDING_STYLE = "safety_grounding_style"
+        const val KEY_SAFETY_FOLLOW_UP_OPT_IN = "safety_follow_up_opt_in"
         const val KEY_LOCAL_RELATIONSHIP_ALIASES = "local_relationship_aliases"
         const val KEY_CONTACT_ACTION_PREFERENCES = "contact_action_preferences"
         const val KEY_VOSK_MODEL_ASSET = "vosk_model_asset"
@@ -11134,6 +11209,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_LEARNING_REMINDER_TITLE = "learning_reminder_title"
         const val KEY_LEARNING_REMINDER_TEXT = "learning_reminder_text"
         private const val RECENT_CALL_REMINDER_GUARD_MS = 8000L
+        private const val SAFETY_MOOD_NONE = "none"
+        private const val SAFETY_MOOD_GENERAL = "general"
+        private const val SAFETY_MOOD_STRESS = "stress"
+        private const val SAFETY_MOOD_SADNESS = "sadness"
+        private const val SAFETY_MOOD_ANGER = "anger"
+        private const val SAFETY_MOOD_CRISIS = "crisis"
         const val KEY_THEME_PRESET = "theme_preset"
         const val KEY_HOME_TITLE = "home_title"
         const val KEY_HOME_SUBTITLE = "home_subtitle"

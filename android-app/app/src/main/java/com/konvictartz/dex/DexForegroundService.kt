@@ -46,6 +46,7 @@ private enum class BackgroundListenMode {
     SMS_COMMAND,
     SMS_REPLY,
     NOTIFICATION_COMMAND,
+    SAFETY_CHECK_IN,
     CALLER_MESSAGE,
     REMINDER_CHECK_IN,
 }
@@ -75,6 +76,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var pendingReminderCallTarget: String? = null
     private var pendingReminderTextTarget: String? = null
     private var pendingReminderTextBody: String? = null
+    private var pendingSafetyTitle: String? = null
+    private var pendingSafetyText: String? = null
+    private var pendingSafetyMood: String? = null
+    private var pendingSafetyEmergency = false
+    private var safetyCheckInAttempts = 0
     private var backgroundRecognizerRecoveryAttempts = 0
     private var wakeWordEngine: DexWakeWordEngine? = null
     private var autoTakeMessageRunnable: Runnable? = null
@@ -86,6 +92,13 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private data class ParsedCallerMessage(
         val callerName: String?,
         val message: String,
+    )
+
+    private data class SafetyPromptProfile(
+        val title: String,
+        val message: String,
+        val mood: String,
+        val emergency: Boolean,
     )
 
     private inner class DexCallStateCallback : TelephonyCallback(), TelephonyCallback.CallStateListener {
@@ -641,8 +654,13 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ?: getString(R.string.safety_check_in_title)
         val text = intent.getStringExtra(DexSafetyCheckInScheduler.EXTRA_TEXT)
             ?: getString(R.string.safety_check_in_text)
+        pendingSafetyTitle = title
+        pendingSafetyText = text
+        pendingSafetyMood = intent.getStringExtra(DexSafetyCheckInScheduler.EXTRA_MOOD).orEmpty().ifBlank { "general" }
+        pendingSafetyEmergency = intent.getBooleanExtra(DexSafetyCheckInScheduler.EXTRA_IS_EMERGENCY, false)
+        safetyCheckInAttempts = 0
         mainHandler.postDelayed({
-            speakShortStatus("$title. $text")
+            speakAndThenListen(buildSafetyCheckInPrompt(), BackgroundListenMode.SAFETY_CHECK_IN)
         }, 700L)
     }
 
@@ -838,6 +856,10 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     repromptBackgroundListenMode(mode)
                 }
             }
+            BackgroundListenMode.SAFETY_CHECK_IN -> {
+                val handled = cleaned.any { handleBackgroundSafetyCheckIn(it.lowercase(Locale.US)) }
+                if (!handled) repromptBackgroundListenMode(mode)
+            }
             BackgroundListenMode.CALLER_MESSAGE -> handleCallerMessage(cleaned.first())
             BackgroundListenMode.REMINDER_CHECK_IN -> {
                 val handled = cleaned.any { handleBackgroundReminderCheckIn(it.lowercase(Locale.US)) }
@@ -886,6 +908,20 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     clearPendingNotification()
                     dismissNotification(NOTIFICATION_PROMPT_ID)
                     speakShortStatus(getString(R.string.notification_command_give_up))
+                }
+            BackgroundListenMode.SAFETY_CHECK_IN ->
+                if (safetyCheckInAttempts < MAX_SAFETY_CHECK_IN_ATTEMPTS) {
+                    safetyCheckInAttempts += 1
+                    speakAndThenListen(
+                        getString(R.string.safety_check_in_retry),
+                        BackgroundListenMode.SAFETY_CHECK_IN
+                    )
+                } else {
+                    if (pendingSafetyEmergency) {
+                        scheduleNextSafetyFollowUp(10, pendingSafetyMood ?: "crisis", true)
+                    }
+                    clearPendingSafetyContext()
+                    speakShortStatus(getString(R.string.safety_check_in_pause))
                 }
             BackgroundListenMode.CALLER_MESSAGE ->
                 if (callMessageCaptureAttempts < MAX_CALL_MESSAGE_CAPTURE_ATTEMPTS) {
@@ -1024,6 +1060,52 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun handleBackgroundSafetyCheckIn(normalized: String): Boolean {
+        return when {
+            isSafetyImprovedReply(normalized) -> {
+                clearPendingSafetyContext()
+                speakShortStatus(getString(R.string.safety_check_in_relieved))
+                true
+            }
+            isHighRiskSafetyReply(normalized) -> {
+                val personName = resolveEmergencyPersonName()
+                val trigger = normalized.replace(Regex("\\s+"), " ").trim()
+                val crisisReply = getString(R.string.local_emergency_reply, personName)
+                val smsStatus = sendEscalationSafetySms(trigger)
+                scheduleNextSafetyFollowUp(10, "crisis", true)
+                clearPendingSafetyContext()
+                val spoken = listOfNotNull(crisisReply, smsStatus, getString(R.string.safety_check_in_staying_with_you))
+                    .joinToString(" ")
+                speakShortStatus(spoken)
+                true
+            }
+            isSafetyDistressReply(normalized) -> {
+                val mood = detectSafetyMoodFromReply(normalized, pendingSafetyMood)
+                val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
+                val followUpMinutes = if (pendingSafetyEmergency) 10 else 20
+                scheduleNextSafetyFollowUp(followUpMinutes, mood, pendingSafetyEmergency)
+                clearPendingSafetyContext()
+                speakShortStatus("$support ${getString(R.string.safety_check_in_following_up)}".trim())
+                true
+            }
+            isAffirmativeCommand(normalized) -> {
+                val mood = pendingSafetyMood ?: "general"
+                val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
+                val followUpMinutes = if (pendingSafetyEmergency) 10 else 20
+                scheduleNextSafetyFollowUp(followUpMinutes, mood, pendingSafetyEmergency)
+                clearPendingSafetyContext()
+                speakShortStatus("$support ${getString(R.string.safety_check_in_following_up)}".trim())
+                true
+            }
+            isNegativeCommand(normalized) -> {
+                clearPendingSafetyContext()
+                speakShortStatus(getString(R.string.safety_check_in_pause))
+                true
+            }
+            else -> false
+        }
+    }
+
     private fun handleBackgroundReminderCheckIn(normalized: String): Boolean {
         val reminderCallTarget = pendingReminderCallTarget
         val reminderTextTarget = pendingReminderTextTarget
@@ -1103,12 +1185,146 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         return null
     }
 
+    private fun buildSafetyCheckInPrompt(): String {
+        val profile = currentSafetyPromptProfile()
+        val name = resolveEmergencyPersonName()
+        return if (profile.emergency) {
+            getString(R.string.safety_check_in_prompt_crisis, name, profile.message)
+        } else {
+            getString(R.string.safety_check_in_prompt_friend, name, profile.message)
+        }
+    }
+
+    private fun currentSafetyPromptProfile(): SafetyPromptProfile {
+        val title = pendingSafetyTitle ?: getString(R.string.safety_check_in_title)
+        val message = pendingSafetyText ?: getString(R.string.safety_check_in_text)
+        val mood = pendingSafetyMood ?: "general"
+        return SafetyPromptProfile(title, message, mood, pendingSafetyEmergency)
+    }
+
+    private fun buildSafetyFollowUpResponse(mood: String, emergency: Boolean): String {
+        val name = resolveEmergencyPersonName()
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val comfortStyle = prefs.getString(MainActivity.KEY_SAFETY_COMFORT_STYLE, "calm").orEmpty().ifBlank { "calm" }
+        val groundingStyle = prefs.getString(MainActivity.KEY_SAFETY_GROUNDING_STYLE, "gentle").orEmpty().ifBlank { "gentle" }
+        return when {
+            emergency -> getString(R.string.safety_check_in_response_crisis, name)
+            mood == "anger" -> getString(R.string.safety_check_in_response_anger, name, groundingStyle)
+            mood == "sadness" -> getString(R.string.safety_check_in_response_sadness, name, comfortStyle)
+            mood == "stress" -> getString(R.string.safety_check_in_response_stress, name, groundingStyle)
+            else -> getString(R.string.safety_check_in_response_general, name, comfortStyle)
+        }
+    }
+
+    private fun detectSafetyMoodFromReply(normalized: String, fallbackMood: String?): String {
+        val angerPhrases = listOf("angry", "mad", "furious", "pissed", "frustrated", "annoyed")
+        val sadnessPhrases = listOf("sad", "crying", "down", "depressed", "lonely", "hurt", "hopeless")
+        val stressPhrases = listOf("stressed", "overwhelmed", "anxious", "panic", "panicking", "tense")
+        return when {
+            angerPhrases.any { normalized.contains(it) } -> "anger"
+            sadnessPhrases.any { normalized.contains(it) } -> "sadness"
+            stressPhrases.any { normalized.contains(it) } -> "stress"
+            else -> fallbackMood ?: "general"
+        }
+    }
+
+    private fun isSafetyImprovedReply(normalized: String): Boolean {
+        return normalized.contains("i'm good") ||
+            normalized.contains("im good") ||
+            normalized.contains("i feel better") ||
+            normalized.contains("feeling better") ||
+            normalized.contains("i'm okay") ||
+            normalized.contains("im okay") ||
+            normalized.contains("i am okay") ||
+            normalized.contains("i am good") ||
+            normalized.contains("better now") ||
+            normalized.contains("i'm alright") ||
+            normalized.contains("im alright")
+    }
+
+    private fun isSafetyDistressReply(normalized: String): Boolean {
+        return normalized.contains("not good") ||
+            normalized.contains("not okay") ||
+            normalized.contains("still upset") ||
+            normalized.contains("still angry") ||
+            normalized.contains("still sad") ||
+            normalized.contains("still stressed") ||
+            normalized.contains("still overwhelmed") ||
+            normalized.contains("i need help") ||
+            normalized.contains("don't feel better") ||
+            normalized.contains("do not feel better") ||
+            normalized.contains("not better")
+    }
+
+    private fun isHighRiskSafetyReply(normalized: String): Boolean {
+        val phrases = listOf(
+            "kill myself",
+            "want to die",
+            "hurt myself",
+            "harm myself",
+            "suicidal",
+            "kill someone",
+            "hurt someone",
+            "harm someone",
+            "hurt others",
+            "harm others"
+        )
+        return phrases.any { normalized.contains(it) }
+    }
+
+    private fun scheduleNextSafetyFollowUp(delayMinutes: Int, mood: String, emergency: Boolean) {
+        val title = pendingSafetyTitle ?: getString(R.string.safety_check_in_title)
+        val text = when {
+            emergency -> getString(R.string.safety_check_in_text_crisis, resolveEmergencyPersonName())
+            mood == "anger" -> getString(R.string.safety_check_in_text_anger, resolveEmergencyPersonName(), "steady")
+            mood == "sadness" -> getString(R.string.safety_check_in_text_sadness, resolveEmergencyPersonName(), "calm")
+            mood == "stress" -> getString(R.string.safety_check_in_text_stress, resolveEmergencyPersonName(), "gentle")
+            else -> getString(R.string.safety_check_in_text_friend, resolveEmergencyPersonName(), "calm")
+        }
+        DexSafetyCheckInScheduler.scheduleOneTimeCheckIn(
+            context = this,
+            delayMinutes = delayMinutes,
+            title = title,
+            text = text,
+            voiceCheckIn = true,
+            kind = "safety",
+            mood = mood,
+            emergencyFollowUp = emergency
+        )
+    }
+
+    private fun sendEscalationSafetySms(triggerMessage: String): String? {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val contactAllowed = prefs.getBoolean(MainActivity.KEY_EMERGENCY_CONTACT_PERMISSION, false)
+        if (!contactAllowed) return null
+        val trustedContact = prefs.getString(MainActivity.KEY_EMERGENCY_CONTACT, null).orEmpty()
+        val phoneNumber = normalizeSmsPhoneNumber(trustedContact)
+        if (phoneNumber.isBlank()) return null
+        if (!hasPermission(Manifest.permission.SEND_SMS)) return getString(R.string.local_emergency_sms_permission_missing)
+        val assistedPersonName = resolveEmergencyPersonName()
+        val smsBody = getString(R.string.local_emergency_sms_body, assistedPersonName, triggerMessage.take(72))
+        return runCatching {
+            resolveSmsManager().sendTextMessage(phoneNumber, null, smsBody, null, null)
+        }.fold(
+            onSuccess = { getString(R.string.local_emergency_sms_attempting) },
+            onFailure = { getString(R.string.local_emergency_sms_failed) }
+        )
+    }
+
     private fun clearPendingReminderContext() {
         pendingReminderTitle = null
         pendingReminderText = null
         pendingReminderCallTarget = null
         pendingReminderTextTarget = null
         pendingReminderTextBody = null
+    }
+
+    private fun clearPendingSafetyContext() {
+        pendingSafetyTitle = null
+        pendingSafetyText = null
+        pendingSafetyMood = null
+        pendingSafetyEmergency = false
+        safetyCheckInAttempts = 0
     }
 
     private fun placeReminderCall(target: String) {
@@ -1344,6 +1560,24 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         return null
     }
 
+    private fun resolveEmergencyPersonName(): String {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(MainActivity.KEY_EMERGENCY_PROFILE_NAME, null)
+            ?.trim()
+            ?.takeUnless { it.isBlank() }
+            ?: getString(R.string.safety_person_default_name)
+    }
+
+    private fun normalizeSmsPhoneNumber(value: String?): String {
+        val digits = value.orEmpty().filter { it.isDigit() }
+        return when {
+            digits.length == 11 && digits.startsWith("1") -> "+$digits"
+            digits.length == 10 -> "+1$digits"
+            digits.length > 10 -> "+$digits"
+            else -> ""
+        }
+    }
+
     private fun sendPhoneSms(number: String, body: String, spokenTarget: String) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             speakShortStatus(getString(R.string.sms_send_permission_missing))
@@ -1576,6 +1810,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 BackgroundListenMode.NOTIFICATION_COMMAND -> addAll(
                     listOf("read it", "reply", "ignore it")
                 )
+                BackgroundListenMode.SAFETY_CHECK_IN -> addAll(
+                    listOf("i'm good", "im good", "i feel better", "i'm okay", "not really", "still upset", "still stressed", "still sad")
+                )
                 BackgroundListenMode.REMINDER_CHECK_IN -> addAll(
                     listOf("remind me again", "check back", "ten minutes", "not now")
                 )
@@ -1605,18 +1842,21 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             BackgroundListenMode.SMS_REPLY -> 6000L
             BackgroundListenMode.GENERAL_COMMAND -> 4200L
             BackgroundListenMode.CALLER_MESSAGE -> 6500L
+            BackgroundListenMode.SAFETY_CHECK_IN -> 5200L
             else -> 3600L
         }
         val possibleSilenceMs = when (mode) {
             BackgroundListenMode.SMS_REPLY -> 3800L
             BackgroundListenMode.GENERAL_COMMAND -> 2800L
             BackgroundListenMode.CALLER_MESSAGE -> 4600L
+            BackgroundListenMode.SAFETY_CHECK_IN -> 3400L
             else -> 2400L
         }
         val minimumMs = when (mode) {
             BackgroundListenMode.SMS_REPLY -> 14000L
             BackgroundListenMode.GENERAL_COMMAND -> 9000L
             BackgroundListenMode.CALLER_MESSAGE -> 18000L
+            BackgroundListenMode.SAFETY_CHECK_IN -> 15000L
             else -> 5000L
         }
         val intent = buildBackgroundRecognitionIntent(mode, 5, completeSilenceMs, possibleSilenceMs, minimumMs)
@@ -1720,6 +1960,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             BackgroundListenMode.SMS_COMMAND -> "sms prompt listening"
             BackgroundListenMode.SMS_REPLY -> "sms reply listening"
             BackgroundListenMode.NOTIFICATION_COMMAND -> "notification listening"
+            BackgroundListenMode.SAFETY_CHECK_IN -> "safety check-in listening"
             BackgroundListenMode.CALLER_MESSAGE -> "caller message listening"
             BackgroundListenMode.REMINDER_CHECK_IN -> "reminder check-in listening"
         }
@@ -1810,6 +2051,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         private const val CALL_MESSAGE_END_DELAY_MS = 1200L
         private const val MAX_CALL_MESSAGE_CAPTURE_ATTEMPTS = 2
         private const val MAX_NOTIFICATION_COMMAND_ATTEMPTS = 2
+        private const val MAX_SAFETY_CHECK_IN_ATTEMPTS = 2
         private const val MIN_CALL_MESSAGE_LENGTH = 8
         private const val MIN_CALL_MESSAGE_WORDS = 3
         private const val DEX_TTS_BACKGROUND_RATE = 0.88f
