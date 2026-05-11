@@ -791,8 +791,9 @@
     <string name="incoming_sms_reply_retry">I missed that. What should I text %1$s?</string>
     <string name="incoming_sms_reply_number_missing">I can read messages from %1$s, but Android did not give me a phone number to reply to from this notification.</string>
     <string name="incoming_sms_ignored">Okay. I will leave the text from %1$s unread aloud.</string>
-    <string name="notification_command_retry">I missed that. Say read it or ignore it.</string>
-    <string name="notification_command_retry_with_reply">I missed that. Say reply, read it again, or ignore it.</string>
+    <string name="notification_command_retry">I missed that. Say yes to read it, or no to ignore it.</string>
+    <string name="notification_command_retry_with_reply">I missed that. Say yes to read it, reply to answer, or no to ignore it.</string>
+    <string name="notification_command_give_up">Okay. I will leave that notification alone for now.</string>
     <string name="background_actions_channel_name">Dex call and text actions</string>
     <string name="background_actions_channel_description">Lets Dex show answer, decline, read, and reply actions while the app stays closed.</string>
     <string name="call_notification_title">Incoming call from %1$s</string>

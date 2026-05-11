@@ -9163,13 +9163,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun isPromptAffirmativeVoiceReply(normalized: String): Boolean {
         return normalized == "yes" ||
             normalized == "yes please" ||
+            normalized == "go ahead" ||
+            normalized == "go ahead please" ||
             normalized == "yeah" ||
             normalized == "yeah please" ||
             normalized == "yep" ||
             normalized == "ok" ||
             normalized == "okay" ||
             normalized == "okay then" ||
-            normalized == "sure"
+            normalized == "sure" ||
+            normalized == "read it please"
     }
 
     private fun isPromptNegativeVoiceReply(normalized: String): Boolean {
@@ -9179,7 +9182,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized == "nope" ||
             normalized == "nah" ||
             normalized == "not now" ||
+            normalized == "leave that" ||
             normalized == "leave it" ||
+            normalized == "don't read it" ||
+            normalized == "do not read it" ||
             normalized == "ignore it" ||
             normalized == "cancel"
     }

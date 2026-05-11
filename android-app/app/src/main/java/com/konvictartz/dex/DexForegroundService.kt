@@ -79,6 +79,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var wakeWordEngine: DexWakeWordEngine? = null
     private var autoTakeMessageRunnable: Runnable? = null
     private var callMessageCaptureAttempts = 0
+    private var notificationCommandAttempts = 0
     private var callScreeningPhraseIndex = 0
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -631,6 +632,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             .apply()
 
         showIncomingNotificationPrompt(appName, body)
+        notificationCommandAttempts = 0
         speakAndThenListen(getString(R.string.notification_prompt, appName), BackgroundListenMode.NOTIFICATION_COMMAND)
     }
 
@@ -802,6 +804,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 }
             speakShortStatus(readback)
         }
+        clearPendingNotification()
+        dismissNotification(NOTIFICATION_PROMPT_ID)
     }
 
     private fun handleNotificationIgnoreAction() {
@@ -828,7 +832,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             BackgroundListenMode.SMS_REPLY -> sendPendingSmsReply(cleaned.first())
             BackgroundListenMode.NOTIFICATION_COMMAND -> {
                 val handled = cleaned.any { handleBackgroundNotificationCommand(it.lowercase(Locale.US)) }
-                if (!handled) repromptBackgroundListenMode(mode)
+                if (handled) {
+                    notificationCommandAttempts = 0
+                } else {
+                    repromptBackgroundListenMode(mode)
+                }
             }
             BackgroundListenMode.CALLER_MESSAGE -> handleCallerMessage(cleaned.first())
             BackgroundListenMode.REMINDER_CHECK_IN -> {
@@ -867,10 +875,18 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 )
             }
             BackgroundListenMode.NOTIFICATION_COMMAND ->
-                speakAndThenListen(
-                    getString(R.string.notification_command_retry),
-                    BackgroundListenMode.NOTIFICATION_COMMAND
-                )
+                if (notificationCommandAttempts < MAX_NOTIFICATION_COMMAND_ATTEMPTS) {
+                    notificationCommandAttempts += 1
+                    speakAndThenListen(
+                        getString(R.string.notification_command_retry),
+                        BackgroundListenMode.NOTIFICATION_COMMAND
+                    )
+                } else {
+                    notificationCommandAttempts = 0
+                    clearPendingNotification()
+                    dismissNotification(NOTIFICATION_PROMPT_ID)
+                    speakShortStatus(getString(R.string.notification_command_give_up))
+                }
             BackgroundListenMode.CALLER_MESSAGE ->
                 if (callMessageCaptureAttempts < MAX_CALL_MESSAGE_CAPTURE_ATTEMPTS) {
                     val retryPrompt = when (nextCallScreeningPhraseVariant()) {
@@ -1129,6 +1145,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun isAffirmativeCommand(normalized: String): Boolean {
         return normalized == "yes" ||
             normalized.startsWith("yes ") ||
+            normalized.contains("yes please") ||
             normalized == "yeah" ||
             normalized.startsWith("yeah ") ||
             normalized == "yep" ||
@@ -1140,8 +1157,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             normalized == "sure" ||
             normalized.startsWith("sure ") ||
             normalized == "please do" ||
+            normalized == "go ahead" ||
+            normalized.startsWith("go ahead ") ||
+            normalized.contains("go ahead and read") ||
             normalized.contains("read it") ||
             normalized.contains("read that") ||
+            normalized.contains("read the notification") ||
             normalized.contains("reply to it") ||
             normalized.contains("reply back")
     }
@@ -1149,6 +1170,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun isNegativeCommand(normalized: String): Boolean {
         return normalized == "no" ||
             normalized.startsWith("no ") ||
+            normalized.contains("no thank you") ||
             normalized == "nope" ||
             normalized.startsWith("nope ") ||
             normalized == "nah" ||
@@ -1156,7 +1178,10 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             normalized.contains("no thanks") ||
             normalized.contains("not now") ||
             normalized.contains("don't") ||
-            normalized.contains("do not")
+            normalized.contains("do not") ||
+            normalized.contains("leave that") ||
+            normalized.contains("don't read it") ||
+            normalized.contains("do not read it")
     }
 
     private fun handleCallerMessage(transcript: String) {
@@ -1483,6 +1508,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun clearPendingNotification() {
+        notificationCommandAttempts = 0
         getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(MainActivity.KEY_PENDING_NOTIFICATION_APP)
@@ -1783,6 +1809,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         private const val AUTO_TAKE_MESSAGE_DELAY_MS = 5500L
         private const val CALL_MESSAGE_END_DELAY_MS = 1200L
         private const val MAX_CALL_MESSAGE_CAPTURE_ATTEMPTS = 2
+        private const val MAX_NOTIFICATION_COMMAND_ATTEMPTS = 2
         private const val MIN_CALL_MESSAGE_LENGTH = 8
         private const val MIN_CALL_MESSAGE_WORDS = 3
         private const val DEX_TTS_BACKGROUND_RATE = 0.88f
