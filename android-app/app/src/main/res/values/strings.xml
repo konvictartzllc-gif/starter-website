@@ -423,9 +423,15 @@
     <string name="safety_check_in_response_crisis_alt_1">%1$s, thank you for being real with me. Right now I care most about keeping you safe and staying with you through this.</string>
     <string name="safety_check_in_response_crisis_alt_2">%1$s, I’m really glad you told me. Your safety comes first right now, and I’m not treating this lightly.</string>
     <string name="safety_check_in_nudge_general">Let’s keep it simple and only focus on the next small thing.</string>
+    <string name="safety_check_in_nudge_general_direct">Let’s strip this down and deal with only the very next thing in front of you.</string>
+    <string name="safety_check_in_nudge_general_faith">Let’s slow down, take the next small step, and remember you do not have to carry this alone.</string>
     <string name="safety_check_in_nudge_stress">Try one %1$s breath with me and let the rest wait for a minute.</string>
+    <string name="safety_check_in_nudge_stress_step">Let’s do this step by step: one breath, loosen your shoulders, then only think about the next minute.</string>
     <string name="safety_check_in_nudge_sadness">If you can, just get a little more comfortable and let me keep this gentle with you.</string>
+    <string name="safety_check_in_nudge_sadness_direct">If you can, sit down, get a little more comfortable, and let this moment be smaller for a minute.</string>
+    <string name="safety_check_in_nudge_sadness_faith">If you can, get a little more comfortable and let yourself rest in the idea that you are still being held through this.</string>
     <string name="safety_check_in_nudge_anger">Let’s keep your hands loose, your voice lower, and your body %1$s for a minute.</string>
+    <string name="safety_check_in_nudge_anger_step">Let’s go step by step: unclench your hands, lower your voice, and keep your feet planted for one minute.</string>
     <string name="safety_check_in_nudge_crisis">Stay with me for this minute and do not handle this by yourself.</string>
     <string name="safety_check_in_channel_name">Dex safety check-ins</string>
     <string name="safety_check_in_channel_description">Supportive follow-up reminders after hard moments.</string>

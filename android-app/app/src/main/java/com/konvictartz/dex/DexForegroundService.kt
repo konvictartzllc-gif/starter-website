@@ -1271,12 +1271,22 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun buildSafetyCopingNudge(mood: String, emergency: Boolean): String {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val comfortStyle = prefs.getString(MainActivity.KEY_SAFETY_COMFORT_STYLE, "calm").orEmpty().ifBlank { "calm" }
         val groundingStyle = prefs.getString(MainActivity.KEY_SAFETY_GROUNDING_STYLE, "gentle").orEmpty().ifBlank { "gentle" }
+        val stepByStep = groundingStyle.contains("step", ignoreCase = true)
+        val faithStyle = comfortStyle.contains("faith", ignoreCase = true)
+        val directStyle = comfortStyle.contains("direct", ignoreCase = true)
         return when {
             emergency -> getString(R.string.safety_check_in_nudge_crisis)
+            mood == "stress" && stepByStep -> getString(R.string.safety_check_in_nudge_stress_step)
             mood == "stress" -> getString(R.string.safety_check_in_nudge_stress, groundingStyle)
+            mood == "sadness" && faithStyle -> getString(R.string.safety_check_in_nudge_sadness_faith)
+            mood == "sadness" && directStyle -> getString(R.string.safety_check_in_nudge_sadness_direct)
             mood == "sadness" -> getString(R.string.safety_check_in_nudge_sadness)
+            mood == "anger" && stepByStep -> getString(R.string.safety_check_in_nudge_anger_step)
             mood == "anger" -> getString(R.string.safety_check_in_nudge_anger, groundingStyle)
+            directStyle -> getString(R.string.safety_check_in_nudge_general_direct)
+            faithStyle -> getString(R.string.safety_check_in_nudge_general_faith)
             else -> getString(R.string.safety_check_in_nudge_general)
         }
     }
