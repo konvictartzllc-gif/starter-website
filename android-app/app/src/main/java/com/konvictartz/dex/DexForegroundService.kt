@@ -2150,14 +2150,35 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun speakNow(text: String) {
-        textToSpeech?.setSpeechRate(DEX_TTS_BACKGROUND_RATE)
-        textToSpeech?.setPitch(DEX_TTS_PITCH)
+        textToSpeech?.setSpeechRate(resolveBackgroundSpeechRate())
+        textToSpeech?.setPitch(resolveBackgroundSpeechPitch())
         textToSpeech?.speak(
             text,
             TextToSpeech.QUEUE_FLUSH,
             null,
             "dex_bg_status_${System.currentTimeMillis()}"
         )
+    }
+
+    private fun resolveBackgroundSpeechRate(): Float {
+        return when {
+            pendingSafetyEmergency -> DEX_TTS_SAFETY_CRISIS_RATE
+            pendingSafetyMood == "anger" -> DEX_TTS_SAFETY_ANGER_RATE
+            pendingSafetyMood == "sadness" -> DEX_TTS_SAFETY_SADNESS_RATE
+            pendingSafetyMood == "stress" -> DEX_TTS_SAFETY_STRESS_RATE
+            pendingListenMode == BackgroundListenMode.SAFETY_CHECK_IN ||
+                activeListenMode == BackgroundListenMode.SAFETY_CHECK_IN -> DEX_TTS_SAFETY_GENERAL_RATE
+            else -> DEX_TTS_BACKGROUND_RATE
+        }
+    }
+
+    private fun resolveBackgroundSpeechPitch(): Float {
+        return when {
+            pendingSafetyEmergency -> DEX_TTS_SAFETY_CRISIS_PITCH
+            pendingSafetyMood == "anger" -> DEX_TTS_SAFETY_ANGER_PITCH
+            pendingSafetyMood == "sadness" -> DEX_TTS_SAFETY_SADNESS_PITCH
+            else -> DEX_TTS_PITCH
+        }
     }
 
     private fun postCallEvent(event: String, caller: String) {
@@ -2222,7 +2243,15 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         private const val MIN_CALL_MESSAGE_LENGTH = 8
         private const val MIN_CALL_MESSAGE_WORDS = 3
         private const val DEX_TTS_BACKGROUND_RATE = 0.88f
+        private const val DEX_TTS_SAFETY_GENERAL_RATE = 0.84f
+        private const val DEX_TTS_SAFETY_STRESS_RATE = 0.82f
+        private const val DEX_TTS_SAFETY_SADNESS_RATE = 0.78f
+        private const val DEX_TTS_SAFETY_ANGER_RATE = 0.8f
+        private const val DEX_TTS_SAFETY_CRISIS_RATE = 0.74f
         private const val DEX_TTS_PITCH = 0.95f
+        private const val DEX_TTS_SAFETY_SADNESS_PITCH = 0.92f
+        private const val DEX_TTS_SAFETY_ANGER_PITCH = 0.9f
+        private const val DEX_TTS_SAFETY_CRISIS_PITCH = 0.9f
         private const val BACKGROUND_RECOGNIZER_RECOVERY_DELAY_MS = 900L
         private const val MAX_BACKGROUND_RECOGNIZER_RECOVERY_ATTEMPTS = 2
     }
