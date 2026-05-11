@@ -1064,7 +1064,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         return when {
             isSafetyImprovedReply(normalized) -> {
                 clearPendingSafetyContext()
-                speakShortStatus(getString(R.string.safety_check_in_relieved))
+                speakShortStatus(buildSafetyRelievedReply())
                 true
             }
             isSafetyStayReply(normalized) -> {
@@ -1072,14 +1072,14 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
                 scheduleNextSafetyFollowUp(if (pendingSafetyEmergency) 10 else 12, mood, pendingSafetyEmergency)
                 clearPendingSafetyContext()
-                speakShortStatus("$support ${getString(R.string.safety_check_in_stay_reply)}".trim())
+                speakShortStatus("$support ${buildSafetyStayReply()}".trim())
                 true
             }
             isSafetyLaterReply(normalized) -> {
                 val mood = pendingSafetyMood ?: "general"
                 scheduleNextSafetyFollowUp(if (pendingSafetyEmergency) 15 else 25, mood, pendingSafetyEmergency)
                 clearPendingSafetyContext()
-                speakShortStatus(getString(R.string.safety_check_in_later_reply))
+                speakShortStatus(buildSafetyLaterReply())
                 true
             }
             isHighRiskSafetyReply(normalized) -> {
@@ -1100,7 +1100,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 val followUpMinutes = if (pendingSafetyEmergency) 10 else 20
                 scheduleNextSafetyFollowUp(followUpMinutes, mood, pendingSafetyEmergency)
                 clearPendingSafetyContext()
-                speakShortStatus("$support ${getString(R.string.safety_check_in_following_up)}".trim())
+                speakShortStatus("$support ${buildSafetyFollowingUpReply()}".trim())
                 true
             }
             isAffirmativeCommand(normalized) -> {
@@ -1109,7 +1109,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 val followUpMinutes = if (pendingSafetyEmergency) 10 else 20
                 scheduleNextSafetyFollowUp(followUpMinutes, mood, pendingSafetyEmergency)
                 clearPendingSafetyContext()
-                speakShortStatus("$support ${getString(R.string.safety_check_in_following_up)}".trim())
+                speakShortStatus("$support ${buildSafetyFollowingUpReply()}".trim())
                 true
             }
             isNegativeCommand(normalized) -> {
@@ -1237,6 +1237,38 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             mood == "sadness" -> getString(R.string.safety_check_in_response_sadness, name, comfortStyle)
             mood == "stress" -> getString(R.string.safety_check_in_response_stress, name, groundingStyle)
             else -> getString(R.string.safety_check_in_response_general, name, comfortStyle)
+        }
+    }
+
+    private fun buildSafetyRelievedReply(): String {
+        return when (nextSafetyCheckInPhraseVariant()) {
+            0 -> getString(R.string.safety_check_in_relieved)
+            1 -> getString(R.string.safety_check_in_relieved_alt_1)
+            else -> getString(R.string.safety_check_in_relieved_alt_2)
+        }
+    }
+
+    private fun buildSafetyStayReply(): String {
+        return when (nextSafetyCheckInPhraseVariant()) {
+            0 -> getString(R.string.safety_check_in_stay_reply)
+            1 -> getString(R.string.safety_check_in_stay_reply_alt_1)
+            else -> getString(R.string.safety_check_in_stay_reply_alt_2)
+        }
+    }
+
+    private fun buildSafetyLaterReply(): String {
+        return when (nextSafetyCheckInPhraseVariant()) {
+            0 -> getString(R.string.safety_check_in_later_reply)
+            1 -> getString(R.string.safety_check_in_later_reply_alt_1)
+            else -> getString(R.string.safety_check_in_later_reply_alt_2)
+        }
+    }
+
+    private fun buildSafetyFollowingUpReply(): String {
+        return when (nextSafetyCheckInPhraseVariant()) {
+            0 -> getString(R.string.safety_check_in_following_up)
+            1 -> getString(R.string.safety_check_in_following_up_alt_1)
+            else -> getString(R.string.safety_check_in_following_up_alt_2)
         }
     }
 
