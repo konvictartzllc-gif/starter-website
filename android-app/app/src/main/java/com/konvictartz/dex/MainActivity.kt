@@ -9563,6 +9563,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             mood = mood,
             emergencyFollowUp = forceEmergency || response?.optBoolean("emergency", false) == true
         )
+        prefs.edit()
+            .putString(KEY_LAST_SAFETY_MOOD, mood)
+            .putLong(KEY_LAST_SAFETY_CHECK_IN_AT, System.currentTimeMillis())
+            .apply()
     }
 
     private fun detectSupportMood(message: String, emergency: Boolean = false): String {
@@ -11200,6 +11204,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val KEY_SAFETY_COMFORT_STYLE = "safety_comfort_style"
         const val KEY_SAFETY_GROUNDING_STYLE = "safety_grounding_style"
         const val KEY_SAFETY_FOLLOW_UP_OPT_IN = "safety_follow_up_opt_in"
+        const val KEY_LAST_SAFETY_MOOD = "last_safety_mood"
+        const val KEY_LAST_SAFETY_CHOICE = "last_safety_choice"
+        const val KEY_LAST_SAFETY_CHECK_IN_AT = "last_safety_check_in_at"
         const val KEY_LOCAL_RELATIONSHIP_ALIASES = "local_relationship_aliases"
         const val KEY_CONTACT_ACTION_PREFERENCES = "contact_action_preferences"
         const val KEY_VOSK_MODEL_ASSET = "vosk_model_asset"

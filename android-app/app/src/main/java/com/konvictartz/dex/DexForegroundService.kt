@@ -1063,6 +1063,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun handleBackgroundSafetyCheckIn(normalized: String): Boolean {
         return when {
             isSafetyImprovedReply(normalized) -> {
+                persistSafetyCheckInMemory("better", pendingSafetyMood ?: "general")
                 clearPendingSafetyContext()
                 speakShortStatus(buildSafetyRelievedReply())
                 true
@@ -1071,6 +1072,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 val mood = detectSafetyMoodFromReply(normalized, pendingSafetyMood)
                 val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
                 scheduleNextSafetyFollowUp(if (pendingSafetyEmergency) 10 else 12, mood, pendingSafetyEmergency)
+                persistSafetyCheckInMemory("stay", mood)
                 clearPendingSafetyContext()
                 speakShortStatus("$support ${buildSafetyStayReply()}".trim())
                 true
@@ -1078,6 +1080,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             isSafetyLaterReply(normalized) -> {
                 val mood = pendingSafetyMood ?: "general"
                 scheduleNextSafetyFollowUp(if (pendingSafetyEmergency) 15 else 25, mood, pendingSafetyEmergency)
+                persistSafetyCheckInMemory("later", mood)
                 clearPendingSafetyContext()
                 speakShortStatus(buildSafetyLaterReply())
                 true
@@ -1088,6 +1091,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 val crisisReply = getString(R.string.local_emergency_reply, personName)
                 val smsStatus = sendEscalationSafetySms(trigger)
                 scheduleNextSafetyFollowUp(10, "crisis", true)
+                persistSafetyCheckInMemory("crisis", "crisis")
                 clearPendingSafetyContext()
                 val spoken = listOfNotNull(crisisReply, smsStatus, getString(R.string.safety_check_in_staying_with_you))
                     .joinToString(" ")
@@ -1099,6 +1103,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
                 val followUpMinutes = if (pendingSafetyEmergency) 10 else 20
                 scheduleNextSafetyFollowUp(followUpMinutes, mood, pendingSafetyEmergency)
+                persistSafetyCheckInMemory("needs_support", mood)
                 clearPendingSafetyContext()
                 speakShortStatus("$support ${buildSafetyFollowingUpReply()}".trim())
                 true
@@ -1108,11 +1113,13 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
                 val followUpMinutes = if (pendingSafetyEmergency) 10 else 20
                 scheduleNextSafetyFollowUp(followUpMinutes, mood, pendingSafetyEmergency)
+                persistSafetyCheckInMemory("needs_support", mood)
                 clearPendingSafetyContext()
                 speakShortStatus("$support ${buildSafetyFollowingUpReply()}".trim())
                 true
             }
             isNegativeCommand(normalized) -> {
+                persistSafetyCheckInMemory("pause", pendingSafetyMood ?: "general")
                 clearPendingSafetyContext()
                 speakShortStatus(getString(R.string.safety_check_in_pause))
                 true
@@ -1204,7 +1211,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val profile = currentSafetyPromptProfile()
         val name = resolveEmergencyPersonName()
         val variant = nextSafetyCheckInPhraseVariant()
-        return if (profile.emergency) {
+        val basePrompt = if (profile.emergency) {
             when (variant) {
                 0 -> getString(R.string.safety_check_in_prompt_crisis, name, profile.message)
                 1 -> getString(R.string.safety_check_in_prompt_crisis_alt_1, name, profile.message)
@@ -1217,6 +1224,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 else -> getString(R.string.safety_check_in_prompt_friend_alt_2, name, profile.message)
             }
         }
+        val memory = buildSafetyMemoryLead(profile.mood)
+        return listOfNotNull(memory, basePrompt).joinToString(" ")
     }
 
     private fun currentSafetyPromptProfile(): SafetyPromptProfile {
@@ -1290,6 +1299,31 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             1 -> getString(R.string.safety_check_in_following_up_alt_1)
             else -> getString(R.string.safety_check_in_following_up_alt_2)
         }
+    }
+
+    private fun buildSafetyMemoryLead(currentMood: String): String? {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val lastAt = prefs.getLong(MainActivity.KEY_LAST_SAFETY_CHECK_IN_AT, 0L)
+        if (lastAt <= 0L || System.currentTimeMillis() - lastAt > SAFETY_MEMORY_WINDOW_MS) return null
+        val lastMood = prefs.getString(MainActivity.KEY_LAST_SAFETY_MOOD, null).orEmpty()
+        val lastChoice = prefs.getString(MainActivity.KEY_LAST_SAFETY_CHOICE, null).orEmpty()
+        return when {
+            lastChoice == "later" -> getString(R.string.safety_check_in_memory_later)
+            lastChoice == "stay" -> getString(R.string.safety_check_in_memory_stay)
+            currentMood == "stress" || lastMood == "stress" -> getString(R.string.safety_check_in_memory_stress)
+            currentMood == "sadness" || lastMood == "sadness" -> getString(R.string.safety_check_in_memory_sadness)
+            currentMood == "anger" || lastMood == "anger" -> getString(R.string.safety_check_in_memory_anger)
+            else -> null
+        }
+    }
+
+    private fun persistSafetyCheckInMemory(choice: String, mood: String) {
+        getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(MainActivity.KEY_LAST_SAFETY_CHOICE, choice)
+            .putString(MainActivity.KEY_LAST_SAFETY_MOOD, mood)
+            .putLong(MainActivity.KEY_LAST_SAFETY_CHECK_IN_AT, System.currentTimeMillis())
+            .apply()
     }
 
     private fun detectSafetyMoodFromReply(normalized: String, fallbackMood: String?): String {
@@ -2155,6 +2189,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         private const val MAX_CALL_MESSAGE_CAPTURE_ATTEMPTS = 2
         private const val MAX_NOTIFICATION_COMMAND_ATTEMPTS = 2
         private const val MAX_SAFETY_CHECK_IN_ATTEMPTS = 2
+        private const val SAFETY_MEMORY_WINDOW_MS = 6 * 60 * 60 * 1000L
         private const val MIN_CALL_MESSAGE_LENGTH = 8
         private const val MIN_CALL_MESSAGE_WORDS = 3
         private const val DEX_TTS_BACKGROUND_RATE = 0.88f

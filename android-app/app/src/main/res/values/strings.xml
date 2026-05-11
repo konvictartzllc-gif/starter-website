@@ -387,6 +387,11 @@
     <string name="safety_check_in_prompt_crisis">%1$s, %2$s Do you want me to stay with you right now, or should I check back again in a little bit?</string>
     <string name="safety_check_in_prompt_crisis_alt_1">%1$s, %2$s I’m still with you. Do you want me to stay close right now, or give you a little space and come back soon?</string>
     <string name="safety_check_in_prompt_crisis_alt_2">%1$s, %2$s I care about how you’re doing. Should I stay with you right now, or check back again in a little while?</string>
+    <string name="safety_check_in_memory_later">Last time you asked me to give you a little room, so I wanted to come back gently.</string>
+    <string name="safety_check_in_memory_stay">You asked me to stay close last time, so I wanted to check back in carefully.</string>
+    <string name="safety_check_in_memory_stress">You sounded really overwhelmed earlier, so I wanted to keep this light and steady.</string>
+    <string name="safety_check_in_memory_sadness">You sounded really weighed down earlier, so I wanted to come back softly.</string>
+    <string name="safety_check_in_memory_anger">You sounded really heated earlier, so I wanted to come back in a calmer way.</string>
     <string name="safety_check_in_retry">I’m still here. You can say stay with me, check back later, or tell me I’m good.</string>
     <string name="safety_check_in_relieved">Okay. I’m glad you told me. I’ll ease off, but I’m still here if you need me again.</string>
     <string name="safety_check_in_relieved_alt_1">Thank you for telling me. I’m glad you’re feeling steadier. I’ll back off, but I’m here if you want me again.</string>
