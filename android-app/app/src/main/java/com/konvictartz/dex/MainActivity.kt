@@ -2511,7 +2511,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun saveSafetyProfile() {
-        val token = authToken ?: return
         val emergencyPersonName = binding.safetyNameInput.text?.toString()?.trim().orEmpty()
         val emergencyBirthday = binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty()
         val emergencyContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
@@ -2523,7 +2522,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_EMERGENCY_CONTACT, emergencyContact)
             .putBoolean(KEY_EMERGENCY_CONTACT_PERMISSION, contactPermission)
             .apply()
+        val confirmedName = emergencyPersonName.ifBlank { resolveEmergencyPersonName() }
+        val confirmedBirthday = emergencyBirthday.ifBlank { getString(R.string.safety_birthday_unknown) }
+        val localSaveReply = getString(R.string.safety_profile_saved_named, confirmedName, confirmedBirthday)
+        val token = authToken
         val serverUrl = currentServerUrl()
+        if (token.isNullOrBlank() || serverUrl.isBlank()) {
+            val reply = getString(R.string.safety_profile_saved_local_only)
+            binding.safetyProfileMessage.text = reply
+            binding.lastReplyValue.text = localSaveReply
+            refreshSafetyDiagnostics()
+            speakDex(localSaveReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
+            return
+        }
         val updates = listOf(
             "safety_person_name" to emergencyPersonName,
             "safety_birthday" to emergencyBirthday,
@@ -2548,18 +2559,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             val reply =
                 if (failed) {
-                    getString(R.string.safety_profile_failed)
+                    getString(R.string.safety_profile_saved_local_only)
                 } else {
-                    val confirmedName = emergencyPersonName.ifBlank { resolveEmergencyPersonName() }
-                    val confirmedBirthday = emergencyBirthday.ifBlank { getString(R.string.safety_birthday_unknown) }
-                    getString(R.string.safety_profile_saved_named, confirmedName, confirmedBirthday)
+                    localSaveReply
                 }
             binding.safetyProfileMessage.text = reply
-            binding.lastReplyValue.text = reply
+            binding.lastReplyValue.text = localSaveReply
             if (!failed) {
                 fetchSafetyPreferences()
-                speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
             }
+            speakDex(localSaveReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
             refreshSafetyDiagnostics()
         }
     }

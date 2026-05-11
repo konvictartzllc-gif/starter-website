@@ -357,6 +357,7 @@
     <string name="safety_profile_saved">Safety profile saved.</string>
     <string name="safety_profile_saved_named">I saved the assisted person profile for %1$s. Birthday: %2$s.</string>
     <string name="safety_profile_failed">Dex could not save your safety profile.</string>
+    <string name="safety_profile_saved_local_only">Saved on this phone, but Dex could not sync your safety profile to the server.</string>
     <string name="safety_lookup_assisted_person">I am assisting %1$s. Saved birthday: %2$s.</string>
     <string name="safety_lookup_birthday">I have %1$s saved with birthday %2$s.</string>
     <string name="safety_lookup_birthday_mismatch">I only have %1$s saved right now. Saved birthday: %2$s.</string>
