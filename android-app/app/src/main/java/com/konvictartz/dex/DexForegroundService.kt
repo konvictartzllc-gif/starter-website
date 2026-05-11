@@ -1232,11 +1232,31 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val comfortStyle = prefs.getString(MainActivity.KEY_SAFETY_COMFORT_STYLE, "calm").orEmpty().ifBlank { "calm" }
         val groundingStyle = prefs.getString(MainActivity.KEY_SAFETY_GROUNDING_STYLE, "gentle").orEmpty().ifBlank { "gentle" }
         return when {
-            emergency -> getString(R.string.safety_check_in_response_crisis, name)
-            mood == "anger" -> getString(R.string.safety_check_in_response_anger, name, groundingStyle)
-            mood == "sadness" -> getString(R.string.safety_check_in_response_sadness, name, comfortStyle)
-            mood == "stress" -> getString(R.string.safety_check_in_response_stress, name, groundingStyle)
-            else -> getString(R.string.safety_check_in_response_general, name, comfortStyle)
+            emergency -> when (nextSafetyCheckInPhraseVariant()) {
+                0 -> getString(R.string.safety_check_in_response_crisis, name)
+                1 -> getString(R.string.safety_check_in_response_crisis_alt_1, name)
+                else -> getString(R.string.safety_check_in_response_crisis_alt_2, name)
+            }
+            mood == "anger" -> when (nextSafetyCheckInPhraseVariant()) {
+                0 -> getString(R.string.safety_check_in_response_anger, name, groundingStyle)
+                1 -> getString(R.string.safety_check_in_response_anger_alt_1, name, groundingStyle)
+                else -> getString(R.string.safety_check_in_response_anger_alt_2, name, groundingStyle)
+            }
+            mood == "sadness" -> when (nextSafetyCheckInPhraseVariant()) {
+                0 -> getString(R.string.safety_check_in_response_sadness, name, comfortStyle)
+                1 -> getString(R.string.safety_check_in_response_sadness_alt_1, name, comfortStyle)
+                else -> getString(R.string.safety_check_in_response_sadness_alt_2, name, comfortStyle)
+            }
+            mood == "stress" -> when (nextSafetyCheckInPhraseVariant()) {
+                0 -> getString(R.string.safety_check_in_response_stress, name, groundingStyle)
+                1 -> getString(R.string.safety_check_in_response_stress_alt_1, name, groundingStyle)
+                else -> getString(R.string.safety_check_in_response_stress_alt_2, name, groundingStyle)
+            }
+            else -> when (nextSafetyCheckInPhraseVariant()) {
+                0 -> getString(R.string.safety_check_in_response_general, name, comfortStyle)
+                1 -> getString(R.string.safety_check_in_response_general_alt_1, name, comfortStyle)
+                else -> getString(R.string.safety_check_in_response_general_alt_2, name, comfortStyle)
+            }
         }
     }
 
