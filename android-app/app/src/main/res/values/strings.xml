@@ -774,6 +774,7 @@
     <string name="auth_backend_required">Add your backend URL first.</string>
     <string name="auth_token_missing">Dex did not return a login token.</string>
     <string name="auth_sign_in_failed">Dex could not sign you in.</string>
+    <string name="auth_session_expired">Your Dex sign-in expired. Please sign in again.</string>
     <string name="phone_enabled">Phone access enabled for Dex.</string>
     <string name="phone_disabled">Phone access disabled for Dex.</string>
     <string name="calendar_enabled">Calendar access enabled for Dex.</string>

@@ -5875,6 +5875,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun parseErrorMessage(body: String, responseCode: Int): String {
+        if (responseCode == 401) {
+            return getString(R.string.auth_session_expired)
+        }
         if (body.isBlank()) return "Request failed with $responseCode"
         val trimmed = body.trimStart()
         if (trimmed.startsWith("<!DOCTYPE", ignoreCase = true) || trimmed.startsWith("<html", ignoreCase = true)) {
@@ -5885,6 +5888,23 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 json.optString("error").ifBlank { "Request failed with $responseCode" }
             }
         } ?: "Dex expected JSON from the backend. Check that the backend URL ends with /api and uses https. (${backendUrlHint()})"
+    }
+
+    private fun isExpiredSessionMessage(message: String?): Boolean {
+        val normalized = message?.trim()?.lowercase(Locale.US).orEmpty()
+        if (normalized.isBlank()) return false
+        return normalized.contains("session expired") ||
+            normalized.contains("invalid or expired token") ||
+            normalized.contains("expired token") ||
+            normalized.contains("unauthorized")
+    }
+
+    private fun handleExpiredSession() {
+        clearSession()
+        val reply = getString(R.string.auth_session_expired)
+        binding.authMessage.text = reply
+        binding.conversationStatus.text = reply
+        binding.lastReplyValue.text = reply
     }
 
     private fun login() {
@@ -5964,6 +5984,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 refreshLoggedInState()
                 fetchDashboardData()
                 fetchBillingStatus()
+            }.onFailure { error ->
+                if (isExpiredSessionMessage(error.message)) {
+                    handleExpiredSession()
+                }
             }
         }
     }
@@ -5993,6 +6017,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.permissionsMessage.text = getString(R.string.permissions_synced)
                 refreshCallMonitorState()
             }.onFailure { error ->
+                if (isExpiredSessionMessage(error.message)) {
+                    handleExpiredSession()
+                    setPermissionsLoading(false)
+                    return@onFailure
+                }
                 binding.permissionsMessage.text = error.message ?: getString(R.string.permissions_load_failed)
                 refreshCallMonitorState()
             }
@@ -9454,6 +9483,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 dexChatInFlight = false
             }.onFailure { error ->
                 val fallback = error.message ?: getString(R.string.wake_mode_fallback_reply)
+                if (isExpiredSessionMessage(fallback)) {
+                    dexChatInFlight = false
+                    handleExpiredSession()
+                    speakDex(fallback, R.string.voice_speaking, resumeWakeModeAfterSpeech = false)
+                    return@onFailure
+                }
                 val localEmergency = isHighRiskEmergencyMessage(message)
                 val spokenReply = if (localEmergency) {
                     listOfNotNull(
