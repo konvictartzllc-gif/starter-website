@@ -382,7 +382,11 @@
     <string name="safety_check_in_text_anger">%1$s, I wanted to circle back with you. Let’s keep this %2$s and give your body a chance to settle before anything else.</string>
     <string name="safety_check_in_text_crisis">%1$s, I’m checking back in because I care about how you’re doing. I’m still here with you. Are you feeling any better, or do you still need me with you right now?</string>
     <string name="safety_check_in_prompt_friend">%1$s, %2$s Do you want me to stay with you for a minute, or check back later?</string>
+    <string name="safety_check_in_prompt_friend_alt_1">%1$s, %2$s I just wanted to check back in. Do you want me to stay close for a minute, or give you a little room and check back later?</string>
+    <string name="safety_check_in_prompt_friend_alt_2">%1$s, %2$s I’m here. Would it help if I stayed with you for a bit, or would you rather I check back later?</string>
     <string name="safety_check_in_prompt_crisis">%1$s, %2$s Do you want me to stay with you right now, or should I check back again in a little bit?</string>
+    <string name="safety_check_in_prompt_crisis_alt_1">%1$s, %2$s I’m still with you. Do you want me to stay close right now, or give you a little space and come back soon?</string>
+    <string name="safety_check_in_prompt_crisis_alt_2">%1$s, %2$s I care about how you’re doing. Should I stay with you right now, or check back again in a little while?</string>
     <string name="safety_check_in_retry">I’m still here. You can say stay with me, check back later, or tell me I’m good.</string>
     <string name="safety_check_in_relieved">Okay. I’m glad you told me. I’ll ease off, but I’m still here if you need me again.</string>
     <string name="safety_check_in_pause">Okay. I’ll give you some space for now and check back later if needed.</string>

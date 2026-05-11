@@ -1203,10 +1203,19 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun buildSafetyCheckInPrompt(): String {
         val profile = currentSafetyPromptProfile()
         val name = resolveEmergencyPersonName()
+        val variant = nextSafetyCheckInPhraseVariant()
         return if (profile.emergency) {
-            getString(R.string.safety_check_in_prompt_crisis, name, profile.message)
+            when (variant) {
+                0 -> getString(R.string.safety_check_in_prompt_crisis, name, profile.message)
+                1 -> getString(R.string.safety_check_in_prompt_crisis_alt_1, name, profile.message)
+                else -> getString(R.string.safety_check_in_prompt_crisis_alt_2, name, profile.message)
+            }
         } else {
-            getString(R.string.safety_check_in_prompt_friend, name, profile.message)
+            when (variant) {
+                0 -> getString(R.string.safety_check_in_prompt_friend, name, profile.message)
+                1 -> getString(R.string.safety_check_in_prompt_friend_alt_1, name, profile.message)
+                else -> getString(R.string.safety_check_in_prompt_friend_alt_2, name, profile.message)
+            }
         }
     }
 
@@ -1612,6 +1621,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             digits.length > 10 -> "+$digits"
             else -> ""
         }
+    }
+
+    private fun nextSafetyCheckInPhraseVariant(): Int {
+        val value = callScreeningPhraseIndex % 3
+        callScreeningPhraseIndex += 1
+        return value
     }
 
     private fun sendPhoneSms(number: String, body: String, spokenTarget: String) {
