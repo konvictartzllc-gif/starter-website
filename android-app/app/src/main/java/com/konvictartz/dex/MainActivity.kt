@@ -125,6 +125,8 @@ private enum class DecorationPickTarget {
 
 private enum class DexSpeechProfile {
     CONVERSATION,
+    SAFETY,
+    CRISIS,
     TEACHING,
     PRONUNCIATION,
 }
@@ -7285,11 +7287,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun applyTtsProfile(profile: DexSpeechProfile) {
         val rate = when (profile) {
             DexSpeechProfile.CONVERSATION -> DEX_TTS_CONVERSATION_RATE
+            DexSpeechProfile.SAFETY -> DEX_TTS_SAFETY_RATE
+            DexSpeechProfile.CRISIS -> DEX_TTS_CRISIS_RATE
             DexSpeechProfile.TEACHING -> DEX_TTS_TEACHING_RATE
             DexSpeechProfile.PRONUNCIATION -> DEX_TTS_PRONUNCIATION_RATE
         }
+        val pitch = when (profile) {
+            DexSpeechProfile.CRISIS -> DEX_TTS_CRISIS_PITCH
+            DexSpeechProfile.SAFETY -> DEX_TTS_SAFETY_PITCH
+            else -> DEX_TTS_PITCH
+        }
         textToSpeech?.setSpeechRate(rate)
-        textToSpeech?.setPitch(DEX_TTS_PITCH)
+        textToSpeech?.setPitch(pitch)
     }
 
     private fun buildSpeechChunks(segment: String, defaultProfile: DexSpeechProfile): List<SpeechChunk> {
@@ -9506,7 +9515,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.conversationStatus.text = getString(R.string.wake_mode_replying)
                 conversationActive = true
                 scheduleConversationTimeout()
-                speakDex(spokenReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                speakDex(
+                    spokenReply,
+                    R.string.voice_speaking,
+                    resumeWakeModeAfterSpeech = true,
+                    speechProfile = if (serverEmergency || localEmergency) DexSpeechProfile.CRISIS else DexSpeechProfile.CONVERSATION
+                )
                 dexChatInFlight = false
             }.onFailure { error ->
                 val fallback = error.message ?: getString(R.string.wake_mode_fallback_reply)
@@ -9530,7 +9544,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.conversationStatus.text = spokenReply
                 conversationActive = true
                 scheduleConversationTimeout()
-                speakDex(spokenReply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+                speakDex(
+                    spokenReply,
+                    R.string.voice_speaking,
+                    resumeWakeModeAfterSpeech = true,
+                    speechProfile = if (localEmergency) DexSpeechProfile.CRISIS else DexSpeechProfile.CONVERSATION
+                )
                 dexChatInFlight = false
             }
         }
@@ -11275,9 +11294,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEFAULT_BACKGROUND_COLOR = "#0F172A"
         private const val DEFAULT_PANEL_COLOR = "#182131"
         private const val DEX_TTS_CONVERSATION_RATE = 0.88f
+        private const val DEX_TTS_SAFETY_RATE = 0.82f
+        private const val DEX_TTS_CRISIS_RATE = 0.74f
         private const val DEX_TTS_TEACHING_RATE = 0.74f
         private const val DEX_TTS_PRONUNCIATION_RATE = 0.55f
         private const val DEX_TTS_PITCH = 0.95f
+        private const val DEX_TTS_SAFETY_PITCH = 0.93f
+        private const val DEX_TTS_CRISIS_PITCH = 0.9f
         private const val TEACHING_PAUSE_MS = 650L
         private const val PRONUNCIATION_PAUSE_MS = 950L
         private const val MAX_DASHBOARD_SECTIONS = 8
