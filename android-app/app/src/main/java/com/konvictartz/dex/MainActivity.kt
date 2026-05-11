@@ -7224,6 +7224,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!resumeWakeModeAfterSpeech) {
             mainHandler.removeCallbacks(restartWakeListeningRunnable)
         }
+        if (speechProfile == DexSpeechProfile.CRISIS && shouldUseSegmentedCrisisSpeech(text)) {
+            speakDexSequence(
+                splitCrisisSpeechSegments(text),
+                activeStatusResId = activeStatusResId,
+                resumeWakeModeAfterSpeech = resumeWakeModeAfterSpeech,
+                speechProfile = speechProfile
+            )
+            return
+        }
         lastDexSpokenText = text
         lastDexSpokenAt = SystemClock.elapsedRealtime()
         textToSpeech?.stop()
@@ -7302,9 +7311,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun buildSpeechChunks(segment: String, defaultProfile: DexSpeechProfile): List<SpeechChunk> {
+        if (defaultProfile == DexSpeechProfile.CRISIS) {
+            val crisisSegments = splitCrisisSpeechSegments(segment)
+            if (crisisSegments.size > 1) {
+                return crisisSegments.map { SpeechChunk(it, DexSpeechProfile.CRISIS, CRISIS_PAUSE_MS) }
+            }
+        }
         val matches = Regex("\\(([^()]{2,80})\\)").findAll(segment).toList()
         if (matches.isEmpty()) {
-            return listOf(SpeechChunk(segment, defaultProfile, TEACHING_PAUSE_MS))
+            return listOf(SpeechChunk(segment, defaultProfile, pauseForProfile(defaultProfile)))
         }
 
         val chunks = mutableListOf<SpeechChunk>()
@@ -7312,7 +7327,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         for (match in matches) {
             val before = segment.substring(cursor, match.range.first).trim()
             if (before.isNotBlank()) {
-                chunks += SpeechChunk(before, defaultProfile, TEACHING_PAUSE_MS)
+                chunks += SpeechChunk(before, defaultProfile, pauseForProfile(defaultProfile))
             }
 
             val pronunciation = normalizePronunciationText(match.groupValues[1])
@@ -7324,9 +7339,29 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         val after = segment.substring(cursor).trim()
         if (after.isNotBlank()) {
-            chunks += SpeechChunk(after, defaultProfile, TEACHING_PAUSE_MS)
+            chunks += SpeechChunk(after, defaultProfile, pauseForProfile(defaultProfile))
         }
-        return chunks.ifEmpty { listOf(SpeechChunk(segment, defaultProfile, TEACHING_PAUSE_MS)) }
+        return chunks.ifEmpty { listOf(SpeechChunk(segment, defaultProfile, pauseForProfile(defaultProfile))) }
+    }
+
+    private fun shouldUseSegmentedCrisisSpeech(text: String): Boolean {
+        return splitCrisisSpeechSegments(text).size > 1
+    }
+
+    private fun splitCrisisSpeechSegments(text: String): List<String> {
+        return text
+            .split(Regex("(?<=[.!?])\\s+"))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    }
+
+    private fun pauseForProfile(profile: DexSpeechProfile): Long {
+        return when (profile) {
+            DexSpeechProfile.CRISIS -> CRISIS_PAUSE_MS
+            DexSpeechProfile.SAFETY -> SAFETY_PAUSE_MS
+            DexSpeechProfile.PRONUNCIATION -> PRONUNCIATION_PAUSE_MS
+            else -> TEACHING_PAUSE_MS
+        }
     }
 
     private fun normalizePronunciationText(text: String): String {
@@ -11301,6 +11336,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         private const val DEX_TTS_PITCH = 0.95f
         private const val DEX_TTS_SAFETY_PITCH = 0.93f
         private const val DEX_TTS_CRISIS_PITCH = 0.9f
+        private const val SAFETY_PAUSE_MS = 800L
+        private const val CRISIS_PAUSE_MS = 1150L
         private const val TEACHING_PAUSE_MS = 650L
         private const val PRONUNCIATION_PAUSE_MS = 950L
         private const val MAX_DASHBOARD_SECTIONS = 8
