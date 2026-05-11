@@ -2150,9 +2150,33 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun speakNow(text: String) {
-        textToSpeech?.setSpeechRate(resolveBackgroundSpeechRate())
-        textToSpeech?.setPitch(resolveBackgroundSpeechPitch())
-        textToSpeech?.speak(
+        val tts = textToSpeech ?: return
+        val rate = resolveBackgroundSpeechRate()
+        val pitch = resolveBackgroundSpeechPitch()
+        val segments = if (shouldUseSegmentedBackgroundSafetySpeech(text)) {
+            splitBackgroundSafetySpeechSegments(text)
+        } else {
+            emptyList()
+        }
+        if (segments.size > 1) {
+            segments.forEachIndexed { index, segment ->
+                tts.setSpeechRate(rate)
+                tts.setPitch(pitch)
+                tts.speak(
+                    segment,
+                    if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD,
+                    null,
+                    "dex_bg_status_${System.currentTimeMillis()}_$index"
+                )
+                if (index < segments.lastIndex) {
+                    tts.playSilentUtterance(resolveBackgroundSpeechPauseMs(), TextToSpeech.QUEUE_ADD, null)
+                }
+            }
+            return
+        }
+        tts.setSpeechRate(rate)
+        tts.setPitch(pitch)
+        tts.speak(
             text,
             TextToSpeech.QUEUE_FLUSH,
             null,
@@ -2178,6 +2202,32 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             pendingSafetyMood == "anger" -> DEX_TTS_SAFETY_ANGER_PITCH
             pendingSafetyMood == "sadness" -> DEX_TTS_SAFETY_SADNESS_PITCH
             else -> DEX_TTS_PITCH
+        }
+    }
+
+    private fun shouldUseSegmentedBackgroundSafetySpeech(text: String): Boolean {
+        val inSafetyFlow =
+            pendingSafetyEmergency ||
+                pendingListenMode == BackgroundListenMode.SAFETY_CHECK_IN ||
+                activeListenMode == BackgroundListenMode.SAFETY_CHECK_IN ||
+                pendingSafetyMood != null
+        return inSafetyFlow && splitBackgroundSafetySpeechSegments(text).size > 1
+    }
+
+    private fun splitBackgroundSafetySpeechSegments(text: String): List<String> {
+        return text
+            .split(Regex("(?<=[.!?])\\s+"))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    }
+
+    private fun resolveBackgroundSpeechPauseMs(): Long {
+        return when {
+            pendingSafetyEmergency -> BACKGROUND_CRISIS_PAUSE_MS
+            pendingListenMode == BackgroundListenMode.SAFETY_CHECK_IN ||
+                activeListenMode == BackgroundListenMode.SAFETY_CHECK_IN ||
+                pendingSafetyMood != null -> BACKGROUND_SAFETY_PAUSE_MS
+            else -> BACKGROUND_DEFAULT_PAUSE_MS
         }
     }
 
@@ -2252,6 +2302,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         private const val DEX_TTS_SAFETY_SADNESS_PITCH = 0.92f
         private const val DEX_TTS_SAFETY_ANGER_PITCH = 0.9f
         private const val DEX_TTS_SAFETY_CRISIS_PITCH = 0.9f
+        private const val BACKGROUND_DEFAULT_PAUSE_MS = 650L
+        private const val BACKGROUND_SAFETY_PAUSE_MS = 900L
+        private const val BACKGROUND_CRISIS_PAUSE_MS = 1200L
         private const val BACKGROUND_RECOGNIZER_RECOVERY_DELAY_MS = 900L
         private const val MAX_BACKGROUND_RECOGNIZER_RECOVERY_ATTEMPTS = 2
     }
