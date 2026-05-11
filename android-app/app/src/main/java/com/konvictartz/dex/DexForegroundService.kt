@@ -2215,10 +2215,36 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun splitBackgroundSafetySpeechSegments(text: String): List<String> {
-        return text
+        val normalized = text.trim()
+        if (normalized.isBlank()) return emptyList()
+        val segments = normalized
             .split(Regex("(?<=[.!?])\\s+"))
             .map { it.trim() }
             .filter { it.isNotBlank() }
+        val first = segments.firstOrNull().orEmpty()
+        val leadAddress = extractLeadAddressSegment(first)
+        if (leadAddress == null) {
+            return segments
+        }
+        val remainder = first.removePrefix(leadAddress).trimStart().removePrefix(",").trimStart()
+        return buildList {
+            add(leadAddress.removeSuffix(",").trim())
+            if (remainder.isNotBlank()) {
+                add(remainder)
+            }
+            addAll(segments.drop(1))
+        }
+    }
+
+    private fun extractLeadAddressSegment(text: String): String? {
+        val commaIndex = text.indexOf(',')
+        if (commaIndex !in 1..24) return null
+        val candidate = text.substring(0, commaIndex).trim()
+        if (candidate.isBlank()) return null
+        val words = candidate.split(Regex("\\s+"))
+        if (words.size !in 1..4) return null
+        if (candidate.any { it.isDigit() }) return null
+        return candidate
     }
 
     private fun resolveBackgroundSpeechPauseMs(): Long {
