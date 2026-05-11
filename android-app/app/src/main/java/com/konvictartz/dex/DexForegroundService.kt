@@ -1067,6 +1067,21 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 speakShortStatus(getString(R.string.safety_check_in_relieved))
                 true
             }
+            isSafetyStayReply(normalized) -> {
+                val mood = detectSafetyMoodFromReply(normalized, pendingSafetyMood)
+                val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
+                scheduleNextSafetyFollowUp(if (pendingSafetyEmergency) 10 else 12, mood, pendingSafetyEmergency)
+                clearPendingSafetyContext()
+                speakShortStatus("$support ${getString(R.string.safety_check_in_stay_reply)}".trim())
+                true
+            }
+            isSafetyLaterReply(normalized) -> {
+                val mood = pendingSafetyMood ?: "general"
+                scheduleNextSafetyFollowUp(if (pendingSafetyEmergency) 15 else 25, mood, pendingSafetyEmergency)
+                clearPendingSafetyContext()
+                speakShortStatus(getString(R.string.safety_check_in_later_reply))
+                true
+            }
             isHighRiskSafetyReply(normalized) -> {
                 val personName = resolveEmergencyPersonName()
                 val trigger = normalized.replace(Regex("\\s+"), " ").trim()
@@ -1254,6 +1269,27 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             normalized.contains("don't feel better") ||
             normalized.contains("do not feel better") ||
             normalized.contains("not better")
+    }
+
+    private fun isSafetyStayReply(normalized: String): Boolean {
+        return normalized.contains("stay with me") ||
+            normalized.contains("stay here") ||
+            normalized.contains("stay on me") ||
+            normalized.contains("stay with me a minute") ||
+            normalized.contains("check on me soon") ||
+            normalized.contains("stay close") ||
+            normalized.contains("don't leave") ||
+            normalized.contains("do not leave")
+    }
+
+    private fun isSafetyLaterReply(normalized: String): Boolean {
+        return normalized.contains("check back later") ||
+            normalized.contains("come back later") ||
+            normalized.contains("give me a minute") ||
+            normalized.contains("give me some time") ||
+            normalized.contains("later is fine") ||
+            normalized.contains("check on me later") ||
+            normalized.contains("give me space")
     }
 
     private fun isHighRiskSafetyReply(normalized: String): Boolean {
@@ -1811,7 +1847,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     listOf("read it", "reply", "ignore it")
                 )
                 BackgroundListenMode.SAFETY_CHECK_IN -> addAll(
-                    listOf("i'm good", "im good", "i feel better", "i'm okay", "not really", "still upset", "still stressed", "still sad")
+                    listOf("i'm good", "im good", "i feel better", "i'm okay", "stay with me", "check back later", "not really", "still upset", "still stressed", "still sad")
                 )
                 BackgroundListenMode.REMINDER_CHECK_IN -> addAll(
                     listOf("remind me again", "check back", "ten minutes", "not now")
