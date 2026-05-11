@@ -422,6 +422,11 @@
     <string name="safety_check_in_response_crisis">%1$s, thank you for telling me the truth. Your safety matters more than anything else right now.</string>
     <string name="safety_check_in_response_crisis_alt_1">%1$s, thank you for being real with me. Right now I care most about keeping you safe and staying with you through this.</string>
     <string name="safety_check_in_response_crisis_alt_2">%1$s, I’m really glad you told me. Your safety comes first right now, and I’m not treating this lightly.</string>
+    <string name="safety_check_in_nudge_general">Let’s keep it simple and only focus on the next small thing.</string>
+    <string name="safety_check_in_nudge_stress">Try one %1$s breath with me and let the rest wait for a minute.</string>
+    <string name="safety_check_in_nudge_sadness">If you can, just get a little more comfortable and let me keep this gentle with you.</string>
+    <string name="safety_check_in_nudge_anger">Let’s keep your hands loose, your voice lower, and your body %1$s for a minute.</string>
+    <string name="safety_check_in_nudge_crisis">Stay with me for this minute and do not handle this by yourself.</string>
     <string name="safety_check_in_channel_name">Dex safety check-ins</string>
     <string name="safety_check_in_channel_description">Supportive follow-up reminders after hard moments.</string>
     <string name="safety_emergency_preview_with_contact">Emergency plan preview. Dex is assisting %1$s. Birthday: %2$s. Trusted contact: %3$s. Contact alerts: %4$s. Follow-up check-ins: %5$s. If %1$s talks about self-harm or harm to another person, Dex will slow down, respond with support, and use the saved emergency plan.</string>

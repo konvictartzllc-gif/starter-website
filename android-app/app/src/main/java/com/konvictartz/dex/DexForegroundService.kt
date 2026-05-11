@@ -1070,7 +1070,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             }
             isSafetyStayReply(normalized) -> {
                 val mood = detectSafetyMoodFromReply(normalized, pendingSafetyMood)
-                val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
+                val support = buildSafetySupportMessage(mood, pendingSafetyEmergency)
                 scheduleNextSafetyFollowUp(if (pendingSafetyEmergency) 10 else 12, mood, pendingSafetyEmergency)
                 persistSafetyCheckInMemory("stay", mood)
                 clearPendingSafetyContext()
@@ -1100,7 +1100,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             }
             isSafetyDistressReply(normalized) -> {
                 val mood = detectSafetyMoodFromReply(normalized, pendingSafetyMood)
-                val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
+                val support = buildSafetySupportMessage(mood, pendingSafetyEmergency)
                 val followUpMinutes = if (pendingSafetyEmergency) 10 else 20
                 scheduleNextSafetyFollowUp(followUpMinutes, mood, pendingSafetyEmergency)
                 persistSafetyCheckInMemory("needs_support", mood)
@@ -1110,7 +1110,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             }
             isAffirmativeCommand(normalized) -> {
                 val mood = pendingSafetyMood ?: "general"
-                val support = buildSafetyFollowUpResponse(mood, pendingSafetyEmergency)
+                val support = buildSafetySupportMessage(mood, pendingSafetyEmergency)
                 val followUpMinutes = if (pendingSafetyEmergency) 10 else 20
                 scheduleNextSafetyFollowUp(followUpMinutes, mood, pendingSafetyEmergency)
                 persistSafetyCheckInMemory("needs_support", mood)
@@ -1267,6 +1267,25 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 else -> getString(R.string.safety_check_in_response_general_alt_2, name, comfortStyle)
             }
         }
+    }
+
+    private fun buildSafetyCopingNudge(mood: String, emergency: Boolean): String {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val groundingStyle = prefs.getString(MainActivity.KEY_SAFETY_GROUNDING_STYLE, "gentle").orEmpty().ifBlank { "gentle" }
+        return when {
+            emergency -> getString(R.string.safety_check_in_nudge_crisis)
+            mood == "stress" -> getString(R.string.safety_check_in_nudge_stress, groundingStyle)
+            mood == "sadness" -> getString(R.string.safety_check_in_nudge_sadness)
+            mood == "anger" -> getString(R.string.safety_check_in_nudge_anger, groundingStyle)
+            else -> getString(R.string.safety_check_in_nudge_general)
+        }
+    }
+
+    private fun buildSafetySupportMessage(mood: String, emergency: Boolean): String {
+        return listOf(
+            buildSafetyFollowUpResponse(mood, emergency),
+            buildSafetyCopingNudge(mood, emergency)
+        ).joinToString(" ")
     }
 
     private fun buildSafetyRelievedReply(): String {
