@@ -15,6 +15,96 @@ function getPreferredVoice() {
   );
 }
 
+function cleanLessonLine(line) {
+  return String(line || "")
+    .replace(/^#+\s*/, "")
+    .replace(/^[-*]\s*/, "")
+    .replace(/\*\*/g, "")
+    .trim();
+}
+
+function splitLessonSections(content = "") {
+  const lines = String(content)
+    .split(/\r?\n/)
+    .map(cleanLessonLine)
+    .filter(Boolean);
+
+  const sections = {
+    vocabulary: [],
+    pronunciation: [],
+    examples: [],
+    practice: [],
+    other: [],
+  };
+
+  let current = "other";
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    if (lower.includes("vocabulary")) {
+      current = "vocabulary";
+      continue;
+    }
+    if (lower.includes("pronunciation")) {
+      current = "pronunciation";
+      continue;
+    }
+    if (lower.includes("example")) {
+      current = "examples";
+      continue;
+    }
+    if (lower.includes("practice") || lower.includes("prompt")) {
+      current = "practice";
+      continue;
+    }
+    sections[current].push(line);
+  }
+
+  return sections;
+}
+
+function buildTeachingScript(lesson) {
+  if (!lesson) return [];
+  const sections = splitLessonSections(lesson.content);
+  const subject = lesson.language || "today's topic";
+  const level = lesson.level || "your level";
+  const script = [
+    `Alright, let's learn this together. Today's lesson is ${lesson.title}.`,
+    `I am going to teach it like we are practicing out loud, not just reading notes. This is for ${subject}, at ${level}.`,
+  ];
+
+  if (sections.vocabulary.length) {
+    script.push("First, listen for the key words.");
+    script.push(sections.vocabulary.slice(0, 4).join(". "));
+    script.push("Say those once in your head, and notice which one feels hardest.");
+  }
+
+  if (sections.pronunciation.length) {
+    script.push("Now pronunciation. Slow it down and let your mouth learn the shape.");
+    script.push(sections.pronunciation.slice(0, 3).join(". "));
+  }
+
+  if (sections.examples.length) {
+    script.push("Here is how it sounds in real use.");
+    script.push(sections.examples.slice(0, 3).join(". "));
+    script.push("The point is not perfection. The point is recognizing the pattern when you hear it again.");
+  }
+
+  const extra = sections.other.slice(0, 3).join(". ");
+  if (extra) {
+    script.push(`One useful thing to remember is this. ${extra}`);
+  }
+
+  if (sections.practice.length) {
+    script.push("Now your turn. Here is the practice.");
+    script.push(sections.practice.slice(0, 2).join(". "));
+  } else {
+    script.push("Now your turn. Try making one short sentence using the main word from this lesson.");
+  }
+
+  script.push("Take a second. Say your answer out loud, then tap Start Quiz Mode when you want me to check what stuck.");
+  return script;
+}
+
 export default function LearningHub() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -53,6 +143,47 @@ export default function LearningHub() {
     window.speechSynthesis.speak(utterance);
   }
 
+  function speakSequence(parts, options = {}) {
+    if (!speechSupported || !parts?.length) {
+      setError("This browser cannot play Dex lesson audio.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    if (typeof window.speechSynthesis.resume === "function") {
+      window.speechSynthesis.resume();
+    }
+
+    const preferredVoice = getPreferredVoice();
+    let index = 0;
+    setSpeaking(true);
+
+    const playNext = () => {
+      const text = parts[index];
+      if (!text) {
+        setSpeaking(false);
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = options.rate || 0.82;
+      utterance.pitch = options.pitch || 0.98;
+      utterance.volume = 1;
+      if (preferredVoice) utterance.voice = preferredVoice;
+      utterance.onend = () => {
+        index += 1;
+        window.setTimeout(playNext, options.pauseMs ?? 450);
+      };
+      utterance.onerror = () => {
+        setSpeaking(false);
+        setError("Dex could not finish the spoken lesson. Try Teach It again.");
+      };
+      window.speechSynthesis.speak(utterance);
+    };
+
+    playNext();
+  }
+
   function stopSpeech() {
     if (!speechSupported) return;
     window.speechSynthesis.cancel();
@@ -62,6 +193,10 @@ export default function LearningHub() {
   function lessonText(currentLesson = lesson) {
     if (!currentLesson) return "";
     return `${currentLesson.title}. ${currentLesson.content}`;
+  }
+
+  function teachLesson() {
+    speakSequence(buildTeachingScript(lesson));
   }
 
   async function loadHistory() {
@@ -208,15 +343,23 @@ export default function LearningHub() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => speakText(lessonText())}
+              onClick={teachLesson}
               disabled={!speechSupported}
               className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-light disabled:opacity-60"
             >
-              {speaking ? "Playing..." : "Play Lesson"}
+              {speaking ? "Teaching..." : "Teach It"}
             </button>
             <button
               type="button"
-              onClick={() => speakText("Hey, I'm Dex. Lesson audio is ready. Tap Play Lesson whenever you want me to teach out loud.")}
+              onClick={() => speakText(lessonText(), { rate: 0.78, pitch: 0.94 })}
+              disabled={!speechSupported}
+              className="rounded-md border border-gray-700 px-3 py-2 text-sm font-semibold text-gray-100 hover:border-gray-500 disabled:opacity-60"
+            >
+              Read Notes
+            </button>
+            <button
+              type="button"
+              onClick={() => speakText("Hey, I'm Dex. Lesson audio is ready. Tap Teach It and I will walk you through the lesson like a real tutor.")}
               disabled={!speechSupported}
               className="rounded-md border border-gray-700 px-3 py-2 text-sm font-semibold text-gray-100 hover:border-gray-500 disabled:opacity-60"
             >
