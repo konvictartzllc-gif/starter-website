@@ -19,10 +19,28 @@ const GAME_PROMPTS = [
     reply: "Correct. A towel. Low drama, high utility.",
   },
   {
+    type: "Riddle",
+    prompt: "What has hands but can not clap?",
+    answer: "clock",
+    reply: "Correct. A clock has hands, but no applause.",
+  },
+  {
+    type: "Riddle",
+    prompt: "What has a face and two hands but no arms or legs?",
+    answer: "clock",
+    reply: "Right. A clock. Dex likes a clean solve.",
+  },
+  {
     type: "Trivia",
-    prompt: "Which planet is known as the Red Planet?",
+    prompt: "Trivia time. Which planet is known as the Red Planet?",
     answer: "mars",
     reply: "Correct. Mars is the Red Planet.",
+  },
+  {
+    type: "Trivia",
+    prompt: "What is the largest ocean on Earth?",
+    answer: "pacific",
+    reply: "Correct. The Pacific Ocean is the largest.",
   },
   {
     type: "Trivia",
@@ -32,11 +50,42 @@ const GAME_PROMPTS = [
   },
   {
     type: "Would You Rather",
+    prompt: "Would you rather explore space for a week or the deep ocean for a week?",
+    answer: "",
+    reply: "That says a lot about your vibe.",
+  },
+  {
+    type: "Would You Rather",
     prompt: "Would you rather have the perfect playlist for every mood or always know the best food spot nearby?",
     answer: "",
     reply: "Solid choice. Dex can work with that vibe.",
   },
+  {
+    type: "Would You Rather",
+    prompt: "Would you rather have one extra day every weekend or one extra hour every morning?",
+    answer: "",
+    reply: "That is a strong life choice.",
+  },
+  {
+    type: "Memory",
+    prompt: "Memory round. Remember these words, then type them back: moon, star, cloud.",
+    answer: "moon star cloud",
+    reply: "Nice. You kept the pattern together.",
+  },
+  {
+    type: "Memory",
+    prompt: "Memory round. Remember these words, then type them back: river, peach, drum.",
+    answer: "river peach drum",
+    reply: "Clean recall. Dex is impressed.",
+  },
+  {
+    type: "Guess",
+    prompt: "Guess my number from 1 to 5.",
+    answer: "3",
+    reply: "You got it. Dex picked 3.",
+  },
 ];
+const GAME_TYPES = ["Riddle", "Trivia", "Memory", "Would You Rather", "Guess"];
 
 function isAccessBlocked(errorCode) {
   return errorCode === "trial_expired" || errorCode === "subscription_expired" || errorCode === "no_access";
@@ -54,6 +103,7 @@ export default function DexChat() {
   const [accessError, setAccessError] = useState(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
+  const [wakeEnabled, setWakeEnabled] = useState(false);
   const [gameOpen, setGameOpen] = useState(false);
   const [gamePrompt, setGamePrompt] = useState(GAME_PROMPTS[0]);
   const [gameAnswer, setGameAnswer] = useState("");
@@ -61,11 +111,12 @@ export default function DexChat() {
   const messagesEndRef = useRef(null);
 
   const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking } = useDexVoice({
-    enabled: true,
+    enabled: wakeEnabled,
     onWakeWord: ({ spokenCommand } = {}) => {
       setOpen(true);
       if (spokenCommand?.trim()) {
         showToast(`Heard: ${spokenCommand}`);
+        speak("I heard you.");
         return;
       }
       const wakeReply = "I'm here. What can I help you with?";
@@ -141,13 +192,22 @@ export default function DexChat() {
     showToast.timeoutId = window.setTimeout(() => setToast(""), 3000);
   }
 
-  function pickGame() {
-    const next = GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)];
+  function pickGame(type) {
+    const options = type ? GAME_PROMPTS.filter((game) => game.type === type) : GAME_PROMPTS;
+    const next = options[Math.floor(Math.random() * options.length)] || GAME_PROMPTS[0];
     setGamePrompt(next);
     setGameAnswer("");
     setGameFeedback("");
     setGameOpen(true);
     setOpen(true);
+  }
+
+  function enableWakeMode() {
+    setWakeEnabled(true);
+    setOpen(true);
+    const message = "Wake mode is on. Say Hey Dex, then tell me what you need.";
+    showToast(message);
+    speak(message);
   }
 
   function submitGameAnswer(e) {
@@ -157,6 +217,7 @@ export default function DexChat() {
     const correct =
       !gamePrompt.answer ||
       answer.includes(gamePrompt.answer) ||
+      gamePrompt.answer.split(" ").every((token) => answer.includes(token)) ||
       (gamePrompt.answer === "six" && answer.includes("6"));
     const feedback = correct ? gamePrompt.reply : `Good try. I was looking for: ${gamePrompt.answer}.`;
     setGameFeedback(feedback);
@@ -335,7 +396,15 @@ export default function DexChat() {
             </button>
             <button
               type="button"
-              onClick={pickGame}
+              onClick={enableWakeMode}
+              disabled={wakeEnabled}
+              className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand disabled:opacity-60"
+            >
+              {wakeEnabled ? "Wake On" : "Wake"}
+            </button>
+            <button
+              type="button"
+              onClick={() => pickGame()}
               className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
             >
               Play
@@ -356,11 +425,27 @@ export default function DexChat() {
                   <p className="font-medium text-white">Dex Game: {gamePrompt.type}</p>
                   <button
                     type="button"
-                    onClick={pickGame}
+                    onClick={() => pickGame(gamePrompt.type)}
                     className="text-xs text-brand hover:text-brand-light"
                   >
                     New
                   </button>
+                </div>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {GAME_TYPES.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => pickGame(type)}
+                      className={`rounded-md border px-2 py-1 text-xs ${
+                        gamePrompt.type === type
+                          ? "border-brand bg-brand/20 text-white"
+                          : "border-gray-700 text-gray-300 hover:border-brand"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
                 </div>
                 <p className="text-gray-200">{gamePrompt.prompt}</p>
                 <form onSubmit={submitGameAnswer} className="mt-3 flex gap-2">
@@ -444,7 +529,7 @@ export default function DexChat() {
               </button>
             </div>
             <div className="mt-2 text-xs text-gray-500">
-              Say "Hey Dex" once to wake voice mode, then keep talking naturally.
+              Tap Talk for one command, or tap Wake once before saying "Hey Dex."
             </div>
           </form>
         </section>

@@ -6,6 +6,10 @@ const WAKE_VARIANTS = [
   "hi dex",
   "hey decks",
   "hi decks",
+  "hey deks",
+  "hey dix",
+  "hey dicks",
+  "hey dick s",
   "hey text",
   "hi text",
 ];
