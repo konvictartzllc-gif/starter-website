@@ -34,6 +34,7 @@ export default function AdminPortal() {
   const [promoEmail, setPromoEmail] = useState("");
   const [promoCode, setPromoCode] = useState("");
   const [promoName, setPromoName] = useState("");
+  const [testEmail, setTestEmail] = useState("");
 
   const isAdmin = user?.role === "admin";
 
@@ -183,13 +184,31 @@ export default function AdminPortal() {
   async function handleSendPromo(e) {
     e.preventDefault();
     try {
-      await api.sendPromo({ email: promoEmail, name: promoName, code: promoCode });
-      setMsg("Promo code sent.");
+      const data = await api.sendPromo({ email: promoEmail, name: promoName, code: promoCode });
+      if (data.emailed) {
+        setMsg("Promo code sent.");
+      } else {
+        setMsg(`Promo email was not confirmed. ${data.emailError || "Check SMTP settings."}`);
+      }
       setPromoEmail("");
       setPromoCode("");
       setPromoName("");
     } catch (err) {
       setMsg("Error: " + (err.error || "Failed"));
+    }
+  }
+
+  async function handleSendTestEmail(e) {
+    e.preventDefault();
+    try {
+      const data = await api.sendTestEmail({ email: testEmail });
+      if (data.emailed) {
+        setMsg(`Test email sent to ${testEmail}.`);
+      } else {
+        setMsg(`Test email was not confirmed. ${data.emailError || "Check SMTP settings."}`);
+      }
+    } catch (err) {
+      setMsg("Error: " + (err.error || "Failed to send test email"));
     }
   }
 
@@ -526,6 +545,19 @@ export default function AdminPortal() {
         {tab === "promo" && (
           <div>
             <h2 className="text-lg font-bold mb-4">Send Promo Code</h2>
+            <form onSubmit={handleSendTestEmail} className="bg-gray-800 rounded-xl p-4 mb-6 flex gap-3 flex-wrap">
+              <input
+                placeholder="Test Email Address *"
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                className="flex-1 min-w-[220px] bg-gray-700 rounded-lg px-3 py-2 text-sm outline-none"
+                required
+              />
+              <button type="submit" className="bg-green-600 text-white rounded-lg px-4 py-2 font-semibold text-sm">
+                Send Test Email
+              </button>
+            </form>
             <form onSubmit={handleSendPromo} className="bg-gray-800 rounded-xl p-4 space-y-3 max-w-md">
               <input
                 placeholder="Recipient Email *"

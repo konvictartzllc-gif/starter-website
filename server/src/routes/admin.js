@@ -3,7 +3,7 @@ import { body, validationResult } from "express-validator";
 import { v4 as uuidv4 } from "uuid";
 import { requireAdmin } from "../middleware/auth.js";
 import { getDb } from "../db.js";
-import { sendAffiliateInvite, sendPromoCode } from "../services/email.js";
+import { getEmailStatus, sendAffiliateInvite, sendCustomEmail, sendPromoCode } from "../services/email.js";
 import { sendLowInventoryAlert } from "../services/ringcentral.js";
 import { ensureAffiliateRecord } from "../services/affiliates.js";
 
@@ -30,11 +30,12 @@ async function deliverAffiliateInviteEmail(email, name, code, registerLink) {
   }
 
   const sent = await sendAffiliateInvite(email, name, code, registerLink);
+  const status = getEmailStatus();
   return sent
     ? { emailed: true, emailError: null }
     : {
         emailed: false,
-        emailError: "Dex could not confirm delivery of the invite email. Check SMTP settings or send the setup link manually.",
+        emailError: `Dex could not confirm delivery of the invite email. ${status.lastError || status.reason || "Check SMTP settings"}; send the setup link manually for now.`,
       };
 }
 
@@ -346,8 +347,35 @@ router.post("/send-promo", requireAdmin, [
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
   const { email, name, code } = req.body;
-  await sendPromoCode(email, name, code);
-  return res.json({ success: true });
+  const sent = await sendPromoCode(email, name, code);
+  const status = getEmailStatus();
+  return res.json({
+    success: sent,
+    emailed: sent,
+    emailError: sent ? null : status.lastError || status.reason || "Promo email was not confirmed.",
+    emailStatus: status,
+  });
+});
+
+router.post("/email/test", requireAdmin, [
+  body("email").isEmail().normalizeEmail(),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const { email } = req.body;
+  const sent = await sendCustomEmail({
+    to: email,
+    subject: "Konvict Artz SMTP test",
+    body: "This is a test email from Dex. If you received this, SMTP delivery is working.",
+  });
+  const status = getEmailStatus();
+  return res.json({
+    success: sent,
+    emailed: sent,
+    emailError: sent ? null : status.lastError || status.reason || "Test email was not confirmed.",
+    emailStatus: status,
+  });
 });
 
 router.get("/users", requireAdmin, async (req, res) => {

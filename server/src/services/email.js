@@ -5,7 +5,12 @@ let emailStatus = {
   configured: false,
   ready: false,
   reason: "not_configured",
+  lastError: null,
 };
+
+function readableEmailError(err) {
+  return err?.response || err?.message || String(err || "Unknown email error");
+}
 
 export function initEmail() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
@@ -14,6 +19,7 @@ export function initEmail() {
       configured: false,
       ready: false,
       reason: "missing_credentials",
+      lastError: "SMTP_HOST, SMTP_USER, or SMTP_PASS is missing.",
     };
     console.warn("Email not configured.");
     return;
@@ -31,15 +37,43 @@ export function initEmail() {
 
   emailStatus = {
     configured: true,
-    ready: true,
-    reason: "ok",
+    ready: false,
+    reason: "verifying",
+    lastError: null,
   };
   console.log("Email initialized");
+
+  transporter.verify()
+    .then(() => {
+      emailStatus = {
+        configured: true,
+        ready: true,
+        reason: "ok",
+        lastError: null,
+      };
+      console.log("Email SMTP connection verified");
+    })
+    .catch((err) => {
+      const lastError = readableEmailError(err);
+      emailStatus = {
+        configured: true,
+        ready: false,
+        reason: "verify_failed",
+        lastError,
+      };
+      console.error("Email verify error:", lastError);
+    });
 }
 
 async function send(to, subject, html) {
   if (!transporter) {
     console.warn("Email skipped: not configured.");
+    emailStatus = {
+      ...emailStatus,
+      ready: false,
+      reason: "not_configured",
+      lastError: "Email transporter is not configured.",
+    };
     return false;
   }
 
@@ -47,9 +81,22 @@ async function send(to, subject, html) {
   try {
     await transporter.sendMail({ from, to, subject, html });
     console.log(`Email sent to ${to}`);
+    emailStatus = {
+      ...emailStatus,
+      ready: true,
+      reason: "ok",
+      lastError: null,
+    };
     return true;
   } catch (err) {
-    console.error("Email error:", err.message);
+    const lastError = readableEmailError(err);
+    emailStatus = {
+      ...emailStatus,
+      ready: false,
+      reason: "send_failed",
+      lastError,
+    };
+    console.error("Email error:", lastError);
     return false;
   }
 }
