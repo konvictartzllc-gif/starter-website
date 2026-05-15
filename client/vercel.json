@@ -1,6 +1,6 @@
 {
-  "routes": [
-    { "src": "/api/(.*)", "dest": "https://konvict-artz.onrender.com/api/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://konvict-artz.onrender.com/api/:path*" },
+    { "source": "/:path*", "destination": "/index.html" }
   ]
 }

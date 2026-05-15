@@ -212,8 +212,12 @@ async function checkInventoryAlerts() {
 async function start() {
   requireJwtSecret();
   const dbPath = process.env.DB_PATH || path.join(__dirname, "../../data/konvict.db");
-  const adminUsername = process.env.ADMIN_EMAIL || "konvictartzllc@gmail.com";
-  const adminPassword = process.env.ADMIN_PASSWORD || "Thuglife1423";
+  const adminUsername = process.env.ADMIN_EMAIL?.trim();
+  const adminPassword = process.env.ADMIN_PASSWORD?.trim();
+
+  if (!adminUsername || !adminPassword) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be configured before Dex can start.");
+  }
 
   await initDb({ dbPath, adminUsername, adminPassword });
   initEmail();
