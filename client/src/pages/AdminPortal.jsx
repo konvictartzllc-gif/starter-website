@@ -131,11 +131,9 @@ export default function AdminPortal() {
       const data = await api.createAffiliate({ email: affEmail, name: affName });
       const deliveryMessage = data.emailed
         ? `The setup code was emailed to ${affEmail}.`
-        : data.emailQueued
-          ? `The setup email is on its way to ${affEmail}.`
-          : data.emailError
-            ? `${data.emailError} Copy the setup code/link and send it manually.`
-            : "The setup email was not sent. Copy the setup code/link and send it manually.";
+        : data.emailError
+          ? `${data.emailError} Copy the setup code/link and send it manually.`
+          : "The setup email was not confirmed. Copy the setup code/link and send it manually.";
       const setupCode = data.invite?.code || data.promoCode;
       const setupLink = data.invite?.registerLink ? ` Signup link: ${data.invite.registerLink}.` : "";
       setMsg(`Affiliate ready. Setup code: ${setupCode}.${setupLink} ${deliveryMessage}`);
@@ -155,18 +153,30 @@ export default function AdminPortal() {
     try {
       const data = await api.createAffiliateInvite({ email: inviteEmail, name: inviteName });
       const deliveryMessage = data.emailed
-        ? `The invite was emailed to ${inviteEmail || "the affiliate"}`
-        : data.emailQueued
-          ? `The invite was created and the email is on its way to ${inviteEmail || "the affiliate"}.`
-          : data.emailError
-            ? `${data.emailError} Copy the code or signup link below and send it manually.`
-          : "The invite was created, but it was not emailed. Copy the code or signup link below and send it manually.";
+        ? `The invite email was sent to ${inviteEmail || "the affiliate"}.`
+        : data.emailError
+          ? `${data.emailError} Copy the code or signup link below and send it manually.`
+          : "The invite was created, but no email delivery was confirmed. Copy the code or signup link below and send it manually.";
       setMsg(`Affiliate invite ready. Code: ${data.invite.code}. Signup link: ${data.invite.registerLink}. ${deliveryMessage}`);
       setInviteEmail("");
       setInviteName("");
       loadAffiliateInvites();
     } catch (err) {
       setMsg("Error: " + (err.error || "Failed"));
+    }
+  }
+
+  async function handleResendAffiliateInvite(invite) {
+    try {
+      const data = await api.resendAffiliateInvite(invite.id);
+      if (data.emailed) {
+        setMsg(`Invite email sent to ${invite.email}. Code: ${data.invite.code}.`);
+      } else {
+        setMsg(`Email was not confirmed. ${data.emailError || "Copy the signup link and send it manually."}`);
+      }
+      loadAffiliateInvites();
+    } catch (err) {
+      setMsg("Error: " + (err.error || "Failed to resend invite"));
     }
   }
 
@@ -467,9 +477,20 @@ export default function AdminPortal() {
                         <p className="font-semibold text-white">{invite.name || invite.email || "Open affiliate invite"}</p>
                         <p className="text-xs text-gray-400">{invite.email || "Any email can claim this code."}</p>
                       </div>
-                      <span className={`text-xs font-bold px-2 py-1 rounded ${invite.used ? "bg-gray-700 text-gray-300" : "bg-green-900/40 text-green-300"}`}>
-                        {invite.used ? "used" : "open"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {!invite.used && invite.email && (
+                          <button
+                            type="button"
+                            onClick={() => handleResendAffiliateInvite(invite)}
+                            className="bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold px-3 py-1 rounded"
+                          >
+                            Resend Email
+                          </button>
+                        )}
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${invite.used ? "bg-gray-700 text-gray-300" : "bg-green-900/40 text-green-300"}`}>
+                          {invite.used ? "used" : "open"}
+                        </span>
+                      </div>
                     </div>
                     <p className="mt-2 text-brand font-mono">{invite.code}</p>
                     <p className="text-xs text-gray-400 break-all">{invite.registerLink}</p>

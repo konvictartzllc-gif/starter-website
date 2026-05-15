@@ -3,7 +3,7 @@ import { body, validationResult } from "express-validator";
 import { v4 as uuidv4 } from "uuid";
 import { requireAdmin } from "../middleware/auth.js";
 import { getDb } from "../db.js";
-import { sendAffiliateInvite, sendPromoterNotification, sendPromoCode } from "../services/email.js";
+import { sendAffiliateInvite, sendPromoCode } from "../services/email.js";
 import { sendLowInventoryAlert } from "../services/ringcentral.js";
 import { ensureAffiliateRecord } from "../services/affiliates.js";
 
@@ -19,6 +19,23 @@ function getAffiliateInviteLink(inviteCode) {
 
 function generateAffiliateInviteCode() {
   return `AFF-${uuidv4().replace(/-/g, "").slice(0, 10).toUpperCase()}`;
+}
+
+async function deliverAffiliateInviteEmail(email, name, code, registerLink) {
+  if (!email) {
+    return {
+      emailed: false,
+      emailError: "No email address was provided for this invite.",
+    };
+  }
+
+  const sent = await sendAffiliateInvite(email, name, code, registerLink);
+  return sent
+    ? { emailed: true, emailError: null }
+    : {
+        emailed: false,
+        emailError: "Dex could not confirm delivery of the invite email. Check SMTP settings or send the setup link manually.",
+      };
 }
 
 async function ensureFeatureFlagsTable(db) {
@@ -210,36 +227,42 @@ router.post("/affiliate-invites/create", requireAdmin, [
 
   const invite = await db.get("SELECT * FROM affiliate_invite_codes WHERE code = ?", [code]);
   const registerLink = getAffiliateInviteLink(code);
-  let emailed = false;
-  let emailQueued = false;
-  let emailError = null;
-  if (email) {
-    const emailPromise = Promise.resolve(sendAffiliateInvite(email, name, code, registerLink));
-    try {
-      const deliveryState = await Promise.race([
-        emailPromise.then((sent) => (sent ? "sent" : "failed")),
-        new Promise((resolve) => setTimeout(() => resolve("queued"), 2500)),
-      ]);
-      if (deliveryState === "sent") {
-        emailed = true;
-      } else if (deliveryState === "failed") {
-        emailError = "Dex could not confirm delivery of the invite email.";
-      } else {
-        emailQueued = true;
-        emailPromise.catch((error) => {
-          console.error("Affiliate invite email error:", error?.message || error);
-        });
-      }
-    } catch (error) {
-      emailError = error?.message || "Dex could not send the invite email.";
-      console.error("Affiliate invite email error:", emailError);
-    }
-  }
+  const delivery = await deliverAffiliateInviteEmail(email, name, code, registerLink);
   return res.json({
     success: true,
-    emailed,
-    emailQueued,
-    emailError,
+    emailed: delivery.emailed,
+    emailQueued: false,
+    emailError: delivery.emailError,
+    invite: {
+      ...invite,
+      registerLink,
+    },
+  });
+});
+
+router.post("/affiliate-invites/:id/resend", requireAdmin, async (req, res) => {
+  const db = getDb();
+  const inviteId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(inviteId)) {
+    return res.status(400).json({ error: "Invalid invite id" });
+  }
+
+  const invite = await db.get("SELECT * FROM affiliate_invite_codes WHERE id = ?", [inviteId]);
+  if (!invite) return res.status(404).json({ error: "Invite not found" });
+  if (!invite.email) {
+    return res.status(400).json({ error: "This invite does not have an email address." });
+  }
+  if (invite.used) {
+    return res.status(409).json({ error: "This invite has already been used." });
+  }
+
+  const registerLink = getAffiliateInviteLink(invite.code);
+  const delivery = await deliverAffiliateInviteEmail(invite.email, invite.name, invite.code, registerLink);
+  return res.json({
+    success: delivery.emailed,
+    emailed: delivery.emailed,
+    emailQueued: false,
+    emailError: delivery.emailError,
     invite: {
       ...invite,
       registerLink,
@@ -288,37 +311,15 @@ router.post("/affiliates/create", requireAdmin, [
     const invite = await db.get("SELECT * FROM affiliate_invite_codes WHERE code = ?", [inviteCode]);
     const registerLink = getAffiliateInviteLink(inviteCode);
 
-    let emailed = false;
-    let emailQueued = false;
-    let emailError = null;
-    const emailPromise = Promise.resolve(sendAffiliateInvite(user.email, user.name || name, inviteCode, registerLink));
-    try {
-      const deliveryState = await Promise.race([
-        emailPromise.then((sent) => (sent ? "sent" : "failed")),
-        new Promise((resolve) => setTimeout(() => resolve("queued"), 2500)),
-      ]);
-      if (deliveryState === "sent") {
-        emailed = true;
-      } else if (deliveryState === "failed") {
-        emailError = "Dex could not confirm delivery of the affiliate setup email.";
-      } else {
-        emailQueued = true;
-        emailPromise.catch((error) => {
-          console.error("Affiliate setup email error:", error?.message || error);
-        });
-      }
-    } catch (error) {
-      emailError = error?.message || "Dex could not send the affiliate setup email.";
-      console.error("Affiliate setup email error:", emailError);
-    }
+    const delivery = await deliverAffiliateInviteEmail(user.email, user.name || name, inviteCode, registerLink);
 
     return res.json({
       success: true,
       promoCode: affiliate.promo_code,
       referralLink,
-      emailed,
-      emailQueued,
-      emailError,
+      emailed: delivery.emailed,
+      emailQueued: false,
+      emailError: delivery.emailError,
       invite: {
         ...invite,
         registerLink,

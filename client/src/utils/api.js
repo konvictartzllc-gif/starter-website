@@ -91,6 +91,7 @@ export const api = {
   createAffiliate: (body) => request("/admin/affiliates/create", { method: "POST", body: JSON.stringify(body) }),
   getAffiliateInvites: () => request("/admin/affiliate-invites"),
   createAffiliateInvite: (body) => request("/admin/affiliate-invites/create", { method: "POST", body: JSON.stringify(body) }),
+  resendAffiliateInvite: (id) => request(`/admin/affiliate-invites/${id}/resend`, { method: "POST", body: JSON.stringify({}) }),
   updateUserAccess: (id, body) => request(`/admin/users/${id}/access`, { method: "PATCH", body: JSON.stringify(body) }),
   sendPromo: (body) => request("/admin/send-promo", { method: "POST", body: JSON.stringify(body) }),
   getUsers: () => request("/admin/users"),
