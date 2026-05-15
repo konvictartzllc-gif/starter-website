@@ -1,6 +1,20 @@
 import { useEffect, useState } from "react";
 import { api } from "../utils/api";
 
+const VOICE_STORAGE_KEY = "dex_voice_name";
+
+function getPreferredVoice() {
+  if (!("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  const savedVoiceName = window.localStorage.getItem(VOICE_STORAGE_KEY);
+  return (
+    voices.find((voice) => voice.name === savedVoiceName) ||
+    voices.find((voice) => voice.name.includes("Google US English") || voice.lang === "en-US") ||
+    voices.find((voice) => voice.lang?.startsWith("en")) ||
+    null
+  );
+}
+
 export default function LearningHub() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -10,6 +24,45 @@ export default function LearningHub() {
   const [quiz, setQuiz] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [quizResult, setQuizResult] = useState(null);
+  const [speaking, setSpeaking] = useState(false);
+  const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+
+  function speakText(text, options = {}) {
+    if (!speechSupported || !text?.trim()) {
+      setError("This browser cannot play Dex lesson audio.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    if (typeof window.speechSynthesis.resume === "function") {
+      window.speechSynthesis.resume();
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = options.rate || 0.86;
+    utterance.pitch = options.pitch || 0.95;
+    utterance.volume = 1;
+    const preferredVoice = getPreferredVoice();
+    if (preferredVoice) utterance.voice = preferredVoice;
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => {
+      setSpeaking(false);
+      setError("Dex could not play lesson audio. Try tapping Play Lesson again.");
+    };
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function stopSpeech() {
+    if (!speechSupported) return;
+    window.speechSynthesis.cancel();
+    setSpeaking(false);
+  }
+
+  function lessonText(currentLesson = lesson) {
+    if (!currentLesson) return "";
+    return `${currentLesson.title}. ${currentLesson.content}`;
+  }
 
   async function loadHistory() {
     try {
@@ -152,6 +205,32 @@ export default function LearningHub() {
             <div className="text-xs uppercase tracking-wide text-gray-500">{lesson.language} • {lesson.level}</div>
             <h3 className="text-lg font-semibold text-white mt-1">{lesson.title}</h3>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => speakText(lessonText())}
+              disabled={!speechSupported}
+              className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-light disabled:opacity-60"
+            >
+              {speaking ? "Playing..." : "Play Lesson"}
+            </button>
+            <button
+              type="button"
+              onClick={() => speakText("Hey, I'm Dex. Lesson audio is ready. Tap Play Lesson whenever you want me to teach out loud.")}
+              disabled={!speechSupported}
+              className="rounded-md border border-gray-700 px-3 py-2 text-sm font-semibold text-gray-100 hover:border-gray-500 disabled:opacity-60"
+            >
+              Test Voice
+            </button>
+            <button
+              type="button"
+              onClick={stopSpeech}
+              disabled={!speaking}
+              className="rounded-md border border-gray-700 px-3 py-2 text-sm font-semibold text-gray-100 hover:border-gray-500 disabled:opacity-60"
+            >
+              Stop
+            </button>
+          </div>
           <pre className="whitespace-pre-wrap text-sm text-gray-200 font-sans">{lesson.content}</pre>
         </div>
       )}
@@ -162,11 +241,39 @@ export default function LearningHub() {
             <div className="text-xs uppercase tracking-wide text-gray-500">{quiz.language || "Language quiz"}</div>
             <h3 className="text-lg font-semibold text-white mt-1">{quiz.title || "Quiz"}</h3>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => speakText(`${quiz.title || "Quiz"}. ${(quiz.questions || []).map((question, index) => `Question ${index + 1}. ${question.question}. Choices: ${(question.choices || []).join(", ")}.`).join(" ")}`)}
+              disabled={!speechSupported}
+              className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-light disabled:opacity-60"
+            >
+              Read Quiz
+            </button>
+            <button
+              type="button"
+              onClick={stopSpeech}
+              disabled={!speaking}
+              className="rounded-md border border-gray-700 px-3 py-2 text-sm font-semibold text-gray-100 hover:border-gray-500 disabled:opacity-60"
+            >
+              Stop
+            </button>
+          </div>
 
           <div className="space-y-4">
             {(quiz.questions || []).map((question, index) => (
               <div key={`${question.question}-${index}`} className="rounded-md border border-gray-800 bg-gray-900 p-3">
-                <p className="text-sm font-medium text-white">{index + 1}. {question.question}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium text-white">{index + 1}. {question.question}</p>
+                  <button
+                    type="button"
+                    onClick={() => speakText(`Question ${index + 1}. ${question.question}. Choices: ${(question.choices || []).join(", ")}.`)}
+                    disabled={!speechSupported}
+                    className="shrink-0 rounded-md border border-gray-700 px-2 py-1 text-xs font-semibold text-gray-100 hover:border-gray-500 disabled:opacity-60"
+                  >
+                    Read
+                  </button>
+                </div>
                 <div className="mt-3 grid gap-2">
                   {(question.choices || []).map((choice) => (
                     <label key={choice} className="flex items-center gap-2 text-sm text-gray-300">
