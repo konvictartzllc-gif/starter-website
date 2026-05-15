@@ -1,5 +1,13 @@
 // ...existing code...
-const BASE = import.meta.env.VITE_API_URL || "/api";
+function normalizeApiBase(value) {
+  const raw = (value || "/api").trim().replace(/\/+$/, "");
+  if (!raw || raw === "/") return "/api";
+  if (raw.endsWith("/api")) return raw;
+  if (/^https?:\/\//i.test(raw)) return `${raw}/api`;
+  return raw;
+}
+
+const BASE = normalizeApiBase(import.meta.env.VITE_API_URL);
 
 function getToken() {
   return localStorage.getItem("dex_token");
