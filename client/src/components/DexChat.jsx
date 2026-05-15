@@ -5,6 +5,38 @@ import { useDexVoice } from "../hooks/useDexVoice.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 
 const DEX_AVATAR = "D";
+const GAME_PROMPTS = [
+  {
+    type: "Riddle",
+    prompt: "What has to be broken before you can use it?",
+    answer: "egg",
+    reply: "Yep. An egg. Dex approves that breakfast logic.",
+  },
+  {
+    type: "Riddle",
+    prompt: "What gets wetter the more it dries?",
+    answer: "towel",
+    reply: "Correct. A towel. Low drama, high utility.",
+  },
+  {
+    type: "Trivia",
+    prompt: "Which planet is known as the Red Planet?",
+    answer: "mars",
+    reply: "Correct. Mars is the Red Planet.",
+  },
+  {
+    type: "Trivia",
+    prompt: "How many sides does a hexagon have?",
+    answer: "six",
+    reply: "Right. A hexagon has six sides.",
+  },
+  {
+    type: "Would You Rather",
+    prompt: "Would you rather have the perfect playlist for every mood or always know the best food spot nearby?",
+    answer: "",
+    reply: "Solid choice. Dex can work with that vibe.",
+  },
+];
 
 function isAccessBlocked(errorCode) {
   return errorCode === "trial_expired" || errorCode === "subscription_expired" || errorCode === "no_access";
@@ -21,6 +53,11 @@ export default function DexChat() {
   const [toast, setToast] = useState("");
   const [accessError, setAccessError] = useState(null);
   const [billingBusy, setBillingBusy] = useState(false);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [gameOpen, setGameOpen] = useState(false);
+  const [gamePrompt, setGamePrompt] = useState(GAME_PROMPTS[0]);
+  const [gameAnswer, setGameAnswer] = useState("");
+  const [gameFeedback, setGameFeedback] = useState("");
   const messagesEndRef = useRef(null);
 
   const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking } = useDexVoice({
@@ -104,6 +141,74 @@ export default function DexChat() {
     showToast.timeoutId = window.setTimeout(() => setToast(""), 3000);
   }
 
+  function pickGame() {
+    const next = GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)];
+    setGamePrompt(next);
+    setGameAnswer("");
+    setGameFeedback("");
+    setGameOpen(true);
+    setOpen(true);
+  }
+
+  function submitGameAnswer(e) {
+    e.preventDefault();
+    const answer = gameAnswer.trim().toLowerCase();
+    if (!answer && gamePrompt.answer) return;
+    const correct =
+      !gamePrompt.answer ||
+      answer.includes(gamePrompt.answer) ||
+      (gamePrompt.answer === "six" && answer.includes("6"));
+    const feedback = correct ? gamePrompt.reply : `Good try. I was looking for: ${gamePrompt.answer}.`;
+    setGameFeedback(feedback);
+    speak(feedback);
+  }
+
+  function startVoiceCommand() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast("Voice dictation is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    let latestTranscript = "";
+
+    recognition.onstart = () => {
+      setVoiceBusy(true);
+      setOpen(true);
+      showToast("Listening now...");
+    };
+    recognition.onresult = (event) => {
+      const results = Array.from(event.results);
+      const lastResult = results[results.length - 1];
+      latestTranscript = lastResult[0].transcript.trim();
+      if (latestTranscript) showToast(`Heard: ${latestTranscript}`);
+      if (lastResult.isFinal && latestTranscript) {
+        recognition.stop();
+        sendMessage(latestTranscript);
+      }
+    };
+    recognition.onerror = (event) => {
+      setVoiceBusy(false);
+      showToast(`Voice error: ${event.error}`);
+    };
+    recognition.onend = () => {
+      setVoiceBusy(false);
+      if (latestTranscript) return;
+      showToast("I did not catch anything. Tap Talk and try again.");
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      setVoiceBusy(false);
+      showToast("Voice could not start. Try refreshing the page.");
+    }
+  }
+
   async function handleCheckout() {
     setBillingBusy(true);
     try {
@@ -178,10 +283,10 @@ export default function DexChat() {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="fixed bottom-5 right-5 z-40 h-14 w-14 rounded-full bg-brand text-white shadow-lg hover:bg-brand-light transition-colors"
+        className={`dex-companion fixed bottom-5 right-5 z-40 h-16 w-16 rounded-full bg-brand text-white shadow-lg hover:bg-brand-light transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
         aria-label={open ? "Close Dex chat" : "Open Dex chat"}
       >
-        <span className="text-lg font-bold">{DEX_AVATAR}</span>
+        <span className="dex-face relative z-10 text-lg font-bold">{DEX_AVATAR}</span>
       </button>
 
       {toast && (
@@ -219,7 +324,63 @@ export default function DexChat() {
             </button>
           </div>
 
+          <div className="flex gap-2 border-b border-gray-800 px-3 py-2">
+            <button
+              type="button"
+              onClick={startVoiceCommand}
+              disabled={voiceBusy}
+              className="rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand-light disabled:opacity-60"
+            >
+              {voiceBusy ? "Listening..." : "Talk"}
+            </button>
+            <button
+              type="button"
+              onClick={pickGame}
+              className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
+            >
+              Play
+            </button>
+            <button
+              type="button"
+              onClick={() => speak("Hey, I'm Dex. Tap Talk and ask me anything, or tap Play for a quick game.")}
+              className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
+            >
+              Test Voice
+            </button>
+          </div>
+
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {gameOpen && (
+              <div className="rounded-lg border border-brand/40 bg-brand/10 p-3 text-sm text-gray-100">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="font-medium text-white">Dex Game: {gamePrompt.type}</p>
+                  <button
+                    type="button"
+                    onClick={pickGame}
+                    className="text-xs text-brand hover:text-brand-light"
+                  >
+                    New
+                  </button>
+                </div>
+                <p className="text-gray-200">{gamePrompt.prompt}</p>
+                <form onSubmit={submitGameAnswer} className="mt-3 flex gap-2">
+                  <input
+                    value={gameAnswer}
+                    onChange={(e) => setGameAnswer(e.target.value)}
+                    placeholder={gamePrompt.answer ? "Your answer..." : "Your choice..."}
+                    className="min-w-0 flex-1 rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:border-brand"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-light"
+                  >
+                    Answer
+                  </button>
+                </form>
+                {gameFeedback && <p className="mt-2 text-gray-300">{gameFeedback}</p>}
+              </div>
+            )}
+
             {messages.map((message, index) => (
               <div
                 key={`${message.role}-${index}`}
