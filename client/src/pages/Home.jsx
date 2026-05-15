@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth.jsx";
 
 const services = [
   { icon: "🌿", title: "Lawn Care", desc: "Mowing, trimming, edging, and full yard maintenance." },
@@ -9,6 +10,7 @@ const services = [
 ];
 
 function Home() {
+  const { user, logout } = useAuth();
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref");
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -65,15 +67,39 @@ function Home() {
           Lawn care, cleaning, handyman services, and electronics — all in one place.
         </p>
         <p className="text-brand font-semibold mb-8">Powered by Dex AI — just say "Hey Dex" to get started.</p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link to={`/register${refCode ? `?ref=${refCode}` : ""}`}
-            className="bg-brand hover:bg-brand-light text-white font-bold px-8 py-3 rounded-xl transition-all">
-            Start Free 3-Day Trial
-          </Link>
-          <Link to="/login" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
-            Log In
-          </Link>
-        </div>
+        {user ? (
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-gray-300">Signed in as {user.name || user.email}</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link to="/settings" className="bg-brand hover:bg-brand-light text-white font-bold px-8 py-3 rounded-xl transition-all">
+                Open Dex Dashboard
+              </Link>
+              {user.role === "affiliate" && (
+                <Link to="/affiliate" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
+                  Affiliate Dashboard
+                </Link>
+              )}
+              {user.role === "admin" && (
+                <Link to="/admin" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
+                  Admin Portal
+                </Link>
+              )}
+              <button onClick={logout} className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
+                Log Out
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link to={`/register${refCode ? `?ref=${refCode}` : ""}`}
+              className="bg-brand hover:bg-brand-light text-white font-bold px-8 py-3 rounded-xl transition-all">
+              Start Free 3-Day Trial
+            </Link>
+            <Link to="/login" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
+              Log In
+            </Link>
+          </div>
+        )}
         {refCode && (
           <p className="mt-4 text-sm text-green-400">🎁 Referral code <strong>{refCode}</strong> applied!</p>
         )}
@@ -129,9 +155,15 @@ function Home() {
               <li key={f} className="flex items-center gap-2"><span className="text-green-400">✓</span>{f}</li>
             ))}
           </ul>
-          <Link to="/register" className="block w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all">
-            Start Free Trial
-          </Link>
+          {user ? (
+            <Link to="/settings" className="block w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all">
+              Manage Your Dex Account
+            </Link>
+          ) : (
+            <Link to="/register" className="block w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all">
+              Start Free Trial
+            </Link>
+          )}
         </div>
       </section>
 

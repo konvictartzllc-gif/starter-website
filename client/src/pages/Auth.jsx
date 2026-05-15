@@ -29,7 +29,7 @@ export function RegisterPage() {
       const data = await api.register(form);
       login(data.token, data.user);
       if (data.user.role === "affiliate") navigate("/affiliate");
-      else navigate("/");
+      else navigate("/settings");
     } catch (err) {
       setError(err.error || err.errors?.[0]?.msg || "Registration failed");
     } finally {
