@@ -23,7 +23,7 @@ export default function DexChat() {
   const [billingBusy, setBillingBusy] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const { status, isSupported, speak, stopSpeaking } = useDexVoice({
+  const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking } = useDexVoice({
     enabled: true,
     onWakeWord: ({ spokenCommand } = {}) => {
       setOpen(true);
@@ -198,6 +198,14 @@ export default function DexChat() {
               <div className="text-xs text-gray-400">
                 {isSupported ? `Voice ${status}` : "Voice not supported here"}
               </div>
+              {voiceError && (
+                <div className="text-xs text-red-300">Voice error: {voiceError}</div>
+              )}
+              {lastHeard && (
+                <div className="max-w-[16rem] truncate text-xs text-gray-500">
+                  Heard: {lastHeard}
+                </div>
+              )}
             </div>
             <button
               type="button"

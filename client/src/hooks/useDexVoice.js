@@ -1,17 +1,46 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const WAKE_WORD = "hey dex";
+const WAKE_VARIANTS = [
+  "hey dex",
+  "hi dex",
+  "hey decks",
+  "hi decks",
+  "hey text",
+  "hi text",
+];
 const VOICE_STORAGE_KEY = "dex_voice_name";
+
+function normalizeTranscript(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findWakeVariant(transcript) {
+  return WAKE_VARIANTS.find((variant) => transcript.includes(variant)) || "";
+}
 
 export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
   const [status, setStatus] = useState("idle"); // idle | listening | active | speaking
   const [isSupported, setIsSupported] = useState(false);
+  const [lastHeard, setLastHeard] = useState("");
+  const [error, setError] = useState("");
   const recognitionRef = useRef(null);
   const listeningForCommandRef = useRef(false);
   const wakeTimeoutRef = useRef(null);
   const synthRef = useRef(window.speechSynthesis);
   const isSpeakingRef = useRef(false);
   const lastCommandRef = useRef({ text: "", at: 0 });
+  const onWakeWordRef = useRef(onWakeWord);
+  const onTranscriptRef = useRef(onTranscript);
+
+  useEffect(() => {
+    onWakeWordRef.current = onWakeWord;
+    onTranscriptRef.current = onTranscript;
+  }, [onWakeWord, onTranscript]);
 
   const clearWakeTimeout = useCallback(() => {
     if (wakeTimeoutRef.current) {
@@ -51,15 +80,17 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
 
       const results = Array.from(event.results);
       const lastResult = results[results.length - 1];
-      const transcript = lastResult[0].transcript.toLowerCase().trim();
+      const transcript = normalizeTranscript(lastResult[0].transcript);
+      if (transcript) setLastHeard(transcript);
 
       if (!listeningForCommandRef.current) {
         // Listening for wake word
-        if (transcript.includes(WAKE_WORD)) {
-          const spokenCommand = transcript.replace(WAKE_WORD, "").trim();
+        const wakeVariant = findWakeVariant(transcript);
+        if (wakeVariant) {
+          const spokenCommand = transcript.replace(wakeVariant, "").trim();
           listeningForCommandRef.current = true;
           setStatus("active");
-          onWakeWord?.({ transcript, spokenCommand });
+          onWakeWordRef.current?.({ transcript, spokenCommand });
 
           // If the user says the wake phrase and command in the same utterance,
           // send it immediately instead of waiting for a second transcript.
@@ -68,7 +99,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
             clearWakeTimeout();
             listeningForCommandRef.current = false;
             setStatus("listening");
-            onTranscript?.(spokenCommand);
+            onTranscriptRef.current?.(spokenCommand);
             return;
           }
 
@@ -82,13 +113,14 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
       } else {
         // Listening for command after wake word
         if (lastResult.isFinal && transcript.trim()) {
-          const command = transcript.replace(WAKE_WORD, "").trim();
+          const wakeVariant = findWakeVariant(transcript);
+          const command = wakeVariant ? transcript.replace(wakeVariant, "").trim() : transcript;
           if (command.length > 2) {
             if (shouldIgnoreCommand(command)) return;
             clearWakeTimeout();
             listeningForCommandRef.current = false;
             setStatus("listening");
-            onTranscript?.(command);
+            onTranscriptRef.current?.(command);
           }
         }
       }
@@ -97,6 +129,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     recognition.onerror = (event) => {
       if (event.error !== "no-speech") {
         console.warn("Speech recognition error:", event.error);
+        setError(event.error);
         if (event.error === "not-allowed") {
           alert(
             "Microphone access was blocked. Please enable microphone permissions in your browser settings to use voice features."
@@ -114,6 +147,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
 
     try {
       recognition.start();
+      setError("");
       setStatus("listening");
     } catch (err) {
       console.warn("Could not start speech recognition:", err);
@@ -126,7 +160,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
       recognitionRef.current = null;
       setStatus("idle");
     };
-  }, [enabled, onWakeWord, onTranscript, clearWakeTimeout, shouldIgnoreCommand]);
+  }, [enabled, clearWakeTimeout, shouldIgnoreCommand]);
 
   const speak = useCallback((text) => {
     const synth = synthRef.current;
@@ -185,5 +219,5 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     try { recognitionRef.current?.start(); } catch {}
   }, [clearWakeTimeout]);
 
-  return { status, isSupported, speak, stopSpeaking };
+  return { status, isSupported, lastHeard, error, speak, stopSpeaking };
 }
