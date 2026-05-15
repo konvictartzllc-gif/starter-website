@@ -129,7 +129,16 @@ export default function AdminPortal() {
     e.preventDefault();
     try {
       const data = await api.createAffiliate({ email: affEmail, name: affName });
-      setMsg(`Affiliate ready. Code: ${data.promoCode}. They can finish setup by registering with ${affEmail}.`);
+      const deliveryMessage = data.emailed
+        ? `The setup code was emailed to ${affEmail}.`
+        : data.emailQueued
+          ? `The setup email is on its way to ${affEmail}.`
+          : data.emailError
+            ? `${data.emailError} Copy the setup code/link and send it manually.`
+            : "The setup email was not sent. Copy the setup code/link and send it manually.";
+      const setupCode = data.invite?.code || data.promoCode;
+      const setupLink = data.invite?.registerLink ? ` Signup link: ${data.invite.registerLink}.` : "";
+      setMsg(`Affiliate ready. Setup code: ${setupCode}.${setupLink} ${deliveryMessage}`);
       setAffEmail("");
       setAffName("");
       loadAffiliates();

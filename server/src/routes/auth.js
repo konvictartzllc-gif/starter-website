@@ -161,6 +161,10 @@ router.post(
         );
 
         const invitedAffiliate = await db.get("SELECT * FROM users WHERE id = ?", [existing.id]);
+        if (affiliateInviteCode) {
+          await consumeAffiliateInviteCode(db, affiliateInviteCode, email, invitedAffiliate.id);
+        }
+        await ensureAffiliateRecord(db, invitedAffiliate.id);
         const resolvedAffiliate = await resolveUserAccess(db, invitedAffiliate);
         return res.json({
           token: signToken(resolvedAffiliate),

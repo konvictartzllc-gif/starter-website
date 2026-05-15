@@ -279,12 +279,50 @@ router.post("/affiliates/create", requireAdmin, [
 
     const affiliate = await ensureAffiliateRecord(db, user.id);
     const referralLink = getReferralLink(affiliate.promo_code);
-    await sendPromoterNotification(user.email, user.name, affiliate.promo_code, referralLink);
+    const inviteCode = generateAffiliateInviteCode();
+    await db.run(
+      `INSERT INTO affiliate_invite_codes (code, email, name, created_by)
+       VALUES (?, ?, ?, ?)`,
+      [inviteCode, user.email, user.name || name || null, req.admin.id]
+    );
+    const invite = await db.get("SELECT * FROM affiliate_invite_codes WHERE code = ?", [inviteCode]);
+    const registerLink = getAffiliateInviteLink(inviteCode);
+
+    let emailed = false;
+    let emailQueued = false;
+    let emailError = null;
+    const emailPromise = Promise.resolve(sendAffiliateInvite(user.email, user.name || name, inviteCode, registerLink));
+    try {
+      const deliveryState = await Promise.race([
+        emailPromise.then((sent) => (sent ? "sent" : "failed")),
+        new Promise((resolve) => setTimeout(() => resolve("queued"), 2500)),
+      ]);
+      if (deliveryState === "sent") {
+        emailed = true;
+      } else if (deliveryState === "failed") {
+        emailError = "Dex could not confirm delivery of the affiliate setup email.";
+      } else {
+        emailQueued = true;
+        emailPromise.catch((error) => {
+          console.error("Affiliate setup email error:", error?.message || error);
+        });
+      }
+    } catch (error) {
+      emailError = error?.message || "Dex could not send the affiliate setup email.";
+      console.error("Affiliate setup email error:", emailError);
+    }
 
     return res.json({
       success: true,
       promoCode: affiliate.promo_code,
       referralLink,
+      emailed,
+      emailQueued,
+      emailError,
+      invite: {
+        ...invite,
+        registerLink,
+      },
       user: {
         id: user.id,
         email: user.email,
