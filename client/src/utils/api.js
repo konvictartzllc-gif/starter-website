@@ -65,6 +65,7 @@ export const api = {
   getDexShop: () => request("/dex/shop"),
   rewardDexCoins: (body) => request("/dex/shop/reward", { method: "POST", body: JSON.stringify(body) }),
   purchaseDexAccessory: (itemId) => request("/dex/shop/purchase", { method: "POST", body: JSON.stringify({ itemId }) }),
+  saveDexColors: (colors) => request("/dex/shop/colors", { method: "POST", body: JSON.stringify({ colors }) }),
 
   // Call Events
   getCallEvents: () => request("/dex/call-events"),

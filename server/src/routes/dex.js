@@ -21,7 +21,7 @@ const DEX_SHOP_ITEMS = [
         { id: "size-big", name: "Big Dex", price: 0, slot: "size" },
         { id: "height-short", name: "Short Build", price: 0, slot: "height" },
         { id: "height-tall", name: "Tall Build", price: 0, slot: "height" },
-        { id: "cap", name: "Purple Cap", price: 40, slot: "hat" },
+        { id: "cap", name: "Color Cap", price: 40, slot: "hat" },
         { id: "crown", name: "Glow Crown", price: 120, slot: "hat" },
         { id: "curls", name: "Curly Hair", price: 75, slot: "hair" },
         { id: "mohawk", name: "Neon Mohawk", price: 85, slot: "hair" },
@@ -686,6 +686,13 @@ router.post("/shop/purchase", requireUser, async (req, res) => {
         const equipped = { ...state.equipped, [item.slot]: item.id };
         await setMemoryValue(db, req.user.id, "dex_equipped", JSON.stringify(equipped));
         return res.json(await getShopState(db, req.user.id));
+});
+
+router.post("/shop/colors", requireUser, async (req, res) => {
+        const db = getDb();
+        const colors = normalizeDexColors(req.body?.colors || req.body || {});
+        await setMemoryValue(db, req.user.id, "dex_colors", JSON.stringify(colors));
+        return res.json({ ...(await getShopState(db, req.user.id)), colors });
 });
 
 router.get("/relationship-aliases", requireUser, async (req, res) => {
@@ -1385,20 +1392,45 @@ function getOpenAI() {
 async function getShopState(db, userId) {
         await ensureMemoryTable(db);
         const rows = await db.all(
-                "SELECT key, value FROM user_memory WHERE user_id = ? AND (key = 'dex_coins' OR key = 'dex_equipped' OR key LIKE 'dex_owned:%')",
+                "SELECT key, value FROM user_memory WHERE user_id = ? AND (key = 'dex_coins' OR key = 'dex_equipped' OR key = 'dex_colors' OR key LIKE 'dex_owned:%')",
                 [userId]
         );
         const owned = {};
         let coins = 0;
         let equipped = {};
+        let colors = defaultDexColors();
         for (const row of rows) {
                 if (row.key === "dex_coins") coins = parseInt(row.value || "0", 10) || 0;
                 if (row.key === "dex_equipped") {
                         try { equipped = JSON.parse(row.value || "{}"); } catch {}
                 }
+                if (row.key === "dex_colors") {
+                        try { colors = normalizeDexColors(JSON.parse(row.value || "{}")); } catch {}
+                }
                 if (row.key.startsWith("dex_owned:")) owned[row.key.replace("dex_owned:", "")] = true;
         }
-        return { coins, owned, equipped, items: DEX_SHOP_ITEMS };
+        return { coins, owned, equipped, colors, items: DEX_SHOP_ITEMS };
+}
+
+function defaultDexColors() {
+        return {
+                bodyPrimary: "#7c3aed",
+                bodySecondary: "#4c1d95",
+                face: "#8b5cf6",
+                accent: "#ffffff",
+                hatPrimary: "#22d3ee",
+                hatSecondary: "#facc15",
+        };
+}
+
+function normalizeDexColors(input = {}) {
+        const defaults = defaultDexColors();
+        const colors = {};
+        for (const key of Object.keys(defaults)) {
+                const value = String(input[key] || defaults[key]).trim();
+                colors[key] = /^#[0-9a-f]{6}$/i.test(value) ? value : defaults[key];
+        }
+        return colors;
 }
 
 async function setMemoryValue(db, userId, key, value) {

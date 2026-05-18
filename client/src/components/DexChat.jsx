@@ -155,6 +155,22 @@ const SHOP_SLOT_LABELS = {
   cheeks: "Cheeks",
   body: "Body",
 };
+const DEFAULT_DEX_COLORS = {
+  bodyPrimary: "#7c3aed",
+  bodySecondary: "#4c1d95",
+  face: "#8b5cf6",
+  accent: "#ffffff",
+  hatPrimary: "#22d3ee",
+  hatSecondary: "#facc15",
+};
+const DEX_COLOR_LABELS = [
+  ["bodyPrimary", "Body"],
+  ["bodySecondary", "Shadow"],
+  ["face", "Face"],
+  ["accent", "Eyes"],
+  ["hatPrimary", "Hat"],
+  ["hatSecondary", "Brim"],
+];
 const MEMORY_WORD_SETS = [
   ["moon", "star", "cloud"],
   ["river", "peach", "drum"],
@@ -257,7 +273,7 @@ export default function DexChat() {
   const [gameStats, setGameStats] = useState({ streak: 0, played: 0 });
   const [memoryVisible, setMemoryVisible] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
-  const [shop, setShop] = useState({ coins: 0, owned: {}, equipped: {}, items: [] });
+  const [shop, setShop] = useState({ coins: 0, owned: {}, equipped: {}, colors: DEFAULT_DEX_COLORS, items: [] });
   const [mascotLineIndex, setMascotLineIndex] = useState(0);
   const messagesEndRef = useRef(null);
   const memoryTimerRef = useRef(null);
@@ -297,6 +313,15 @@ export default function DexChat() {
     (loading ? "Thinking..." : status === "speaking" ? "Talking..." : status === "active" ? "I'm listening." : MASCOT_LINES[mascotLineIndex]);
   const dexSizeClass = shop.equipped?.size === "size-small" ? "dex-size-small" : shop.equipped?.size === "size-big" ? "dex-size-big" : "";
   const dexHeightClass = shop.equipped?.height === "height-short" ? "dex-height-short" : shop.equipped?.height === "height-tall" ? "dex-height-tall" : "";
+  const dexColors = { ...DEFAULT_DEX_COLORS, ...(shop.colors || {}) };
+  const dexColorStyle = {
+    "--dex-body-primary": dexColors.bodyPrimary,
+    "--dex-body-secondary": dexColors.bodySecondary,
+    "--dex-face-color": dexColors.face,
+    "--dex-accent-color": dexColors.accent,
+    "--dex-hat-primary": dexColors.hatPrimary,
+    "--dex-hat-secondary": dexColors.hatSecondary,
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -462,6 +487,23 @@ export default function DexChat() {
     }
   }
 
+  function updateDexColor(key, value) {
+    setShop((prev) => ({
+      ...prev,
+      colors: { ...DEFAULT_DEX_COLORS, ...(prev.colors || {}), [key]: value },
+    }));
+  }
+
+  async function saveDexColors() {
+    try {
+      const nextShop = await api.saveDexColors(dexColors);
+      setShop(nextShop);
+      showToast("Dex colors saved.");
+    } catch (err) {
+      showToast(err?.message || "Could not save Dex colors.");
+    }
+  }
+
   async function buyCoins(packId) {
     try {
       const data = await api.createCoinCheckout(packId);
@@ -596,6 +638,7 @@ export default function DexChat() {
           type="button"
           onClick={() => setOpen((prev) => !prev)}
           className={`dex-companion dex-robot-button ${dexSizeClass} ${dexHeightClass} text-white shadow-lg transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
+          style={dexColorStyle}
           aria-label={open ? "Close Dex chat" : "Open Dex chat"}
         >
           <span className="dex-robot-antenna" aria-hidden="true" />
@@ -713,6 +756,32 @@ export default function DexChat() {
                       <span className="text-gray-400">{pack.price}</span>
                     </button>
                   ))}
+                </div>
+                <div className="mb-3 rounded-md border border-gray-700 bg-gray-950 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-300">Dex Colors</p>
+                    <button
+                      type="button"
+                      onClick={saveDexColors}
+                      className="rounded-md border border-brand px-2 py-1 text-xs font-semibold text-white hover:bg-brand/20"
+                    >
+                      Save
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {DEX_COLOR_LABELS.map(([key, label]) => (
+                      <label key={key} className="rounded-md border border-gray-800 bg-gray-900 px-2 py-2 text-xs text-gray-300">
+                        <span className="mb-1 block">{label}</span>
+                        <input
+                          type="color"
+                          value={dexColors[key]}
+                          onChange={(e) => updateDexColor(key, e.target.value)}
+                          className="h-8 w-full cursor-pointer rounded border border-gray-700 bg-transparent"
+                          aria-label={`Dex ${label} color`}
+                        />
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {(shop.items || []).map((item) => {
