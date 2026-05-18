@@ -23,9 +23,12 @@ function fireAndForget(label, task) {
 }
 
 function getStripe() {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const secretKey = (process.env.STRIPE_SECRET_KEY || "").trim();
   if (!secretKey) {
     throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY.");
+  }
+  if (!secretKey.startsWith("sk_live_") && !secretKey.startsWith("sk_test_")) {
+    throw new Error("STRIPE_SECRET_KEY must start with sk_live_ or sk_test_. Do not use a pk_ publishable key here.");
   }
   return new Stripe(secretKey);
 }
@@ -244,7 +247,7 @@ async function createCheckoutSession(req, res) {
   try {
     const stripe = getStripe();
     const customerId = await ensureStripeCustomer(stripe, db, user);
-    const priceId = process.env.STRIPE_PRICE_ID;
+    const priceId = (process.env.STRIPE_PRICE_ID || "").trim();
     const trialDays = trialDaysForUser(user);
 
     const sessionPayload = {
@@ -295,7 +298,7 @@ async function createCheckoutSession(req, res) {
       success: true,
       checkoutUrl: session.url,
       sessionId: session.id,
-      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
+      publishableKey: (process.env.STRIPE_PUBLISHABLE_KEY || "").trim() || null,
     });
   } catch (err) {
     console.error("Stripe subscribe error:", err);
@@ -348,7 +351,7 @@ router.post("/portal", requireUser, async (req, res) => {
 
 // POST /api/payments/webhook
 router.post("/webhook", async (req, res) => {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const webhookSecret = (process.env.STRIPE_WEBHOOK_SECRET || "").trim();
   if (!webhookSecret) {
     return res.status(500).send("Stripe webhook secret is not configured.");
   }
