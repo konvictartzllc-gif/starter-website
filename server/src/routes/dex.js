@@ -17,10 +17,19 @@ const SENSITIVE_INFO_WARNING =
         "I won't save sensitive information like bank details, card numbers, passwords, or Social Security numbers. Please remove that information and try again.";
 const WORKFLOW_PREFIX = "pref:workflow:";
 const DEX_SHOP_ITEMS = [
+        { id: "size-small", name: "Pocket Dex", price: 0, slot: "size" },
+        { id: "size-big", name: "Big Dex", price: 0, slot: "size" },
+        { id: "height-short", name: "Short Build", price: 0, slot: "height" },
+        { id: "height-tall", name: "Tall Build", price: 0, slot: "height" },
         { id: "cap", name: "Purple Cap", price: 40, slot: "hat" },
         { id: "crown", name: "Glow Crown", price: 120, slot: "hat" },
+        { id: "curls", name: "Curly Hair", price: 75, slot: "hair" },
+        { id: "mohawk", name: "Neon Mohawk", price: 85, slot: "hair" },
         { id: "glasses", name: "Star Glasses", price: 60, slot: "face" },
         { id: "visor", name: "Neon Visor", price: 90, slot: "face" },
+        { id: "smile", name: "Big Smile", price: 0, slot: "mouth" },
+        { id: "cool", name: "Cool Face", price: 35, slot: "mouth" },
+        { id: "blush", name: "Blush Cheeks", price: 30, slot: "cheeks" },
         { id: "bowtie", name: "Tiny Bow Tie", price: 55, slot: "body" },
         { id: "chain", name: "Dex Chain", price: 100, slot: "body" },
 ];

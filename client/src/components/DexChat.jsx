@@ -145,6 +145,16 @@ const COIN_PACKS = [
   { id: "popular", label: "300 coins", price: "$4.99" },
   { id: "mega", label: "750 coins", price: "$9.99" },
 ];
+const SHOP_SLOT_LABELS = {
+  size: "Size",
+  height: "Height",
+  hair: "Hair",
+  hat: "Hats",
+  face: "Eyes",
+  mouth: "Mouth",
+  cheeks: "Cheeks",
+  body: "Body",
+};
 
 function isAccessBlocked(errorCode) {
   return errorCode === "trial_expired" || errorCode === "subscription_expired" || errorCode === "no_access";
@@ -206,6 +216,8 @@ export default function DexChat() {
   const mascotLine =
     toast ||
     (loading ? "Thinking..." : status === "speaking" ? "Talking..." : status === "active" ? "I'm listening." : MASCOT_LINES[mascotLineIndex]);
+  const dexSizeClass = shop.equipped?.size === "size-small" ? "dex-size-small" : shop.equipped?.size === "size-big" ? "dex-size-big" : "";
+  const dexHeightClass = shop.equipped?.height === "height-short" ? "dex-height-short" : shop.equipped?.height === "height-tall" ? "dex-height-tall" : "";
 
   useEffect(() => {
     if (!user) return;
@@ -505,7 +517,7 @@ export default function DexChat() {
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className={`dex-companion dex-robot-button text-white shadow-lg transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
+          className={`dex-companion dex-robot-button ${dexSizeClass} ${dexHeightClass} text-white shadow-lg transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
           aria-label={open ? "Close Dex chat" : "Open Dex chat"}
         >
           <span className="dex-robot-antenna" aria-hidden="true" />
@@ -513,9 +525,14 @@ export default function DexChat() {
           <span className="dex-robot-ear dex-robot-ear-right" aria-hidden="true" />
           {shop.equipped?.hat === "cap" && <span className="dex-accessory dex-hat-cap" aria-hidden="true" />}
           {shop.equipped?.hat === "crown" && <span className="dex-accessory dex-hat-crown" aria-hidden="true" />}
+          {shop.equipped?.hair === "curls" && <span className="dex-accessory dex-hair-curls" aria-hidden="true" />}
+          {shop.equipped?.hair === "mohawk" && <span className="dex-accessory dex-hair-mohawk" aria-hidden="true" />}
           {shop.equipped?.face === "glasses" && <span className="dex-accessory dex-glasses" aria-hidden="true" />}
           {shop.equipped?.face === "visor" && <span className="dex-accessory dex-visor" aria-hidden="true" />}
           <span className="dex-face relative z-10 text-lg font-bold">{DEX_AVATAR}</span>
+          {shop.equipped?.mouth === "smile" && <span className="dex-accessory dex-mouth-smile" aria-hidden="true" />}
+          {shop.equipped?.mouth === "cool" && <span className="dex-accessory dex-mouth-cool" aria-hidden="true" />}
+          {shop.equipped?.cheeks === "blush" && <span className="dex-accessory dex-cheeks-blush" aria-hidden="true" />}
           {shop.equipped?.body === "bowtie" && <span className="dex-accessory dex-bowtie" aria-hidden="true" />}
           {shop.equipped?.body === "chain" && <span className="dex-accessory dex-chain" aria-hidden="true" />}
           <span className="dex-robot-body" aria-hidden="true">
@@ -630,6 +647,7 @@ export default function DexChat() {
                         onClick={() => buyAccessory(item.id)}
                         className={`rounded-md border px-2 py-2 text-left text-xs ${equipped ? "border-brand bg-brand/20" : "border-gray-700 hover:border-brand"}`}
                       >
+                        <span className="block text-[0.65rem] uppercase tracking-wide text-gray-500">{SHOP_SLOT_LABELS[item.slot] || item.slot}</span>
                         <span className="block font-semibold text-white">{item.name}</span>
                         <span className="text-gray-400">{owned ? (equipped ? "Equipped" : "Equip") : `${item.price} coins`}</span>
                       </button>

@@ -92,6 +92,26 @@
   background: linear-gradient(145deg, #8b5cf6, #5b21b6);
 }
 
+.dex-size-small {
+  transform: scale(0.82);
+  transform-origin: bottom right;
+}
+
+.dex-size-big {
+  transform: scale(1.16);
+  transform-origin: bottom right;
+}
+
+.dex-height-short {
+  height: 4.35rem;
+  border-radius: 1.2rem;
+}
+
+.dex-height-tall {
+  height: 5.9rem;
+  border-radius: 1.25rem 1.25rem 1rem 1rem;
+}
+
 .dex-face {
   display: inline-flex;
   align-items: center;
@@ -182,6 +202,29 @@
   clip-path: polygon(0 100%, 0 35%, 25% 72%, 50% 0, 75% 72%, 100% 35%, 100% 100%);
 }
 
+.dex-hair-curls {
+  top: 0.45rem;
+  left: 0.88rem;
+  width: 2.7rem;
+  height: 0.7rem;
+  background:
+    radial-gradient(circle at 0.35rem 0.34rem, #312e81 0.26rem, transparent 0.28rem),
+    radial-gradient(circle at 0.9rem 0.22rem, #312e81 0.3rem, transparent 0.32rem),
+    radial-gradient(circle at 1.45rem 0.3rem, #312e81 0.29rem, transparent 0.31rem),
+    radial-gradient(circle at 2rem 0.22rem, #312e81 0.3rem, transparent 0.32rem),
+    radial-gradient(circle at 2.45rem 0.36rem, #312e81 0.24rem, transparent 0.26rem);
+}
+
+.dex-hair-mohawk {
+  top: 0.22rem;
+  left: 1.92rem;
+  width: 0.68rem;
+  height: 1.05rem;
+  background: linear-gradient(#22d3ee, #a78bfa);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.7));
+}
+
 .dex-glasses {
   top: 1.48rem;
   left: 0.98rem;
@@ -219,6 +262,44 @@
   border-bottom: 0.22rem dotted #facc15;
   border-radius: 9999px;
 }
+
+.dex-mouth-smile {
+  top: 2.38rem;
+  left: 1.78rem;
+  width: 0.95rem;
+  height: 0.48rem;
+  border-bottom: 0.16rem solid #ffffff;
+  border-radius: 0 0 9999px 9999px;
+}
+
+.dex-mouth-cool {
+  top: 2.42rem;
+  left: 1.9rem;
+  width: 0.72rem;
+  height: 0.12rem;
+  border-radius: 9999px;
+  background: #ffffff;
+}
+
+.dex-cheeks-blush {
+  top: 2.08rem;
+  left: 1.05rem;
+  width: 2.4rem;
+  height: 0.4rem;
+}
+
+.dex-cheeks-blush::before,
+.dex-cheeks-blush::after {
+  content: '';
+  position: absolute;
+  width: 0.42rem;
+  height: 0.22rem;
+  border-radius: 9999px;
+  background: rgba(244, 114, 182, 0.88);
+}
+
+.dex-cheeks-blush::before { left: 0; }
+.dex-cheeks-blush::after { right: 0; }
 
 .dex-face::before,
 .dex-face::after {
