@@ -23,10 +23,12 @@
 }
 
 .dex-companion {
+  --dex-scale: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: visible;
+  transform-origin: bottom right;
   animation: dex-float 3.2s ease-in-out infinite;
 }
 
@@ -93,13 +95,11 @@
 }
 
 .dex-size-small {
-  transform: scale(0.82);
-  transform-origin: bottom right;
+  --dex-scale: 0.82;
 }
 
 .dex-size-big {
-  transform: scale(1.16);
-  transform-origin: bottom right;
+  --dex-scale: 1.16;
 }
 
 .dex-height-short {
@@ -317,8 +317,8 @@
 .dex-face::after { right: 1.04rem; }
 
 @keyframes dex-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  0%, 100% { transform: translateY(0) scale(var(--dex-scale)); }
+  50% { transform: translateY(-6px) scale(var(--dex-scale)); }
 }
 
 @keyframes dex-roam {
