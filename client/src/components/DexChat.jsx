@@ -116,7 +116,6 @@ export default function DexChat() {
       setOpen(true);
       if (spokenCommand?.trim()) {
         showToast(`Heard: ${spokenCommand}`);
-        speak("I heard you.");
         return;
       }
       const wakeReply = "I'm here. What can I help you with?";
@@ -328,6 +327,8 @@ export default function DexChat() {
       } else {
         const fallback = "Sorry, something went wrong. Please try again later.";
         setMessages((prev) => [...prev, { role: "assistant", content: fallback }]);
+        showToast(err?.message || fallback);
+        speak(fallback);
       }
     } finally {
       setLoading(false);

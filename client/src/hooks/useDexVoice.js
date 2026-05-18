@@ -35,6 +35,8 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
   const recognitionRef = useRef(null);
   const listeningForCommandRef = useRef(false);
   const wakeTimeoutRef = useRef(null);
+  const commandTimeoutRef = useRef(null);
+  const pendingCommandRef = useRef("");
   const synthRef = useRef(window.speechSynthesis);
   const isSpeakingRef = useRef(false);
   const lastCommandRef = useRef({ text: "", at: 0 });
@@ -53,6 +55,13 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     }
   }, []);
 
+  const clearCommandTimeout = useCallback(() => {
+    if (commandTimeoutRef.current) {
+      clearTimeout(commandTimeoutRef.current);
+      commandTimeoutRef.current = null;
+    }
+  }, []);
+
   const shouldIgnoreCommand = useCallback((command) => {
     const now = Date.now();
     const isDuplicate =
@@ -62,6 +71,17 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     lastCommandRef.current = { text: command, at: now };
     return false;
   }, []);
+
+  const submitCommand = useCallback((command) => {
+    const cleaned = normalizeTranscript(command);
+    if (cleaned.length <= 2 || shouldIgnoreCommand(cleaned)) return;
+    clearWakeTimeout();
+    clearCommandTimeout();
+    pendingCommandRef.current = "";
+    listeningForCommandRef.current = false;
+    setStatus("listening");
+    onTranscriptRef.current?.(cleaned);
+  }, [clearCommandTimeout, clearWakeTimeout, shouldIgnoreCommand]);
 
   useEffect(() => {
     synthRef.current = window.speechSynthesis;
@@ -98,12 +118,12 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
 
           // If the user says the wake phrase and command in the same utterance,
           // send it immediately instead of waiting for a second transcript.
-          if (lastResult.isFinal && spokenCommand.length > 2) {
-            if (shouldIgnoreCommand(spokenCommand)) return;
-            clearWakeTimeout();
-            listeningForCommandRef.current = false;
-            setStatus("listening");
-            onTranscriptRef.current?.(spokenCommand);
+          if (spokenCommand.length > 2) {
+            pendingCommandRef.current = spokenCommand;
+            clearCommandTimeout();
+            commandTimeoutRef.current = setTimeout(() => {
+              submitCommand(pendingCommandRef.current);
+            }, lastResult.isFinal ? 0 : 700);
             return;
           }
 
@@ -115,17 +135,16 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
           }, 10000);
         }
       } else {
-        // Listening for command after wake word
-        if (lastResult.isFinal && transcript.trim()) {
-          const wakeVariant = findWakeVariant(transcript);
-          const command = wakeVariant ? transcript.replace(wakeVariant, "").trim() : transcript;
-          if (command.length > 2) {
-            if (shouldIgnoreCommand(command)) return;
-            clearWakeTimeout();
-            listeningForCommandRef.current = false;
-            setStatus("listening");
-            onTranscriptRef.current?.(command);
-          }
+        // Listening for command after wake word. Chrome sometimes never marks
+        // speech final, so send the latest stable interim command after a pause.
+        const wakeVariant = findWakeVariant(transcript);
+        const command = wakeVariant ? transcript.replace(wakeVariant, "").trim() : transcript;
+        if (command.length > 2) {
+          pendingCommandRef.current = command;
+          clearCommandTimeout();
+          commandTimeoutRef.current = setTimeout(() => {
+            submitCommand(pendingCommandRef.current);
+          }, lastResult.isFinal ? 0 : 900);
         }
       }
     };
@@ -159,12 +178,14 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
 
     return () => {
       clearWakeTimeout();
+      clearCommandTimeout();
+      pendingCommandRef.current = "";
       listeningForCommandRef.current = false;
       try { recognition.stop(); } catch {}
       recognitionRef.current = null;
       setStatus("idle");
     };
-  }, [enabled, clearWakeTimeout, shouldIgnoreCommand]);
+  }, [enabled, clearWakeTimeout, clearCommandTimeout, submitCommand]);
 
   const speak = useCallback((text) => {
     const synth = synthRef.current;
