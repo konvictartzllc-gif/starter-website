@@ -71,6 +71,8 @@
 
 .preferences-form {
   color: #e5e7eb;
+  display: grid;
+  gap: 1rem;
 }
 
 .preferences-form h2 {
@@ -81,7 +83,7 @@
 }
 
 .preferences-form h3 {
-  margin: 1.25rem 0 0.35rem;
+  margin: 0 0 0.35rem;
   font-size: 1rem;
   font-weight: 700;
   color: #ffffff;
@@ -97,6 +99,15 @@
 .preferences-form label {
   color: #e5e7eb;
   font-weight: 600;
+}
+
+.preferences-form > ul {
+  display: none;
+}
+
+.preferences-form form {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .preferences-form input[type="text"],
@@ -154,7 +165,36 @@
 .preferences-form .voice-section,
 .preferences-form .emergency-contact-section,
 .preferences-form .automations-section {
-  margin-top: 1rem;
+  margin-top: 0;
+  border: 1px solid #1f2937;
+  border-radius: 0.75rem;
+  background: #111827;
+  padding: 1rem;
+}
+
+.preferences-form .learning-section + .learning-section,
+.preferences-form .voice-section,
+.preferences-form .automations-section {
+  margin-top: 0.25rem;
+}
+
+.preferences-form .emergency-contact-section form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.preferences-form .emergency-contact-section label,
+.preferences-form .learning-section > label {
+  display: flex !important;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.75rem 0 1rem !important;
+}
+
+@media (max-width: 640px) {
+  .preferences-form .emergency-contact-section form {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Scrollbar */
