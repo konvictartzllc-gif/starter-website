@@ -71,6 +71,9 @@ function Home() {
           <div className="flex flex-col items-center gap-3">
             <p className="text-sm text-gray-300">Signed in as {user.name || user.email}</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link to="/shop" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
+                Shop Products
+              </Link>
               <Link to="/settings" className="bg-brand hover:bg-brand-light text-white font-bold px-8 py-3 rounded-xl transition-all">
                 Open Dex Dashboard
               </Link>
@@ -91,6 +94,9 @@ function Home() {
           </div>
         ) : (
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link to="/shop" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
+              Shop Products
+            </Link>
             <Link to={`/register${refCode ? `?ref=${refCode}` : ""}`}
               className="bg-brand hover:bg-brand-light text-white font-bold px-8 py-3 rounded-xl transition-all">
               Start Free 3-Day Trial
@@ -172,6 +178,7 @@ function Home() {
         <p>© 2026 Konvict Artz. All rights reserved.</p>
         <div className="flex justify-center gap-4 mt-2">
           <Link to="/admin" className="hover:text-gray-300">Admin</Link>
+          <Link to="/shop" className="hover:text-gray-300">Shop</Link>
           <Link to="/affiliate" className="hover:text-gray-300">Affiliate Dashboard</Link>
         </div>
       </footer>

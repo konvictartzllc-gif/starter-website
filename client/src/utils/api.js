@@ -81,6 +81,8 @@ export const api = {
   // Payments
   createCheckoutSession: () => request("/payments/checkout-session", { method: "POST", body: JSON.stringify({}) }),
   createCoinCheckout: (packId) => request("/payments/coins-checkout", { method: "POST", body: JSON.stringify({ packId }) }),
+  getProducts: () => request("/payments/products"),
+  createProductCheckout: (id, quantity = 1) => request(`/payments/products/${id}/checkout`, { method: "POST", body: JSON.stringify({ quantity }) }),
   subscribe: () => request("/payments/checkout-session", { method: "POST", body: JSON.stringify({}) }),
   openBillingPortal: () => request("/payments/portal", { method: "POST", body: JSON.stringify({}) }),
   getPaymentStatus: () => request("/payments/status"),

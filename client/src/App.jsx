@@ -5,6 +5,7 @@ import Home from "./pages/Home.jsx";
 import { RegisterPage, LoginPage } from "./pages/Auth.jsx";
 import AdminPortal from "./pages/AdminPortal.jsx";
 import AffiliateDashboard from "./pages/AffiliateDashboard.jsx";
+import Shop from "./pages/Shop.jsx";
 import DexChat from "./components/DexChat.jsx";
 import Onboarding from "./components/Onboarding.jsx";
 import BannerAds from "./components/BannerAds.jsx";
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/admin" element={<AdminPortal />} />
         <Route path="/affiliate" element={<AffiliateDashboard />} />
+        <Route path="/shop" element={<Shop />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
       <Route path="/settings" element={<Settings />} />

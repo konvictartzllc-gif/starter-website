@@ -24,6 +24,7 @@ export default function AdminPortal() {
     price_cents: "",
     quantity: "",
     low_threshold: "5",
+    image_url: "",
   });
 
   const [affEmail, setAffEmail] = useState("");
@@ -106,6 +107,7 @@ export default function AdminPortal() {
         price_cents: "",
         quantity: "",
         low_threshold: "5",
+        image_url: "",
       });
       loadInventory();
       loadStats();
@@ -408,6 +410,12 @@ export default function AdminPortal() {
                 value={invForm.low_threshold}
                 onChange={(e) => setInvForm((p) => ({ ...p, low_threshold: e.target.value }))}
                 className="bg-gray-700 rounded-lg px-3 py-2 text-sm outline-none"
+              />
+              <input
+                placeholder="Image URL"
+                value={invForm.image_url || ""}
+                onChange={(e) => setInvForm((p) => ({ ...p, image_url: e.target.value }))}
+                className="col-span-2 bg-gray-700 rounded-lg px-3 py-2 text-sm outline-none"
               />
               <textarea
                 placeholder="Description"

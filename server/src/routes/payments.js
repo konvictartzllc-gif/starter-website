@@ -57,6 +57,11 @@ function getCancelUrl(req) {
   return DEFAULT_CANCEL_URL.replace(/^https?:\/\/[^/]+/i, siteUrl);
 }
 
+function getShopReturnUrl(req, status) {
+  const siteUrl = process.env.PUBLIC_SITE_URL || getSiteUrl(req);
+  return `${siteUrl.replace(/\/+$/, "")}/shop?checkout=${encodeURIComponent(status)}`;
+}
+
 async function resolveBillingAccess(db, userId) {
   const user = await db.get(
     "SELECT access_type, trial_start, sub_expires, stripe_customer_id, stripe_subscription_id, role FROM users WHERE id = ?",
@@ -258,6 +263,15 @@ async function upsertPaymentRecord(db, values) {
   return result.lastID;
 }
 
+async function hasCompletedCheckoutSession(db, checkoutSessionId) {
+  if (!checkoutSessionId) return false;
+  const existing = await db.get(
+    "SELECT id FROM payments WHERE stripe_checkout_session_id = ? AND status = 'completed' LIMIT 1",
+    [checkoutSessionId]
+  );
+  return Boolean(existing);
+}
+
 async function createCheckoutSession(req, res) {
   const db = getDb();
   const user = await db.get("SELECT * FROM users WHERE id = ?", [req.user.id]);
@@ -378,6 +392,72 @@ router.post("/coins-checkout", requireUser, async (req, res) => {
   }
 });
 
+router.get("/products", async (req, res) => {
+  const db = getDb();
+  const products = await db.all(
+    `SELECT id, name, description, category, price_cents, quantity, image_url
+       FROM inventory
+      WHERE quantity > 0
+      ORDER BY category ASC, name ASC`
+  );
+  return res.json({ products });
+});
+
+router.post("/products/:id/checkout", requireUser, async (req, res) => {
+  const productId = parseInt(req.params.id, 10);
+  const quantity = Math.max(1, Math.min(10, parseInt(req.body?.quantity || "1", 10) || 1));
+  const db = getDb();
+  const user = await db.get("SELECT * FROM users WHERE id = ?", [req.user.id]);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  const product = await db.get(
+    `SELECT id, name, description, category, price_cents, quantity, image_url
+       FROM inventory
+      WHERE id = ?`,
+    [productId]
+  );
+  if (!product) return res.status(404).json({ error: "product_not_found", message: "That item is no longer available." });
+  if (product.quantity < quantity) {
+    return res.status(400).json({ error: "not_enough_stock", message: `Only ${product.quantity} left in stock.` });
+  }
+  if (product.price_cents <= 0) {
+    return res.status(400).json({ error: "invalid_product_price", message: "This item needs a price before checkout." });
+  }
+
+  try {
+    const stripe = getStripe();
+    const customerId = await ensureStripeCustomer(stripe, db, user);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      success_url: `${getShopReturnUrl(req, "success")}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: getShopReturnUrl(req, "cancelled"),
+      customer: customerId,
+      client_reference_id: String(user.id),
+      metadata: {
+        purpose: "inventory_purchase",
+        user_id: String(user.id),
+        product_id: String(product.id),
+        quantity: String(quantity),
+      },
+      line_items: [{
+        quantity,
+        price_data: {
+          currency: DEFAULT_CURRENCY,
+          unit_amount: product.price_cents,
+          product_data: {
+            name: product.name,
+            description: product.description || product.category || "Konvict Artz product",
+            ...(product.image_url ? { images: [product.image_url] } : {}),
+          },
+        },
+      }],
+    });
+    return res.json({ success: true, checkoutUrl: session.url, sessionId: session.id });
+  } catch (err) {
+    console.error("Stripe product checkout error:", err);
+    return res.status(500).json({ error: "product_checkout_failed", message: err.message || "Could not open checkout." });
+  }
+});
+
 // POST /api/payments/portal
 router.post("/portal", requireUser, async (req, res) => {
   const db = getDb();
@@ -436,6 +516,32 @@ router.post("/webhook", async (req, res) => {
         if (session.metadata?.purpose === "dex_coin_pack" && user) {
           const coins = parseInt(session.metadata.coins || "0", 10) || 0;
           if (coins > 0) await addDexCoins(db, user.id, coins);
+          await upsertPaymentRecord(db, {
+            userId: user.id,
+            paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id,
+            checkoutSessionId: session.id,
+            subscriptionId: null,
+            amountCents: session.amount_total || 0,
+            currency: (session.currency || DEFAULT_CURRENCY).toUpperCase(),
+            status: "completed",
+            affiliateCode: user.referred_by || null,
+          });
+          break;
+        }
+        if (session.metadata?.purpose === "inventory_purchase" && user) {
+          const productId = parseInt(session.metadata.product_id || "0", 10);
+          const quantity = Math.max(1, parseInt(session.metadata.quantity || "1", 10) || 1);
+          const alreadyCompleted = await hasCompletedCheckoutSession(db, session.id);
+          if (!alreadyCompleted && productId) {
+            await db.run(
+              `UPDATE inventory
+                  SET quantity = MAX(quantity - ?, 0),
+                      updated_at = datetime('now'),
+                      alerted = 0
+                WHERE id = ?`,
+              [quantity, productId]
+            );
+          }
           await upsertPaymentRecord(db, {
             userId: user.id,
             paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id,
