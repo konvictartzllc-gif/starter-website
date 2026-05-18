@@ -16,6 +16,14 @@ const CHAT_MEMORY_RETENTION_DAYS = 3;
 const SENSITIVE_INFO_WARNING =
         "I won't save sensitive information like bank details, card numbers, passwords, or Social Security numbers. Please remove that information and try again.";
 const WORKFLOW_PREFIX = "pref:workflow:";
+const DEX_SHOP_ITEMS = [
+        { id: "cap", name: "Purple Cap", price: 40, slot: "hat" },
+        { id: "crown", name: "Glow Crown", price: 120, slot: "hat" },
+        { id: "glasses", name: "Star Glasses", price: 60, slot: "face" },
+        { id: "visor", name: "Neon Visor", price: 90, slot: "face" },
+        { id: "bowtie", name: "Tiny Bow Tie", price: 55, slot: "body" },
+        { id: "chain", name: "Dex Chain", price: 100, slot: "body" },
+];
 
 function normalizeEmergencyContactTarget(target) {
         const value = String(target || "").trim();
@@ -635,6 +643,40 @@ router.post("/workflows", requireUser, async (req, res) => {
         await ensureMemoryTable(db);
         const workflow = await saveLearnedWorkflow(db, userId, { title, trigger, steps });
         return res.json({ success: true, workflow });
+});
+
+router.get("/shop", requireUser, async (req, res) => {
+        const db = getDb();
+        const state = await getShopState(db, req.user.id);
+        return res.json(state);
+});
+
+router.post("/shop/reward", requireUser, async (req, res) => {
+        const db = getDb();
+        const won = Boolean(req.body?.won);
+        if (!won) return res.json(await getShopState(db, req.user.id));
+        const coins = await addDexCoins(db, req.user.id, 5);
+        return res.json({ ...(await getShopState(db, req.user.id)), coins, awarded: 5 });
+});
+
+router.post("/shop/purchase", requireUser, async (req, res) => {
+        const db = getDb();
+        const item = DEX_SHOP_ITEMS.find((entry) => entry.id === req.body?.itemId);
+        if (!item) return res.status(404).json({ error: "item_not_found", message: "Dex could not find that shop item." });
+        const state = await getShopState(db, req.user.id);
+        if (state.owned[item.id]) {
+                const equipped = { ...state.equipped, [item.slot]: item.id };
+                await setMemoryValue(db, req.user.id, "dex_equipped", JSON.stringify(equipped));
+                return res.json({ ...(await getShopState(db, req.user.id)), equipped });
+        }
+        if (state.coins < item.price) {
+                return res.status(400).json({ error: "not_enough_coins", message: "Not enough coins yet. Win games or buy a coin pack." });
+        }
+        await setMemoryValue(db, req.user.id, "dex_coins", state.coins - item.price);
+        await setMemoryValue(db, req.user.id, `dex_owned:${item.id}`, "1");
+        const equipped = { ...state.equipped, [item.slot]: item.id };
+        await setMemoryValue(db, req.user.id, "dex_equipped", JSON.stringify(equipped));
+        return res.json(await getShopState(db, req.user.id));
 });
 
 router.get("/relationship-aliases", requireUser, async (req, res) => {
@@ -1329,6 +1371,41 @@ function getOpenAI() {
         throw error;
     }
     return getAIClient();
+}
+
+async function getShopState(db, userId) {
+        await ensureMemoryTable(db);
+        const rows = await db.all(
+                "SELECT key, value FROM user_memory WHERE user_id = ? AND (key = 'dex_coins' OR key = 'dex_equipped' OR key LIKE 'dex_owned:%')",
+                [userId]
+        );
+        const owned = {};
+        let coins = 0;
+        let equipped = {};
+        for (const row of rows) {
+                if (row.key === "dex_coins") coins = parseInt(row.value || "0", 10) || 0;
+                if (row.key === "dex_equipped") {
+                        try { equipped = JSON.parse(row.value || "{}"); } catch {}
+                }
+                if (row.key.startsWith("dex_owned:")) owned[row.key.replace("dex_owned:", "")] = true;
+        }
+        return { coins, owned, equipped, items: DEX_SHOP_ITEMS };
+}
+
+async function setMemoryValue(db, userId, key, value) {
+        await ensureMemoryTable(db);
+        await db.run(
+                `INSERT INTO user_memory (user_id, key, value) VALUES (?, ?, ?)
+                 ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value`,
+                [userId, key, String(value)]
+        );
+}
+
+async function addDexCoins(db, userId, amount) {
+        const state = await getShopState(db, userId);
+        const coins = Math.max(0, state.coins + amount);
+        await setMemoryValue(db, userId, "dex_coins", coins);
+        return coins;
 }
 
 function slugifyWorkflowTitle(value = "") {

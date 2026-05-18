@@ -157,6 +157,69 @@
   background: rgba(255, 255, 255, 0.82);
 }
 
+.dex-accessory {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.dex-hat-cap {
+  top: 0.42rem;
+  left: 1.1rem;
+  width: 2.3rem;
+  height: 0.72rem;
+  border-radius: 0.65rem 0.65rem 0.25rem 0.25rem;
+  background: #a78bfa;
+  box-shadow: 0.95rem 0.18rem 0 -0.18rem #c4b5fd;
+}
+
+.dex-hat-crown {
+  top: 0.18rem;
+  left: 1.18rem;
+  width: 2.1rem;
+  height: 0.95rem;
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  clip-path: polygon(0 100%, 0 35%, 25% 72%, 50% 0, 75% 72%, 100% 35%, 100% 100%);
+}
+
+.dex-glasses {
+  top: 1.48rem;
+  left: 0.98rem;
+  width: 2.45rem;
+  height: 0.58rem;
+  border-radius: 9999px;
+  border: 0.18rem solid #111827;
+  box-shadow: inset 0 0 0 0.12rem #c4b5fd;
+}
+
+.dex-visor {
+  top: 1.5rem;
+  left: 1rem;
+  width: 2.45rem;
+  height: 0.48rem;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #22d3ee, #a78bfa);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.6);
+}
+
+.dex-bowtie {
+  bottom: 1.08rem;
+  left: 1.62rem;
+  width: 1.18rem;
+  height: 0.58rem;
+  background: #f472b6;
+  clip-path: polygon(0 0, 45% 50%, 0 100%, 100% 100%, 55% 50%, 100% 0);
+}
+
+.dex-chain {
+  bottom: 1.04rem;
+  left: 1.32rem;
+  width: 1.8rem;
+  height: 0.72rem;
+  border-bottom: 0.22rem dotted #facc15;
+  border-radius: 9999px;
+}
+
 .dex-face::before,
 .dex-face::after {
   content: '';

@@ -140,6 +140,11 @@ const GAME_PROMPTS = [
   },
 ];
 const GAME_TYPES = ["Riddle", "Trivia", "Memory", "Would You Rather", "Guess", "Quick Math", "Word Scramble", "This or That", "Mini Challenge"];
+const COIN_PACKS = [
+  { id: "starter", label: "100 coins", price: "$1.99" },
+  { id: "popular", label: "300 coins", price: "$4.99" },
+  { id: "mega", label: "750 coins", price: "$9.99" },
+];
 
 function isAccessBlocked(errorCode) {
   return errorCode === "trial_expired" || errorCode === "subscription_expired" || errorCode === "no_access";
@@ -163,6 +168,8 @@ export default function DexChat() {
   const [gameAnswer, setGameAnswer] = useState("");
   const [gameFeedback, setGameFeedback] = useState("");
   const [gameStats, setGameStats] = useState({ streak: 0, played: 0 });
+  const [shopOpen, setShopOpen] = useState(false);
+  const [shop, setShop] = useState({ coins: 0, owned: {}, equipped: {}, items: [] });
   const [mascotLineIndex, setMascotLineIndex] = useState(0);
   const messagesEndRef = useRef(null);
 
@@ -241,6 +248,13 @@ export default function DexChat() {
 
   useEffect(() => {
     if (!user) return;
+    api.getDexShop()
+      .then(setShop)
+      .catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
     api.getMemory()
       .then(({ memory }) => {
         if (memory && memory.name) {
@@ -284,6 +298,13 @@ export default function DexChat() {
     setGameFeedback("");
     setGameOpen(true);
     setOpen(true);
+  }
+
+  async function loadShop() {
+    if (!user) return;
+    try {
+      setShop(await api.getDexShop());
+    } catch {}
   }
 
   function shuffleGame() {
@@ -331,7 +352,32 @@ export default function DexChat() {
     setGameFeedback(feedback);
     speak(feedback);
     if (correct) {
+      api.rewardDexCoins({ won: true })
+        .then((nextShop) => {
+          setShop(nextShop);
+          showToast(`+${nextShop.awarded || 5} Dex coins`);
+        })
+        .catch(() => {});
       window.setTimeout(() => shuffleGame(), 1300);
+    }
+  }
+
+  async function buyAccessory(itemId) {
+    try {
+      const nextShop = await api.purchaseDexAccessory(itemId);
+      setShop(nextShop);
+      showToast("Dex accessory equipped.");
+    } catch (err) {
+      showToast(err?.message || "Not enough coins yet.");
+    }
+  }
+
+  async function buyCoins(packId) {
+    try {
+      const data = await api.createCoinCheckout(packId);
+      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+    } catch (err) {
+      showToast(err?.message || "Could not open coin checkout.");
     }
   }
 
@@ -465,7 +511,13 @@ export default function DexChat() {
           <span className="dex-robot-antenna" aria-hidden="true" />
           <span className="dex-robot-ear dex-robot-ear-left" aria-hidden="true" />
           <span className="dex-robot-ear dex-robot-ear-right" aria-hidden="true" />
+          {shop.equipped?.hat === "cap" && <span className="dex-accessory dex-hat-cap" aria-hidden="true" />}
+          {shop.equipped?.hat === "crown" && <span className="dex-accessory dex-hat-crown" aria-hidden="true" />}
+          {shop.equipped?.face === "glasses" && <span className="dex-accessory dex-glasses" aria-hidden="true" />}
+          {shop.equipped?.face === "visor" && <span className="dex-accessory dex-visor" aria-hidden="true" />}
           <span className="dex-face relative z-10 text-lg font-bold">{DEX_AVATAR}</span>
+          {shop.equipped?.body === "bowtie" && <span className="dex-accessory dex-bowtie" aria-hidden="true" />}
+          {shop.equipped?.body === "chain" && <span className="dex-accessory dex-chain" aria-hidden="true" />}
           <span className="dex-robot-body" aria-hidden="true">
             <span />
             <span />
@@ -534,6 +586,17 @@ export default function DexChat() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                setShopOpen((prev) => !prev);
+                setOpen(true);
+                loadShop();
+              }}
+              className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
+            >
+              Shop
+            </button>
+            <button
+              type="button"
               onClick={() => speak("Hey, I'm Dex. Tap Talk and ask me anything, or tap Play for a quick game.")}
               className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
             >
@@ -542,6 +605,40 @@ export default function DexChat() {
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {shopOpen && (
+              <div className="rounded-lg border border-brand/40 bg-gray-900 p-3 text-sm text-gray-100">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="font-medium text-white">Dex Shop</p>
+                  <span className="rounded-full bg-brand/20 px-3 py-1 text-xs font-bold text-brand">{shop.coins || 0} coins</span>
+                </div>
+                <div className="mb-3 grid grid-cols-3 gap-2">
+                  {COIN_PACKS.map((pack) => (
+                    <button key={pack.id} type="button" onClick={() => buyCoins(pack.id)} className="rounded-md border border-gray-700 px-2 py-2 text-xs hover:border-brand">
+                      <span className="block font-semibold text-white">{pack.label}</span>
+                      <span className="text-gray-400">{pack.price}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(shop.items || []).map((item) => {
+                    const owned = Boolean(shop.owned?.[item.id]);
+                    const equipped = shop.equipped?.[item.slot] === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => buyAccessory(item.id)}
+                        className={`rounded-md border px-2 py-2 text-left text-xs ${equipped ? "border-brand bg-brand/20" : "border-gray-700 hover:border-brand"}`}
+                      >
+                        <span className="block font-semibold text-white">{item.name}</span>
+                        <span className="text-gray-400">{owned ? (equipped ? "Equipped" : "Equip") : `${item.price} coins`}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {gameOpen && (
               <div className="rounded-lg border border-brand/40 bg-brand/10 p-3 text-sm text-gray-100">
                 <div className="mb-2 flex items-center justify-between gap-3">

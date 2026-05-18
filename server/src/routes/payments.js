@@ -7,6 +7,11 @@ import { sendSubscriptionConfirmation } from "../services/email.js";
 const router = Router();
 const DEFAULT_PRICE_CENTS = parseInt(process.env.DEX_PRICE_CENTS || "999", 10);
 const DEFAULT_CURRENCY = (process.env.DEX_CURRENCY || "usd").toLowerCase();
+const COIN_PACKS = {
+  starter: { coins: 100, amountCents: 199, name: "100 Dex Coins" },
+  popular: { coins: 300, amountCents: 499, name: "300 Dex Coins" },
+  mega: { coins: 750, amountCents: 999, name: "750 Dex Coins" },
+};
 const DEFAULT_SUCCESS_URL =
   process.env.STRIPE_SUCCESS_URL ||
   "https://konvict-artz.com/settings?billing=success";
@@ -111,6 +116,30 @@ async function ensureStripeCustomer(stripe, db, user) {
 
   await db.run("UPDATE users SET stripe_customer_id = ? WHERE id = ?", [customer.id, user.id]);
   return customer.id;
+}
+
+async function ensureMemoryTable(db) {
+  await db.run(
+    `CREATE TABLE IF NOT EXISTS user_memory (
+      user_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT,
+      PRIMARY KEY(user_id, key)
+    )`
+  );
+}
+
+async function addDexCoins(db, userId, amount) {
+  await ensureMemoryTable(db);
+  const row = await db.get("SELECT value FROM user_memory WHERE user_id = ? AND key = 'dex_coins'", [userId]);
+  const current = parseInt(row?.value || "0", 10) || 0;
+  const next = current + amount;
+  await db.run(
+    `INSERT INTO user_memory (user_id, key, value) VALUES (?, 'dex_coins', ?)
+     ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value`,
+    [userId, String(next)]
+  );
+  return next;
 }
 
 async function markAffiliateCredit(db, user) {
@@ -306,6 +335,49 @@ router.post("/subscribe", requireUser, createCheckoutSession);
 // POST /api/payments/checkout-session
 router.post("/checkout-session", requireUser, createCheckoutSession);
 
+router.post("/coins-checkout", requireUser, async (req, res) => {
+  const packId = String(req.body?.packId || "starter");
+  const pack = COIN_PACKS[packId];
+  if (!pack) return res.status(400).json({ error: "invalid_coin_pack", message: "Unknown Dex coin pack." });
+
+  const db = getDb();
+  const user = await db.get("SELECT * FROM users WHERE id = ?", [req.user.id]);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  try {
+    const stripe = getStripe();
+    const customerId = await ensureStripeCustomer(stripe, db, user);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      success_url: `${getSuccessUrl(req)}&coins=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: getCancelUrl(req),
+      customer: customerId,
+      client_reference_id: String(user.id),
+      metadata: {
+        purpose: "dex_coin_pack",
+        user_id: String(user.id),
+        pack_id: packId,
+        coins: String(pack.coins),
+      },
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency: DEFAULT_CURRENCY,
+          unit_amount: pack.amountCents,
+          product_data: {
+            name: pack.name,
+            description: "Coins for Dex accessories",
+          },
+        },
+      }],
+    });
+    return res.json({ success: true, checkoutUrl: session.url, sessionId: session.id });
+  } catch (err) {
+    console.error("Stripe coin checkout error:", err);
+    return res.status(500).json({ error: "coin_checkout_failed", message: err.message || "Could not open coin checkout." });
+  }
+});
+
 // POST /api/payments/portal
 router.post("/portal", requireUser, async (req, res) => {
   const db = getDb();
@@ -361,6 +433,21 @@ router.post("/webhook", async (req, res) => {
         const session = event.data.object;
         const userId = parseInt(session.client_reference_id || session.metadata?.user_id || "0", 10);
         const user = userId ? await db.get("SELECT * FROM users WHERE id = ?", [userId]) : null;
+        if (session.metadata?.purpose === "dex_coin_pack" && user) {
+          const coins = parseInt(session.metadata.coins || "0", 10) || 0;
+          if (coins > 0) await addDexCoins(db, user.id, coins);
+          await upsertPaymentRecord(db, {
+            userId: user.id,
+            paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id,
+            checkoutSessionId: session.id,
+            subscriptionId: null,
+            amountCents: session.amount_total || 0,
+            currency: (session.currency || DEFAULT_CURRENCY).toUpperCase(),
+            status: "completed",
+            affiliateCode: user.referred_by || null,
+          });
+          break;
+        }
         const subscriptionId = typeof session.subscription === "string"
           ? session.subscription
           : session.subscription?.id;

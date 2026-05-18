@@ -62,6 +62,9 @@ export const api = {
   setPreference: (key, value) => request("/dex/preferences", { method: "POST", body: JSON.stringify({ key, value }) }),
   getWorkflows: () => request("/dex/workflows"),
   saveWorkflow: (body) => request("/dex/workflows", { method: "POST", body: JSON.stringify(body) }),
+  getDexShop: () => request("/dex/shop"),
+  rewardDexCoins: (body) => request("/dex/shop/reward", { method: "POST", body: JSON.stringify(body) }),
+  purchaseDexAccessory: (itemId) => request("/dex/shop/purchase", { method: "POST", body: JSON.stringify({ itemId }) }),
 
   // Call Events
   getCallEvents: () => request("/dex/call-events"),
@@ -76,6 +79,7 @@ export const api = {
 
   // Payments
   createCheckoutSession: () => request("/payments/checkout-session", { method: "POST", body: JSON.stringify({}) }),
+  createCoinCheckout: (packId) => request("/payments/coins-checkout", { method: "POST", body: JSON.stringify({ packId }) }),
   subscribe: () => request("/payments/checkout-session", { method: "POST", body: JSON.stringify({}) }),
   openBillingPortal: () => request("/payments/portal", { method: "POST", body: JSON.stringify({}) }),
   getPaymentStatus: () => request("/payments/status"),
