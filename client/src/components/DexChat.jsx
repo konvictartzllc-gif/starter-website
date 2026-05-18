@@ -155,6 +155,83 @@ const SHOP_SLOT_LABELS = {
   cheeks: "Cheeks",
   body: "Body",
 };
+const MEMORY_WORD_SETS = [
+  ["moon", "star", "cloud"],
+  ["river", "peach", "drum"],
+  ["purple", "ticket", "studio"],
+  ["crown", "mirror", "coin"],
+  ["music", "paint", "spark"],
+  ["window", "planet", "button"],
+];
+const SCRAMBLE_WORDS = ["artz", "dex", "music", "paint", "studio", "purple", "canvas", "rhythm"];
+const QUICK_MATH_BUILDERS = [
+  () => {
+    const a = 4 + Math.floor(Math.random() * 14);
+    const b = 3 + Math.floor(Math.random() * 12);
+    return { prompt: `Quick math. What is ${a} + ${b}?`, answer: String(a + b) };
+  },
+  () => {
+    const b = 2 + Math.floor(Math.random() * 7);
+    const answer = 2 + Math.floor(Math.random() * 8);
+    return { prompt: `Quick math. ${b} groups with ${answer} items each equals how many items?`, answer: String(b * answer) };
+  },
+  () => {
+    const b = 2 + Math.floor(Math.random() * 8);
+    const answer = 4 + Math.floor(Math.random() * 9);
+    return { prompt: `Quick math. What is ${answer + b} - ${b}?`, answer: String(answer) };
+  },
+];
+
+function randomItem(items) {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function shuffledLetters(word) {
+  const letters = word.toUpperCase().split("");
+  for (let index = letters.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [letters[index], letters[swapIndex]] = [letters[swapIndex], letters[index]];
+  }
+  return letters.join(" ");
+}
+
+function buildGameRound(type, previous) {
+  const roundType = type || randomItem(GAME_TYPES);
+  if (roundType === "Memory") {
+    let words = randomItem(MEMORY_WORD_SETS);
+    if (previous?.type === "Memory" && MEMORY_WORD_SETS.length > 1) {
+      while (words.join(" ") === previous.answer) words = randomItem(MEMORY_WORD_SETS);
+    }
+    return {
+      type: "Memory",
+      prompt: "Memory round. Study these words, then they will hide.",
+      answer: words.join(" "),
+      reply: "Nice. You kept the pattern together.",
+      memoryWords: words,
+    };
+  }
+  if (roundType === "Quick Math") {
+    const next = randomItem(QUICK_MATH_BUILDERS)();
+    return { type: "Quick Math", ...next, reply: "Sharp. You solved that one." };
+  }
+  if (roundType === "Guess") {
+    const answer = String(1 + Math.floor(Math.random() * 5));
+    return { type: "Guess", prompt: "Guess my number from 1 to 5.", answer, reply: `You got it. Dex picked ${answer}.` };
+  }
+  if (roundType === "Word Scramble") {
+    let answer = randomItem(SCRAMBLE_WORDS);
+    if (previous?.type === "Word Scramble" && SCRAMBLE_WORDS.length > 1) {
+      while (answer === previous.answer) answer = randomItem(SCRAMBLE_WORDS);
+    }
+    return { type: "Word Scramble", prompt: `Unscramble this word: ${shuffledLetters(answer)}`, answer, reply: "Nice. You found it." };
+  }
+  const options = GAME_PROMPTS.filter((game) => game.type === roundType);
+  let next = randomItem(options.length ? options : GAME_PROMPTS);
+  if (options.length > 1) {
+    while (next.prompt === previous?.prompt) next = randomItem(options);
+  }
+  return next;
+}
 
 function isAccessBlocked(errorCode) {
   return errorCode === "trial_expired" || errorCode === "subscription_expired" || errorCode === "no_access";
@@ -174,14 +251,16 @@ export default function DexChat() {
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [wakeEnabled, setWakeEnabled] = useState(false);
   const [gameOpen, setGameOpen] = useState(false);
-  const [gamePrompt, setGamePrompt] = useState(GAME_PROMPTS[0]);
+  const [gamePrompt, setGamePrompt] = useState(() => buildGameRound("Riddle"));
   const [gameAnswer, setGameAnswer] = useState("");
   const [gameFeedback, setGameFeedback] = useState("");
   const [gameStats, setGameStats] = useState({ streak: 0, played: 0 });
+  const [memoryVisible, setMemoryVisible] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
   const [shop, setShop] = useState({ coins: 0, owned: {}, equipped: {}, items: [] });
   const [mascotLineIndex, setMascotLineIndex] = useState(0);
   const messagesEndRef = useRef(null);
+  const memoryTimerRef = useRef(null);
 
   const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking, sleep } = useDexVoice({
     enabled: wakeEnabled,
@@ -283,6 +362,8 @@ export default function DexChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, open, accessError]);
 
+  useEffect(() => () => window.clearTimeout(memoryTimerRef.current), []);
+
   useEffect(() => {
     if (open || toast) return;
     const interval = window.setInterval(() => {
@@ -302,14 +383,21 @@ export default function DexChat() {
     showToast.sleepHintTimeoutId = null;
   }
 
-  function pickGame(type) {
-    const options = type ? GAME_PROMPTS.filter((game) => game.type === type) : GAME_PROMPTS;
-    const next = options[Math.floor(Math.random() * options.length)] || GAME_PROMPTS[0];
+  function startGameRound(next) {
+    window.clearTimeout(memoryTimerRef.current);
     setGamePrompt(next);
     setGameAnswer("");
     setGameFeedback("");
+    setMemoryVisible(Boolean(next.memoryWords));
     setGameOpen(true);
     setOpen(true);
+    if (next.memoryWords) {
+      memoryTimerRef.current = window.setTimeout(() => setMemoryVisible(false), 3200);
+    }
+  }
+
+  function pickGame(type) {
+    startGameRound(buildGameRound(type, gamePrompt));
   }
 
   async function loadShop() {
@@ -320,18 +408,7 @@ export default function DexChat() {
   }
 
   function shuffleGame() {
-    const currentIndex = GAME_PROMPTS.indexOf(gamePrompt);
-    let next = GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)] || GAME_PROMPTS[0];
-    if (GAME_PROMPTS.length > 1) {
-      while (GAME_PROMPTS.indexOf(next) === currentIndex) {
-        next = GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)] || GAME_PROMPTS[0];
-      }
-    }
-    setGamePrompt(next);
-    setGameAnswer("");
-    setGameFeedback("");
-    setGameOpen(true);
-    setOpen(true);
+    startGameRound(buildGameRound(null, gamePrompt));
   }
 
   function enableWakeMode() {
@@ -344,6 +421,7 @@ export default function DexChat() {
 
   function submitGameAnswer(e) {
     e.preventDefault();
+    if (gameFeedback || memoryVisible) return;
     const answer = gameAnswer.trim().toLowerCase();
     if (!answer && gamePrompt.answer) return;
     const correct =
@@ -370,8 +448,8 @@ export default function DexChat() {
           showToast(`+${nextShop.awarded || 5} Dex coins`);
         })
         .catch(() => {});
-      window.setTimeout(() => shuffleGame(), 1300);
     }
+    window.setTimeout(() => startGameRound(buildGameRound(gamePrompt.type, gamePrompt)), correct ? 1500 : 2100);
   }
 
   async function buyAccessory(itemId) {
@@ -698,15 +776,26 @@ export default function DexChat() {
                   ))}
                 </div>
                 <p className="text-gray-200">{gamePrompt.prompt}</p>
+                {gamePrompt.memoryWords && (
+                  <div className="mt-3 rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-center">
+                    {memoryVisible ? (
+                      <p className="text-lg font-bold tracking-wide text-white">{gamePrompt.memoryWords.join("  |  ")}</p>
+                    ) : (
+                      <p className="text-sm text-gray-300">Words hidden. Type what you remember.</p>
+                    )}
+                  </div>
+                )}
                 <form onSubmit={submitGameAnswer} className="mt-3 flex gap-2">
                   <input
                     value={gameAnswer}
                     onChange={(e) => setGameAnswer(e.target.value)}
-                    placeholder={gamePrompt.answer ? "Your answer..." : "Your choice..."}
+                    disabled={memoryVisible || Boolean(gameFeedback)}
+                    placeholder={memoryVisible ? "Study first..." : gamePrompt.answer ? "Your answer..." : "Your choice..."}
                     className="min-w-0 flex-1 rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:border-brand"
                   />
                   <button
                     type="submit"
+                    disabled={memoryVisible || Boolean(gameFeedback)}
                     className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-light"
                   >
                     Answer
