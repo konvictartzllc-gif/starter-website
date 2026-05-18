@@ -1414,10 +1414,10 @@ async function getShopState(db, userId) {
 
 function defaultDexColors() {
         return {
-                bodyPrimary: "#7c3aed",
-                bodySecondary: "#4c1d95",
-                face: "#8b5cf6",
-                accent: "#ffffff",
+                bodyPrimary: "#dbeafe",
+                bodySecondary: "#8b5cf6",
+                face: "#070817",
+                accent: "#a78bfa",
                 hatPrimary: "#22d3ee",
                 hatSecondary: "#facc15",
         };

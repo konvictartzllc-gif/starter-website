@@ -156,10 +156,10 @@ const SHOP_SLOT_LABELS = {
   body: "Body",
 };
 const DEFAULT_DEX_COLORS = {
-  bodyPrimary: "#7c3aed",
-  bodySecondary: "#4c1d95",
-  face: "#8b5cf6",
-  accent: "#ffffff",
+  bodyPrimary: "#dbeafe",
+  bodySecondary: "#8b5cf6",
+  face: "#070817",
+  accent: "#a78bfa",
   hatPrimary: "#22d3ee",
   hatSecondary: "#facc15",
 };
@@ -651,6 +651,7 @@ export default function DexChat() {
           {shop.equipped?.face === "glasses" && <span className="dex-accessory dex-glasses" aria-hidden="true" />}
           {shop.equipped?.face === "visor" && <span className="dex-accessory dex-visor" aria-hidden="true" />}
           <span className="dex-face relative z-10 text-lg font-bold">{DEX_AVATAR}</span>
+          <span className="dex-default-smile" aria-hidden="true" />
           {shop.equipped?.mouth === "smile" && <span className="dex-accessory dex-mouth-smile" aria-hidden="true" />}
           {shop.equipped?.mouth === "cool" && <span className="dex-accessory dex-mouth-cool" aria-hidden="true" />}
           {shop.equipped?.cheeks === "blush" && <span className="dex-accessory dex-cheeks-blush" aria-hidden="true" />}
