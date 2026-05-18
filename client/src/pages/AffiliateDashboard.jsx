@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { api } from "../utils/api.js";
 import { useAuth } from "../hooks/useAuth.jsx";
+import AssistantHub from "../components/AssistantHub.jsx";
+import CommunicationsCenter from "../components/CommunicationsCenter.jsx";
+import LearningHub from "../components/LearningHub.jsx";
+import Permissions from "../components/Permissions.jsx";
+import Preferences from "../components/Preferences.jsx";
 
 export default function AffiliateDashboard() {
   const { user } = useAuth();
@@ -45,9 +50,9 @@ export default function AffiliateDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-6">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold mb-1">Affiliate Dashboard</h1>
-        <p className="text-gray-400 text-sm mb-6">Welcome back, {user.name || user.email}!</p>
+        <p className="text-gray-400 text-sm mb-6">Welcome back, {user.name || user.email}! Your affiliate account includes Dex access and learning tools.</p>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
@@ -95,9 +100,30 @@ export default function AffiliateDashboard() {
           </ol>
         </div>
 
-        {/* Recent Signups */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <section className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+            <AssistantHub />
+          </section>
+          <section className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+            <CommunicationsCenter />
+          </section>
+        </div>
+
+        <section className="mt-6 bg-gray-900 border border-gray-800 rounded-lg p-5">
+          <LearningHub />
+        </section>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <section className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+            <Permissions />
+          </section>
+          <section className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+            <Preferences />
+          </section>
+        </div>
+
         {data.recentSignups?.length > 0 && (
-          <div>
+          <div className="mt-6">
             <h3 className="font-bold mb-3">Recent Signups</h3>
             <div className="space-y-2">
               {data.recentSignups.map((s, i) => (
