@@ -116,9 +116,6 @@ export default function DexChat() {
   const [gameFeedback, setGameFeedback] = useState("");
   const [mascotLineIndex, setMascotLineIndex] = useState(0);
   const messagesEndRef = useRef(null);
-  const mascotLine =
-    toast ||
-    (loading ? "Thinking..." : status === "speaking" ? "Talking..." : status === "active" ? "I'm listening." : MASCOT_LINES[mascotLineIndex]);
 
   const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking, sleep } = useDexVoice({
     enabled: wakeEnabled,
@@ -150,6 +147,9 @@ export default function DexChat() {
       }, 7200);
     },
   });
+  const mascotLine =
+    toast ||
+    (loading ? "Thinking..." : status === "speaking" ? "Talking..." : status === "active" ? "I'm listening." : MASCOT_LINES[mascotLineIndex]);
 
   useEffect(() => {
     if (!user) return;
