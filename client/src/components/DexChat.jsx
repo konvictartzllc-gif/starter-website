@@ -5,6 +5,12 @@ import { useDexVoice } from "../hooks/useDexVoice.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 
 const DEX_AVATAR = "D";
+const MASCOT_LINES = [
+  "Say Hey Dex",
+  "Need help?",
+  "I can teach, plan, or play.",
+  "Tap me anytime.",
+];
 const GAME_PROMPTS = [
   {
     type: "Riddle",
@@ -108,7 +114,11 @@ export default function DexChat() {
   const [gamePrompt, setGamePrompt] = useState(GAME_PROMPTS[0]);
   const [gameAnswer, setGameAnswer] = useState("");
   const [gameFeedback, setGameFeedback] = useState("");
+  const [mascotLineIndex, setMascotLineIndex] = useState(0);
   const messagesEndRef = useRef(null);
+  const mascotLine =
+    toast ||
+    (loading ? "Thinking..." : status === "speaking" ? "Talking..." : status === "active" ? "I'm listening." : MASCOT_LINES[mascotLineIndex]);
 
   const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking, sleep } = useDexVoice({
     enabled: wakeEnabled,
@@ -197,6 +207,14 @@ export default function DexChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, open, accessError]);
+
+  useEffect(() => {
+    if (open || toast) return;
+    const interval = window.setInterval(() => {
+      setMascotLineIndex((index) => (index + 1) % MASCOT_LINES.length);
+    }, 5200);
+    return () => window.clearInterval(interval);
+  }, [open, toast]);
 
   function showToast(msg) {
     setToast(msg);
@@ -360,17 +378,27 @@ export default function DexChat() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className={`dex-companion fixed bottom-5 right-5 z-40 h-16 w-16 rounded-full bg-brand text-white shadow-lg hover:bg-brand-light transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
-        aria-label={open ? "Close Dex chat" : "Open Dex chat"}
-      >
-        <span className="dex-face relative z-10 text-lg font-bold">{DEX_AVATAR}</span>
-      </button>
+      <div className="dex-mascot fixed bottom-5 right-5 z-40">
+        <div className="dex-mascot-bubble" aria-live="polite">{mascotLine}</div>
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          className={`dex-companion dex-robot-button text-white shadow-lg transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
+          aria-label={open ? "Close Dex chat" : "Open Dex chat"}
+        >
+          <span className="dex-robot-antenna" aria-hidden="true" />
+          <span className="dex-robot-ear dex-robot-ear-left" aria-hidden="true" />
+          <span className="dex-robot-ear dex-robot-ear-right" aria-hidden="true" />
+          <span className="dex-face relative z-10 text-lg font-bold">{DEX_AVATAR}</span>
+          <span className="dex-robot-body" aria-hidden="true">
+            <span />
+            <span />
+          </span>
+        </button>
+      </div>
 
       {toast && (
-        <div className="fixed bottom-24 right-5 z-40 max-w-xs rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 shadow-lg">
+        <div className="fixed bottom-32 right-5 z-40 max-w-xs rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 shadow-lg">
           {toast}
         </div>
       )}
