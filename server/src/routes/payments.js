@@ -52,16 +52,6 @@ function getCancelUrl(req) {
   return DEFAULT_CANCEL_URL.replace(/^https?:\/\/[^/]+/i, siteUrl);
 }
 
-function trialDaysForUser(user) {
-  if (!user?.trial_start) return 0;
-  const trialStart = new Date(user.trial_start);
-  const trialEnd = new Date(trialStart);
-  trialEnd.setDate(trialEnd.getDate() + 3);
-  const remainingMs = trialEnd.getTime() - Date.now();
-  if (remainingMs <= 0) return 0;
-  return Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
-}
-
 async function resolveBillingAccess(db, userId) {
   const user = await db.get(
     "SELECT access_type, trial_start, sub_expires, stripe_customer_id, stripe_subscription_id, role FROM users WHERE id = ?",
@@ -248,8 +238,6 @@ async function createCheckoutSession(req, res) {
     const stripe = getStripe();
     const customerId = await ensureStripeCustomer(stripe, db, user);
     const priceId = (process.env.STRIPE_PRICE_ID || "").trim();
-    const trialDays = trialDaysForUser(user);
-
     const sessionPayload = {
       mode: "subscription",
       success_url: `${getSuccessUrl(req)}&session_id={CHECKOUT_SESSION_ID}`,
@@ -266,10 +254,6 @@ async function createCheckoutSession(req, res) {
         },
       },
     };
-
-    if (trialDays > 0) {
-      sessionPayload.subscription_data.trial_period_days = trialDays;
-    }
 
     if (priceId) {
       sessionPayload.line_items = [{ price: priceId, quantity: 1 }];
