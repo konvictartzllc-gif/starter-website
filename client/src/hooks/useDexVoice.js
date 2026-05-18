@@ -14,6 +14,8 @@ const WAKE_VARIANTS = [
   "hi text",
 ];
 const VOICE_STORAGE_KEY = "dex_voice_name";
+const CONVERSATION_IDLE_MS = 12000;
+const SLEEP_GRACE_MS = 7000;
 
 function normalizeTranscript(value) {
   return String(value || "")
@@ -27,7 +29,7 @@ function findWakeVariant(transcript) {
   return WAKE_VARIANTS.find((variant) => transcript.includes(variant)) || "";
 }
 
-export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
+export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = true, stayAwake = false }) {
   const [status, setStatus] = useState("idle"); // idle | listening | active | speaking
   const [isSupported, setIsSupported] = useState(false);
   const [lastHeard, setLastHeard] = useState("");
@@ -36,17 +38,23 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
   const listeningForCommandRef = useRef(false);
   const wakeTimeoutRef = useRef(null);
   const commandTimeoutRef = useRef(null);
+  const conversationTimeoutRef = useRef(null);
+  const sleepTimeoutRef = useRef(null);
   const pendingCommandRef = useRef("");
+  const conversationActiveRef = useRef(false);
+  const idlePromptActiveRef = useRef(false);
   const synthRef = useRef(window.speechSynthesis);
   const isSpeakingRef = useRef(false);
   const lastCommandRef = useRef({ text: "", at: 0 });
   const onWakeWordRef = useRef(onWakeWord);
   const onTranscriptRef = useRef(onTranscript);
+  const onIdlePromptRef = useRef(onIdlePrompt);
 
   useEffect(() => {
     onWakeWordRef.current = onWakeWord;
     onTranscriptRef.current = onTranscript;
-  }, [onWakeWord, onTranscript]);
+    onIdlePromptRef.current = onIdlePrompt;
+  }, [onWakeWord, onTranscript, onIdlePrompt]);
 
   const clearWakeTimeout = useCallback(() => {
     if (wakeTimeoutRef.current) {
@@ -61,6 +69,33 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
       commandTimeoutRef.current = null;
     }
   }, []);
+
+  const clearConversationTimers = useCallback(() => {
+    if (conversationTimeoutRef.current) {
+      clearTimeout(conversationTimeoutRef.current);
+      conversationTimeoutRef.current = null;
+    }
+    if (sleepTimeoutRef.current) {
+      clearTimeout(sleepTimeoutRef.current);
+      sleepTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleIdlePrompt = useCallback(() => {
+    clearConversationTimers();
+    if (!stayAwake || !conversationActiveRef.current) return;
+    conversationTimeoutRef.current = setTimeout(() => {
+      idlePromptActiveRef.current = true;
+      onIdlePromptRef.current?.();
+      sleepTimeoutRef.current = setTimeout(() => {
+        idlePromptActiveRef.current = false;
+        conversationActiveRef.current = false;
+        listeningForCommandRef.current = false;
+        pendingCommandRef.current = "";
+        setStatus("listening");
+      }, SLEEP_GRACE_MS);
+    }, CONVERSATION_IDLE_MS);
+  }, [clearConversationTimers, stayAwake]);
 
   const shouldIgnoreCommand = useCallback((command) => {
     const now = Date.now();
@@ -77,11 +112,14 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     if (cleaned.length <= 2 || shouldIgnoreCommand(cleaned)) return;
     clearWakeTimeout();
     clearCommandTimeout();
+    clearConversationTimers();
     pendingCommandRef.current = "";
-    listeningForCommandRef.current = false;
+    conversationActiveRef.current = stayAwake;
+    idlePromptActiveRef.current = false;
+    listeningForCommandRef.current = stayAwake;
     setStatus("listening");
     onTranscriptRef.current?.(cleaned);
-  }, [clearCommandTimeout, clearWakeTimeout, shouldIgnoreCommand]);
+  }, [clearCommandTimeout, clearConversationTimers, clearWakeTimeout, shouldIgnoreCommand, stayAwake]);
 
   useEffect(() => {
     synthRef.current = window.speechSynthesis;
@@ -107,12 +145,15 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
       const transcript = normalizeTranscript(lastResult[0].transcript);
       if (transcript) setLastHeard(transcript);
 
-      if (!listeningForCommandRef.current) {
+      if (!listeningForCommandRef.current && !conversationActiveRef.current) {
         // Listening for wake word
         const wakeVariant = findWakeVariant(transcript);
         if (wakeVariant) {
           const spokenCommand = transcript.replace(wakeVariant, "").trim();
           listeningForCommandRef.current = true;
+          conversationActiveRef.current = stayAwake;
+          idlePromptActiveRef.current = false;
+          clearConversationTimers();
           setStatus("active");
           onWakeWordRef.current?.({ transcript, spokenCommand });
 
@@ -130,7 +171,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
           // Reset after 10 seconds if no command
           clearWakeTimeout();
           wakeTimeoutRef.current = setTimeout(() => {
-            listeningForCommandRef.current = false;
+            listeningForCommandRef.current = stayAwake && conversationActiveRef.current;
             setStatus("listening");
           }, 10000);
         }
@@ -140,6 +181,7 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
         const wakeVariant = findWakeVariant(transcript);
         const command = wakeVariant ? transcript.replace(wakeVariant, "").trim() : transcript;
         if (command.length > 2) {
+          clearConversationTimers();
           pendingCommandRef.current = command;
           clearCommandTimeout();
           commandTimeoutRef.current = setTimeout(() => {
@@ -179,13 +221,16 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     return () => {
       clearWakeTimeout();
       clearCommandTimeout();
+      clearConversationTimers();
       pendingCommandRef.current = "";
+      conversationActiveRef.current = false;
+      idlePromptActiveRef.current = false;
       listeningForCommandRef.current = false;
       try { recognition.stop(); } catch {}
       recognitionRef.current = null;
       setStatus("idle");
     };
-  }, [enabled, clearWakeTimeout, clearCommandTimeout, submitCommand]);
+  }, [enabled, clearWakeTimeout, clearCommandTimeout, clearConversationTimers, submitCommand, stayAwake]);
 
   const speak = useCallback((text) => {
     const synth = synthRef.current;
@@ -219,6 +264,9 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
         isSpeakingRef.current = false;
         setStatus("listening");
         try { recognitionRef.current?.start(); } catch {}
+        if (conversationActiveRef.current && !idlePromptActiveRef.current) {
+          scheduleIdlePrompt();
+        }
       };
       utterance.onend = resumeListening;
       utterance.onerror = resumeListening;
@@ -233,16 +281,31 @@ export function useDexVoice({ onWakeWord, onTranscript, enabled = true }) {
     } else {
       speakNow();
     }
-  }, []);
+  }, [clearWakeTimeout, scheduleIdlePrompt]);
 
   const stopSpeaking = useCallback(() => {
     const synth = synthRef.current;
     if (!synth) return;
     synth.cancel();
+    clearConversationTimers();
+    conversationActiveRef.current = false;
+    idlePromptActiveRef.current = false;
+    listeningForCommandRef.current = false;
     isSpeakingRef.current = false;
     setStatus("listening");
     try { recognitionRef.current?.start(); } catch {}
-  }, [clearWakeTimeout]);
+  }, [clearConversationTimers]);
 
-  return { status, isSupported, lastHeard, error, speak, stopSpeaking };
+  const sleep = useCallback(() => {
+    clearWakeTimeout();
+    clearCommandTimeout();
+    clearConversationTimers();
+    pendingCommandRef.current = "";
+    conversationActiveRef.current = false;
+    idlePromptActiveRef.current = false;
+    listeningForCommandRef.current = false;
+    setStatus(enabled ? "listening" : "idle");
+  }, [clearCommandTimeout, clearConversationTimers, clearWakeTimeout, enabled]);
+
+  return { status, isSupported, lastHeard, error, speak, stopSpeaking, sleep };
 }

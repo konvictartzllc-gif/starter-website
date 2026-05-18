@@ -110,9 +110,11 @@ export default function DexChat() {
   const [gameFeedback, setGameFeedback] = useState("");
   const messagesEndRef = useRef(null);
 
-  const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking } = useDexVoice({
+  const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking, sleep } = useDexVoice({
     enabled: wakeEnabled,
+    stayAwake: true,
     onWakeWord: ({ spokenCommand } = {}) => {
+      clearSleepHint();
       setOpen(true);
       if (spokenCommand?.trim()) {
         showToast(`Heard: ${spokenCommand}`);
@@ -123,8 +125,19 @@ export default function DexChat() {
       speak(wakeReply);
     },
     onTranscript: (text) => {
+      clearSleepHint();
       setOpen(true);
       sendMessage(text);
+    },
+    onIdlePrompt: () => {
+      const message = "I'm still here. Anything else?";
+      showToast(message);
+      speak(message);
+      window.clearTimeout(showToast.sleepHintTimeoutId);
+      showToast.sleepHintTimeoutId = window.setTimeout(() => {
+        sleep();
+        showToast("Dex is back to wake mode. Say Hey Dex when you need me.");
+      }, 7200);
     },
   });
 
@@ -191,6 +204,11 @@ export default function DexChat() {
     showToast.timeoutId = window.setTimeout(() => setToast(""), 3000);
   }
 
+  function clearSleepHint() {
+    window.clearTimeout(showToast.sleepHintTimeoutId);
+    showToast.sleepHintTimeoutId = null;
+  }
+
   function pickGame(type) {
     const options = type ? GAME_PROMPTS.filter((game) => game.type === type) : GAME_PROMPTS;
     const next = options[Math.floor(Math.random() * options.length)] || GAME_PROMPTS[0];
@@ -204,7 +222,7 @@ export default function DexChat() {
   function enableWakeMode() {
     setWakeEnabled(true);
     setOpen(true);
-    const message = "Wake mode is on. Say Hey Dex, then tell me what you need.";
+    const message = "Wake mode is on. Say Hey Dex once, then keep talking naturally.";
     showToast(message);
     speak(message);
   }
