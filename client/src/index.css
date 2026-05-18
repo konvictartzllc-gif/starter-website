@@ -37,7 +37,7 @@
 }
 
 .dex-mascot-roam {
-  animation: dex-roam 9s ease-in-out infinite;
+  animation: dex-roam 22s ease-in-out infinite;
 }
 
 .dex-mascot .dex-companion,
@@ -179,9 +179,12 @@
 
 @keyframes dex-roam {
   0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  20% { transform: translate(-1.1rem, -0.35rem) rotate(-2deg); }
-  45% { transform: translate(-2.35rem, 0.2rem) rotate(2deg); }
-  70% { transform: translate(-0.85rem, -0.75rem) rotate(-1deg); }
+  14% { transform: translate(-12vw, -8vh) rotate(-4deg); }
+  28% { transform: translate(-27vw, -2vh) rotate(3deg); }
+  42% { transform: translate(-38vw, -15vh) rotate(-2deg); }
+  56% { transform: translate(-24vw, -28vh) rotate(4deg); }
+  72% { transform: translate(-8vw, -20vh) rotate(-3deg); }
+  86% { transform: translate(-18vw, -6vh) rotate(2deg); }
 }
 
 @keyframes dex-bubble-in {
@@ -190,6 +193,10 @@
 }
 
 @media (max-width: 640px) {
+  .dex-mascot-roam {
+    animation: dex-roam-mobile 18s ease-in-out infinite;
+  }
+
   .dex-mascot-bubble {
     right: 0;
     bottom: 6rem;
@@ -201,6 +208,14 @@
     border: 0;
     border-bottom: 1px solid rgba(139, 92, 246, 0.45);
     border-right: 1px solid rgba(139, 92, 246, 0.45);
+  }
+
+  @keyframes dex-roam-mobile {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    20% { transform: translate(-20vw, -6vh) rotate(-3deg); }
+    40% { transform: translate(-44vw, -13vh) rotate(3deg); }
+    60% { transform: translate(-26vw, -24vh) rotate(-2deg); }
+    80% { transform: translate(-8vw, -15vh) rotate(2deg); }
   }
 }
 
