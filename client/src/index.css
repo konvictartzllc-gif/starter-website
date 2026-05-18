@@ -36,6 +36,10 @@
   pointer-events: none;
 }
 
+.dex-mascot-roam {
+  animation: dex-roam 9s ease-in-out infinite;
+}
+
 .dex-mascot .dex-companion,
 .dex-mascot-bubble {
   pointer-events: auto;
@@ -171,6 +175,13 @@
 @keyframes dex-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
+}
+
+@keyframes dex-roam {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  20% { transform: translate(-1.1rem, -0.35rem) rotate(-2deg); }
+  45% { transform: translate(-2.35rem, 0.2rem) rotate(2deg); }
+  70% { transform: translate(-0.85rem, -0.75rem) rotate(-1deg); }
 }
 
 @keyframes dex-bubble-in {

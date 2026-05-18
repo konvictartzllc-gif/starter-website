@@ -90,8 +90,56 @@ const GAME_PROMPTS = [
     answer: "3",
     reply: "You got it. Dex picked 3.",
   },
+  {
+    type: "Quick Math",
+    prompt: "Quick math. What is 8 + 7?",
+    answer: "15",
+    reply: "Sharp. Fifteen it is.",
+  },
+  {
+    type: "Quick Math",
+    prompt: "Quick math. If you have 3 orders and each has 4 items, how many items is that?",
+    answer: "12",
+    reply: "Correct. Twelve items. Clean count.",
+  },
+  {
+    type: "Word Scramble",
+    prompt: "Unscramble this word: T R A Z",
+    answer: "artz",
+    reply: "Nice. Artz was hiding in plain sight.",
+  },
+  {
+    type: "Word Scramble",
+    prompt: "Unscramble this word: X E D",
+    answer: "dex",
+    reply: "Exactly. Dex knows his own name.",
+  },
+  {
+    type: "This or That",
+    prompt: "This or That: studio session or live show?",
+    answer: "",
+    reply: "That choice has a whole personality.",
+  },
+  {
+    type: "This or That",
+    prompt: "This or That: build the plan first or freestyle and adjust?",
+    answer: "",
+    reply: "I can work with that mode.",
+  },
+  {
+    type: "Mini Challenge",
+    prompt: "Mini challenge: type one goal you want done today in 5 words or less.",
+    answer: "",
+    reply: "Locked in. Small goal, real momentum.",
+  },
+  {
+    type: "Mini Challenge",
+    prompt: "Mini challenge: name one thing you are grateful for today.",
+    answer: "",
+    reply: "Good. That keeps the day grounded.",
+  },
 ];
-const GAME_TYPES = ["Riddle", "Trivia", "Memory", "Would You Rather", "Guess"];
+const GAME_TYPES = ["Riddle", "Trivia", "Memory", "Would You Rather", "Guess", "Quick Math", "Word Scramble", "This or That", "Mini Challenge"];
 
 function isAccessBlocked(errorCode) {
   return errorCode === "trial_expired" || errorCode === "subscription_expired" || errorCode === "no_access";
@@ -114,6 +162,7 @@ export default function DexChat() {
   const [gamePrompt, setGamePrompt] = useState(GAME_PROMPTS[0]);
   const [gameAnswer, setGameAnswer] = useState("");
   const [gameFeedback, setGameFeedback] = useState("");
+  const [gameStats, setGameStats] = useState({ streak: 0, played: 0 });
   const [mascotLineIndex, setMascotLineIndex] = useState(0);
   const messagesEndRef = useRef(null);
 
@@ -237,6 +286,21 @@ export default function DexChat() {
     setOpen(true);
   }
 
+  function shuffleGame() {
+    const currentIndex = GAME_PROMPTS.indexOf(gamePrompt);
+    let next = GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)] || GAME_PROMPTS[0];
+    if (GAME_PROMPTS.length > 1) {
+      while (GAME_PROMPTS.indexOf(next) === currentIndex) {
+        next = GAME_PROMPTS[Math.floor(Math.random() * GAME_PROMPTS.length)] || GAME_PROMPTS[0];
+      }
+    }
+    setGamePrompt(next);
+    setGameAnswer("");
+    setGameFeedback("");
+    setGameOpen(true);
+    setOpen(true);
+  }
+
   function enableWakeMode() {
     setWakeEnabled(true);
     setOpen(true);
@@ -254,9 +318,21 @@ export default function DexChat() {
       answer.includes(gamePrompt.answer) ||
       gamePrompt.answer.split(" ").every((token) => answer.includes(token)) ||
       (gamePrompt.answer === "six" && answer.includes("6"));
-    const feedback = correct ? gamePrompt.reply : `Good try. I was looking for: ${gamePrompt.answer}.`;
+    setGameStats((prev) => ({
+      played: prev.played + 1,
+      streak: correct ? prev.streak + 1 : 0,
+    }));
+    const nextStreak = correct ? gameStats.streak + 1 : 0;
+    const feedback = correct
+      ? `${gamePrompt.reply} Streak: ${nextStreak}.`
+      : gamePrompt.answer
+        ? `Good try. I was looking for: ${gamePrompt.answer}. Streak reset, but we run it back.`
+        : gamePrompt.reply;
     setGameFeedback(feedback);
     speak(feedback);
+    if (correct) {
+      window.setTimeout(() => shuffleGame(), 1300);
+    }
   }
 
   function startVoiceCommand() {
@@ -378,7 +454,7 @@ export default function DexChat() {
 
   return (
     <>
-      <div className="dex-mascot fixed bottom-5 right-5 z-40">
+      <div className={`dex-mascot fixed bottom-5 right-5 z-40 ${open ? "" : "dex-mascot-roam"}`}>
         <div className="dex-mascot-bubble" aria-live="polite">{mascotLine}</div>
         <button
           type="button"
@@ -469,14 +545,26 @@ export default function DexChat() {
             {gameOpen && (
               <div className="rounded-lg border border-brand/40 bg-brand/10 p-3 text-sm text-gray-100">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="font-medium text-white">Dex Game: {gamePrompt.type}</p>
-                  <button
-                    type="button"
-                    onClick={() => pickGame(gamePrompt.type)}
-                    className="text-xs text-brand hover:text-brand-light"
-                  >
-                    New
-                  </button>
+                  <div>
+                    <p className="font-medium text-white">Dex Game: {gamePrompt.type}</p>
+                    <p className="text-xs text-gray-400">Played {gameStats.played} • Streak {gameStats.streak}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={shuffleGame}
+                      className="text-xs text-brand hover:text-brand-light"
+                    >
+                      Shuffle
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => pickGame(gamePrompt.type)}
+                      className="text-xs text-brand hover:text-brand-light"
+                    >
+                      New
+                    </button>
+                  </div>
                 </div>
                 <div className="mb-3 flex flex-wrap gap-2">
                   {GAME_TYPES.map((type) => (
