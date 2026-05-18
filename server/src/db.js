@@ -18,12 +18,27 @@
   }
 
   export async function initDb({ dbPath, adminUsername, adminPassword }) {
-    const dbDir = path.dirname(dbPath);
+    let resolvedDbPath = dbPath;
+    let dbDir = path.dirname(resolvedDbPath);
     if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
+      try {
+        fs.mkdirSync(dbDir, { recursive: true });
+      } catch (err) {
+        if (process.env.NODE_ENV === "production" && resolvedDbPath.startsWith("/data/")) {
+          resolvedDbPath = path.join(process.cwd(), "data", "konvict.db");
+          dbDir = path.dirname(resolvedDbPath);
+          fs.mkdirSync(dbDir, { recursive: true });
+          console.warn(
+            `Persistent DB path ${dbPath} is not writable yet (${err.code || err.message}). ` +
+            `Using temporary DB path ${resolvedDbPath}. Upgrade Render and mount /data before launch.`
+          );
+        } else {
+          throw err;
+        }
+      }
     }
 
-    db = await open({ filename: dbPath, driver: sqlite3.Database });
+    db = await open({ filename: resolvedDbPath, driver: sqlite3.Database });
     await db.exec("PRAGMA journal_mode = WAL;");
     await db.exec("PRAGMA foreign_keys = ON;");
 
