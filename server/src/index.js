@@ -216,6 +216,12 @@ async function start() {
   const adminUsername = process.env.ADMIN_EMAIL?.trim();
   const adminPassword = process.env.ADMIN_PASSWORD?.trim();
 
+  if (process.env.NODE_ENV === "production" && !dbPath.startsWith("/data/")) {
+    throw new Error(
+      `Production DB_PATH must point to the persistent Render disk at /data. Current DB_PATH: ${dbPath}`
+    );
+  }
+
   if (!adminUsername || !adminPassword) {
     throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be configured before Dex can start.");
   }
