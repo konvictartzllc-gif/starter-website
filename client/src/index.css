@@ -184,13 +184,17 @@
 }
 
 .dex-hat-cap {
-  top: 0.42rem;
-  left: 1.1rem;
-  width: 2.3rem;
-  height: 0.72rem;
-  border-radius: 0.65rem 0.65rem 0.25rem 0.25rem;
-  background: #a78bfa;
-  box-shadow: 0.95rem 0.18rem 0 -0.18rem #c4b5fd;
+  top: 0.32rem;
+  left: 0.96rem;
+  width: 2.45rem;
+  height: 0.84rem;
+  border: 2px solid #0f172a;
+  border-radius: 0.8rem 0.8rem 0.28rem 0.28rem;
+  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 58%, #facc15 58%, #fde047 100%);
+  box-shadow:
+    0.98rem 0.23rem 0 -0.12rem #facc15,
+    0.98rem 0.23rem 0 0.02rem #0f172a,
+    0 0.16rem 0 rgba(15, 23, 42, 0.35);
 }
 
 .dex-hat-crown {
