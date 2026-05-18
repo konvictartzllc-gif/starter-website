@@ -183,6 +183,7 @@ app.get("/api/diagnostics/providers", (req, res) => {
     environment: {
       nodeEnv: process.env.NODE_ENV || "development",
       port: PORT,
+      dbPath: process.env.DB_PATH || path.join(__dirname, "../../data/konvict.db"),
     },
   });
 });
