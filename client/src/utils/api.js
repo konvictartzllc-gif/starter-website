@@ -60,6 +60,8 @@ export const api = {
   // Learned Preferences
   getPreferences: () => request("/dex/preferences"),
   setPreference: (key, value) => request("/dex/preferences", { method: "POST", body: JSON.stringify({ key, value }) }),
+  getWorkflows: () => request("/dex/workflows"),
+  saveWorkflow: (body) => request("/dex/workflows", { method: "POST", body: JSON.stringify(body) }),
 
   // Call Events
   getCallEvents: () => request("/dex/call-events"),

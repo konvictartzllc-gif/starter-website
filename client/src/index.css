@@ -243,7 +243,8 @@
 .preferences-form input[type="text"],
 .preferences-form input[type="email"],
 .preferences-form input[type="time"],
-.preferences-form select {
+.preferences-form select,
+.preferences-form textarea {
   width: 100%;
   min-height: 2.75rem;
   margin-top: 0.3rem;
@@ -255,12 +256,18 @@
   outline: none;
 }
 
+.preferences-form textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
 .preferences-form input::placeholder {
   color: #94a3b8;
 }
 
 .preferences-form input:focus,
-.preferences-form select:focus {
+.preferences-form select:focus,
+.preferences-form textarea:focus {
   border-color: #7c3aed;
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25);
 }
@@ -294,7 +301,8 @@
 .preferences-form .learning-section,
 .preferences-form .voice-section,
 .preferences-form .emergency-contact-section,
-.preferences-form .automations-section {
+.preferences-form .automations-section,
+.preferences-form .workflow-section {
   margin-top: 0;
   border: 1px solid #1f2937;
   border-radius: 0.75rem;
@@ -304,8 +312,38 @@
 
 .preferences-form .learning-section + .learning-section,
 .preferences-form .voice-section,
-.preferences-form .automations-section {
+.preferences-form .automations-section,
+.preferences-form .workflow-section {
   margin-top: 0.25rem;
+}
+
+.workflow-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.workflow-item {
+  border: 1px solid #273449;
+  border-radius: 0.65rem;
+  background: #0f172a;
+  padding: 0.85rem;
+}
+
+.workflow-title {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.workflow-trigger {
+  margin-top: 0.2rem;
+  color: #a78bfa;
+  font-size: 0.82rem;
+}
+
+.workflow-item p {
+  margin: 0.55rem 0 0;
+  white-space: pre-wrap;
 }
 
 .preferences-form .emergency-contact-section form {

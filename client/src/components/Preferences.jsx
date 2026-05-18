@@ -14,10 +14,18 @@ export default function Preferences() {
   const [automationSaving, setAutomationSaving] = useState(false);
   const [voices, setVoices] = useState([]);
   const [voiceName, setVoiceName] = useState(localStorage.getItem(VOICE_STORAGE_KEY) || "");
+  const [workflows, setWorkflows] = useState([]);
+  const [workflowForm, setWorkflowForm] = useState({ title: "", trigger: "", steps: "" });
 
   useEffect(() => {
-    api.getPreferences()
-      .then(({ preferences }) => setPreferences(preferences || {}))
+    Promise.all([
+      api.getPreferences(),
+      api.getWorkflows().catch(() => ({ workflows: [] })),
+    ])
+      .then(([preferencesData, workflowData]) => {
+        setPreferences(preferencesData.preferences || {});
+        setWorkflows(workflowData.workflows || []);
+      })
       .catch(() => setError("Failed to load preferences."))
       .finally(() => setLoading(false));
   }, []);
@@ -82,6 +90,25 @@ export default function Preferences() {
       setSuccess(successMessage || "Preference saved!");
     } catch (err) {
       setError(err?.message || "Failed to save preference.");
+    }
+    setSaving(false);
+  }
+
+  async function handleSaveWorkflow(e) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const data = await api.saveWorkflow(workflowForm);
+      setWorkflows((prev) => {
+        const withoutOld = prev.filter((workflow) => workflow.id !== data.workflow.id);
+        return [data.workflow, ...withoutOld];
+      });
+      setWorkflowForm({ title: "", trigger: "", steps: "" });
+      setSuccess("Dex learned that workflow.");
+    } catch (err) {
+      setError(err?.message || "Dex could not save that workflow.");
     }
     setSaving(false);
   }
@@ -169,6 +196,46 @@ export default function Preferences() {
           </div>
         </div>
       )}
+
+      <div className="workflow-section">
+        <h3>Teach Dex A Workflow</h3>
+        <p>Explain how you do something once. Dex will remember the steps and mimic your process when you ask for it later.</p>
+        <form onSubmit={handleSaveWorkflow}>
+          <input
+            type="text"
+            placeholder="Workflow name, like Customer follow-up"
+            value={workflowForm.title}
+            onChange={(e) => setWorkflowForm((prev) => ({ ...prev, title: e.target.value }))}
+            required
+          />
+          <input
+            type="text"
+            placeholder="When should Dex use it? Example: when I ask for customer follow-up"
+            value={workflowForm.trigger}
+            onChange={(e) => setWorkflowForm((prev) => ({ ...prev, trigger: e.target.value }))}
+          />
+          <textarea
+            placeholder="Steps Dex should copy. Example: 1. Thank them. 2. Mention the service. 3. Ask what time works. 4. Keep it friendly."
+            value={workflowForm.steps}
+            onChange={(e) => setWorkflowForm((prev) => ({ ...prev, steps: e.target.value }))}
+            required
+          />
+          <button type="submit" disabled={saving}>
+            {saving ? "Learning..." : "Teach Dex This"}
+          </button>
+        </form>
+        {workflows.length > 0 && (
+          <div className="workflow-list">
+            {workflows.map((workflow) => (
+              <div key={workflow.id} className="workflow-item">
+                <div className="workflow-title">{workflow.title}</div>
+                {workflow.trigger && <div className="workflow-trigger">{workflow.trigger}</div>}
+                <p>{workflow.steps}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="learning-section">
         <h3>Learning With Dex</h3>

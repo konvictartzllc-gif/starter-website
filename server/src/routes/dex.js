@@ -15,6 +15,7 @@ const router = Router();
 const CHAT_MEMORY_RETENTION_DAYS = 3;
 const SENSITIVE_INFO_WARNING =
         "I won't save sensitive information like bank details, card numbers, passwords, or Social Security numbers. Please remove that information and try again.";
+const WORKFLOW_PREFIX = "pref:workflow:";
 
 function normalizeEmergencyContactTarget(target) {
         const value = String(target || "").trim();
@@ -600,6 +601,40 @@ router.post("/preferences", requireUser, async (req, res) => {
                 [userId, `pref:${key}`, value]
         );
         res.json({ success: true });
+});
+
+router.get("/workflows", requireUser, async (req, res) => {
+        const db = getDb();
+        const userId = req.user.id;
+        const user = await getUserRecord(userId);
+        if (!isPaidSubscriber(user)) {
+                return res.status(403).json({ error: "paid_subscription_required", message: "Dex self-learning workflows are available with paid or unlimited Dex memory." });
+        }
+        const workflows = await loadLearnedWorkflows(db, userId, 50);
+        return res.json({ workflows });
+});
+
+router.post("/workflows", requireUser, async (req, res) => {
+        const db = getDb();
+        const userId = req.user.id;
+        const user = await getUserRecord(userId);
+        if (!isPaidSubscriber(user)) {
+                return res.status(403).json({ error: "paid_subscription_required", message: "Dex self-learning workflows are available with paid or unlimited Dex memory." });
+        }
+
+        const title = String(req.body?.title || "").trim();
+        const trigger = String(req.body?.trigger || title).trim();
+        const steps = String(req.body?.steps || "").trim();
+        if (!title || !steps) {
+                return res.status(400).json({ error: "missing_workflow", message: "A workflow title and steps are required." });
+        }
+        if (detectSensitiveInfo(`${title} ${trigger} ${steps}`)) {
+                return res.status(400).json({ error: "sensitive_info_blocked", message: SENSITIVE_INFO_WARNING });
+        }
+
+        await ensureMemoryTable(db);
+        const workflow = await saveLearnedWorkflow(db, userId, { title, trigger, steps });
+        return res.json({ success: true, workflow });
 });
 
 router.get("/relationship-aliases", requireUser, async (req, res) => {
@@ -1296,6 +1331,99 @@ function getOpenAI() {
     return getAIClient();
 }
 
+function slugifyWorkflowTitle(value = "") {
+        const slug = String(value)
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "")
+                .slice(0, 48);
+        return slug || `workflow-${Date.now()}`;
+}
+
+function parseWorkflowValue(row) {
+        try {
+                const parsed = JSON.parse(row.value || "{}");
+                return {
+                        id: row.key.replace(WORKFLOW_PREFIX, ""),
+                        title: parsed.title || row.key.replace(WORKFLOW_PREFIX, ""),
+                        trigger: parsed.trigger || "",
+                        steps: parsed.steps || "",
+                        createdAt: parsed.createdAt || null,
+                        updatedAt: parsed.updatedAt || null,
+                };
+        } catch {
+                return null;
+        }
+}
+
+async function loadLearnedWorkflows(db, userId, limit = 8) {
+        await ensureMemoryTable(db);
+        const rows = await db.all(
+                `SELECT key, value
+                   FROM user_memory
+                  WHERE user_id = ?
+                    AND key LIKE ?
+                  ORDER BY key ASC`,
+                [userId, `${WORKFLOW_PREFIX}%`]
+        );
+        return rows.map(parseWorkflowValue).filter(Boolean).slice(0, limit);
+}
+
+function buildWorkflowContext(workflows = []) {
+        if (!workflows.length) return null;
+        const text = workflows
+                .map((workflow) => {
+                        const trigger = workflow.trigger ? `Trigger: ${workflow.trigger}. ` : "";
+                        return `Workflow "${workflow.title}". ${trigger}Steps: ${workflow.steps}`;
+                })
+                .join("\n\n");
+        return (
+                "The user has personally taught Dex these reusable workflows. " +
+                "When the user asks for one of these tasks, mimic their saved process and follow these steps before improvising. " +
+                "If the workflow requires an outside action you cannot directly complete, explain the next step or draft the output.\n\n" +
+                text
+        );
+}
+
+function extractTaughtWorkflow(message = "") {
+        const text = String(message || "").trim();
+        const match = text.match(/\b(?:dex\s*,?\s*)?(?:remember|save|learn|teach yourself|teach dex)\s+(?:this\s+)?(?:workflow|process|routine|how\s+i\s+do|how\s+to|to)\s+([^:\n.?!]+)[:\n-]+([\s\S]{20,})$/i);
+        if (!match) return null;
+        const title = match[1].trim().replace(/^["']|["']$/g, "");
+        const steps = match[2].trim();
+        if (!title || !steps || detectSensitiveInfo(`${title} ${steps}`)) return null;
+        return {
+                title,
+                trigger: title,
+                steps,
+        };
+}
+
+async function saveLearnedWorkflow(db, userId, workflow) {
+        const id = slugifyWorkflowTitle(workflow.title);
+        const now = new Date().toISOString();
+        const existing = await db.get("SELECT value FROM user_memory WHERE user_id = ? AND key = ?", [userId, `${WORKFLOW_PREFIX}${id}`]);
+        let createdAt = now;
+        if (existing?.value) {
+                try {
+                        createdAt = JSON.parse(existing.value).createdAt || now;
+                } catch {}
+        }
+        const value = JSON.stringify({
+                title: workflow.title,
+                trigger: workflow.trigger || workflow.title,
+                steps: workflow.steps,
+                createdAt,
+                updatedAt: now,
+        });
+        await db.run(
+                `INSERT INTO user_memory (user_id, key, value) VALUES (?, ?, ?)
+                 ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value`,
+                [userId, `${WORKFLOW_PREFIX}${id}`, value]
+        );
+        return { id, ...JSON.parse(value) };
+}
+
 const DEX_SYSTEM_PROMPT = `You are Dex, a friendly and empathetic AI assistant for Konvict Artz. You help users with scheduling, questions, general support, and teaching. Be warm, concise, and helpful.
 
 When a user wants to learn something:
@@ -1485,12 +1613,17 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                     [userId]
               );
               const relationshipContext = buildRelationshipContext(relationshipAliases);
+              const learnedWorkflows = isPaidSubscriber(user) ? await loadLearnedWorkflows(db, userId) : [];
+              const workflowContext = buildWorkflowContext(learnedWorkflows);
     const messages = history.reverse().map((h) => ({ role: h.role, content: h.content }));
     if (learningContext) {
       messages.unshift({ role: "system", content: learningContext });
     }
     if (relationshipContext) {
       messages.unshift({ role: "system", content: relationshipContext });
+    }
+    if (workflowContext) {
+      messages.unshift({ role: "system", content: workflowContext });
     }
     messages.push({ role: "user", content: message });
 
@@ -1507,7 +1640,18 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
               temperature: 0.85,
       });
 
-      const reply = completion.choices[0].message.content.trim();
+      let reply = completion.choices[0].message.content.trim();
+                    const taughtWorkflow = extractTaughtWorkflow(message);
+                    let learnedWorkflow = null;
+                    if (taughtWorkflow && isPaidSubscriber(user)) {
+                            try {
+                                    await ensureMemoryTable(db);
+                                    learnedWorkflow = await saveLearnedWorkflow(db, userId, taughtWorkflow);
+                                    reply += `\n\nI saved that as a workflow: ${learnedWorkflow.title}. Next time you ask me to do that, I'll follow your steps.`;
+                            } catch (error) {
+                                    console.error("Workflow learning error:", error?.message || error);
+                            }
+                    }
                     await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, reply]);
 
                         // Auto-learn frequent chat intents.
