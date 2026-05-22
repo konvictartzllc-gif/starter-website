@@ -543,6 +543,10 @@ export default function DexChat() {
     };
     recognition.onerror = (event) => {
       setVoiceBusy(false);
+      if (event.error === "network" || event.error === "aborted" || event.error === "no-speech") {
+        showToast("Voice had a quick hiccup. Try again.");
+        return;
+      }
       showToast(`Voice error: ${event.error}`);
     };
     recognition.onend = () => {

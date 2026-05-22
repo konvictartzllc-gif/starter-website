@@ -192,6 +192,18 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
     };
 
     recognition.onerror = (event) => {
+      if (event.error === "network" || event.error === "aborted" || event.error === "no-speech") {
+        if (event.error === "network") {
+          console.warn("Speech recognition network hiccup; retrying.");
+          window.setTimeout(() => {
+            if (enabled && !isSpeakingRef.current) {
+              try { recognition.start(); } catch {}
+            }
+          }, 900);
+        }
+        setError("");
+        return;
+      }
       if (event.error !== "no-speech") {
         console.warn("Speech recognition error:", event.error);
         setError(event.error);
