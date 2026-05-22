@@ -253,6 +253,14 @@ export default function LearningHub() {
       const data = await api.submitLearningQuiz({ quiz, answers });
       setQuizResult(data);
       await loadHistory();
+      try {
+        const nextLesson = await api.getDailyLesson();
+        setLesson(nextLesson.lesson);
+        setQuiz(null);
+        setAnswers([]);
+      } catch {
+        setError("Quiz scored, but Dex could not build the next lesson yet. Tap Get Daily Lesson to try again.");
+      }
     } catch (err) {
       setError(err?.message || "Dex could not score your quiz right now.");
     } finally {
@@ -444,7 +452,7 @@ export default function LearningHub() {
             disabled={busy === "submit"}
             className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-light disabled:opacity-60"
           >
-            {busy === "submit" ? "Scoring..." : "Submit Quiz"}
+            {busy === "submit" ? "Scoring and building next lesson..." : "Submit Quiz"}
           </button>
         </div>
       )}
@@ -455,6 +463,11 @@ export default function LearningHub() {
           <p className="text-sm text-green-200">
             You scored {quizResult.score} out of {quizResult.totalQuestions} ({quizResult.percentage}%).
           </p>
+          {lesson && (
+            <p className="text-sm text-green-100">
+              Dex built your next lesson below based on that quiz.
+            </p>
+          )}
           <div className="space-y-2">
             {quizResult.results.map((result, index) => (
               <div key={`${result.question}-${index}`} className="rounded-md border border-gray-800 bg-gray-950 p-3 text-sm">
