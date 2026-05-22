@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "../utils/api.js";
 import { useAuth } from "../hooks/useAuth.jsx";
+import AssistantHub from "../components/AssistantHub.jsx";
+import CommunicationsCenter from "../components/CommunicationsCenter.jsx";
+import LearningHub from "../components/LearningHub.jsx";
+import Permissions from "../components/Permissions.jsx";
+import Preferences from "../components/Preferences.jsx";
 
 export default function AdminPortal() {
   const { user, login, logout } = useAuth();
@@ -274,7 +279,7 @@ export default function AdminPortal() {
     );
   }
 
-  const tabs = ["stats", "flags", "inventory", "affiliates", "promo", "users"];
+  const tabs = ["stats", "dex tools", "flags", "inventory", "affiliates", "promo", "users"];
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -367,6 +372,34 @@ export default function AdminPortal() {
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "dex tools" && (
+          <div>
+            <h2 className="text-lg font-bold mb-2">Dex Tools</h2>
+            <p className="text-sm text-gray-400 mb-6">
+              Admin accounts have full Dex access here, including learning, preferences, permissions, tasks, and communication tools.
+            </p>
+            <div className="grid gap-6 xl:grid-cols-2">
+              <section className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                <AssistantHub />
+              </section>
+              <section className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                <CommunicationsCenter />
+              </section>
+            </div>
+            <section className="mt-6 bg-gray-900 border border-gray-800 rounded-lg p-5">
+              <LearningHub />
+            </section>
+            <div className="mt-6 grid gap-6 xl:grid-cols-2">
+              <section className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                <Permissions />
+              </section>
+              <section className="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                <Preferences />
+              </section>
             </div>
           </div>
         )}
