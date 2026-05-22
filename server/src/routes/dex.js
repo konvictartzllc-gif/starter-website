@@ -45,6 +45,20 @@ function normalizeEmergencyContactTarget(target) {
         return value;
 }
 
+function isTruthyPreference(value) {
+        return ["1", "true", "yes", "on", "enabled"].includes(String(value || "").trim().toLowerCase());
+}
+
+function isEmergencyContactAlertRequest(message = "") {
+        const text = String(message || "").trim();
+        if (!text) return false;
+        return (
+                /\b(send|trigger|start)\b.*\bemergency alert\b/i.test(text) ||
+                /\b(alert|notify|text|message|call|contact|tell)\b.*\b(my )?(emergency|trusted)\b.*\b(contact|person|support)\b/i.test(text) ||
+                /\b(my )?(emergency|trusted)\b.*\b(contact|person)\b.*\b(now|help|alert|notify|message|text|call)\b/i.test(text)
+        );
+}
+
 const FREE_SETTING_KEYS = new Set([
         "emergency_contact",
         "emergency_contact_permission",
@@ -1679,13 +1693,16 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                         }
 
                         const safetySignal = detectSafetySignal(message);
-                        if (safetySignal.level === "emergency") {
+                        const emergencyContactRequested = isEmergencyContactAlertRequest(message);
+                        if (safetySignal.level === "emergency" || emergencyContactRequested) {
                                 const userInfo = `${user.name || "Unknown"} (${user.email})`;
                                 Promise.resolve(triggerEmergencyAlert(userInfo, message)).catch((error) => {
                                         console.error("Emergency alert error:", error?.message || error);
                                 });
                                 let reply = "";
-                                if (safetySignal.type === "self_harm") {
+                                if (emergencyContactRequested && safetySignal.level !== "emergency") {
+                                        reply = "I am treating this as an emergency contact request. If you are in immediate danger, call 911 or your local emergency number right now.";
+                                } else if (safetySignal.type === "self_harm") {
                                         reply = "Hey, I hear you and I want you to know you matter. Please reach out to the 988 Suicide & Crisis Lifeline by calling or texting 988 right now. If you are in immediate danger, call 911 or your local emergency number. You are not alone.";
                                 } else if (safetySignal.type === "harm_others") {
                                         reply = "I'm concerned by your message. If you or someone else is in immediate danger, please call 911 or your local emergency number right away. Step away from the situation and reach out to someone who can help you stay safe.";
@@ -1702,8 +1719,8 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                         const memory = {};
                                         for (const row of memRows) memory[row.key] = row.value;
                                         trustedContactEnabled =
-                                                memory.emergency_contact_permission === "1" ||
-                                                memory["pref:emergency_contact_permission"] === "1";
+                                                isTruthyPreference(memory.emergency_contact_permission) ||
+                                                isTruthyPreference(memory["pref:emergency_contact_permission"]);
                                         trustedContactTarget = String(
                                                 memory.emergency_contact ||
                                                 memory["pref:emergency_contact"] ||
@@ -1747,9 +1764,14 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                                 ? reply + " I also used your emergency contact plan to reach out for extra support."
                                                 : trustedContactEnabled && trustedContactConfigured
                                                         ? reply + " I tried to reach your emergency contact, but the message could not be confirmed. Please contact them directly if you can."
-                                                        : reply,
+                                                        : !trustedContactConfigured
+                                                                ? reply + " I do not have an emergency contact saved yet, so I could not send that alert."
+                                                                : !trustedContactEnabled
+                                                                        ? reply + " Emergency contact alerts are turned off in your settings, so I could not send that alert."
+                                                                        : reply,
                                         emergency: true,
-                                        emergencyType: safetySignal.type,
+                                        emergencyType: safetySignal.type || "trusted_contact_request",
+                                        emergencyContactRequested,
                                         trustedContactEnabled,
                                         trustedContactConfigured,
                                         trustedContactDelivered,
