@@ -150,6 +150,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, buildNotification())
+        hydrateCallStateFromIntent(intent)
         when (intent?.action) {
             ACTION_ANNOUNCE_SMS -> handleIncomingSms(intent)
             ACTION_ANNOUNCE_NOTIFICATION -> handleIncomingNotification(intent)
@@ -167,6 +168,19 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         startCallMonitoringIfReady()
         refreshWakeWordBackgroundState()
         return START_STICKY
+    }
+
+    private fun hydrateCallStateFromIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_CALL_IS_RINGING, false) != true) return
+        lastCallState = TelephonyManager.CALL_STATE_RINGING
+        lastCaller = intent.getStringExtra(EXTRA_CALLER_NAME)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: lastCaller
+        lastIncomingNumber = intent.getStringExtra(EXTRA_CALLER_NUMBER)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: lastIncomingNumber
     }
 
     override fun onDestroy() {
@@ -2305,6 +2319,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val ACTION_CALL_ANSWER = "com.konvictartz.dex.action.CALL_ANSWER"
         const val ACTION_CALL_DECLINE = "com.konvictartz.dex.action.CALL_DECLINE"
         const val ACTION_CALL_TAKE_MESSAGE = "com.konvictartz.dex.action.CALL_TAKE_MESSAGE"
+        const val EXTRA_CALLER_NAME = "com.konvictartz.dex.extra.CALLER_NAME"
+        const val EXTRA_CALLER_NUMBER = "com.konvictartz.dex.extra.CALLER_NUMBER"
+        const val EXTRA_CALL_IS_RINGING = "com.konvictartz.dex.extra.CALL_IS_RINGING"
         const val ACTION_SMS_READ = "com.konvictartz.dex.action.SMS_READ"
         const val ACTION_SMS_IGNORE = "com.konvictartz.dex.action.SMS_IGNORE"
         const val ACTION_SMS_REPLY = "com.konvictartz.dex.action.SMS_REPLY"

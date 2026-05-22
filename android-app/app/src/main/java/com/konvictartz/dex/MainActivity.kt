@@ -2682,12 +2682,32 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else {
             ""
         }
-        if (typedBirthday.isNotBlank()) return typedBirthday
+        if (typedBirthday.isNotBlank()) return formatBirthdayForSpeech(typedBirthday)
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_EMERGENCY_PROFILE_BIRTHDAY, null)
+        return formatBirthdayForSpeech(
+            prefs.getString(KEY_EMERGENCY_PROFILE_BIRTHDAY, null)
             .orEmpty()
             .trim()
             .ifBlank { getString(R.string.safety_birthday_unknown) }
+        )
+    }
+
+    private fun formatBirthdayForSpeech(value: String): String {
+        val trimmed = value.trim()
+        if (trimmed.isBlank() || trimmed == getString(R.string.safety_birthday_unknown)) return trimmed
+        val numericMatch = Regex("""^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$""").matchEntire(trimmed)
+        if (numericMatch != null) {
+            val monthIndex = numericMatch.groupValues[1].toIntOrNull()?.minus(1) ?: -1
+            val day = numericMatch.groupValues[2].toIntOrNull()
+            val rawYear = numericMatch.groupValues[3]
+            val year = if (rawYear.length == 2) "19$rawYear" else rawYear
+            val months = arrayOf(
+                "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"
+            )
+            if (monthIndex in months.indices && day != null) return "${months[monthIndex]} $day, $year"
+        }
+        return trimmed.replace(Regex(""",(?=\S)"""), ", ")
     }
 
     private fun resolveEmergencyTrustedContact(): String {
@@ -8300,6 +8320,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.lastReplyValue.text = reply
         val intent = Intent(this, DexForegroundService::class.java).apply {
             action = DexForegroundService.ACTION_CALL_TAKE_MESSAGE
+            putExtra(DexForegroundService.EXTRA_CALLER_NAME, lastCaller)
+            putExtra(DexForegroundService.EXTRA_CALLER_NUMBER, lastIncomingNumber)
+            putExtra(DexForegroundService.EXTRA_CALL_IS_RINGING, true)
         }
         ContextCompat.startForegroundService(this, intent)
     }
