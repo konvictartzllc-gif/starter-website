@@ -926,6 +926,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 .edit()
                 .putBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, isChecked)
                 .apply()
+            updatePermissions("phone", binding.phonePermissionSwitch.isChecked)
             maintainBackgroundService()
         }
         binding.autoAnswerAnyCallerSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -934,6 +935,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 .edit()
                 .putBoolean(KEY_AUTO_ANSWER_ANY_NON_SPAM, isChecked)
                 .apply()
+            updatePermissions("phone", binding.phonePermissionSwitch.isChecked)
             maintainBackgroundService()
         }
         binding.autoDeclineSpamSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -942,6 +944,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 .edit()
                 .putBoolean(KEY_AUTO_DECLINE_SPAM, isChecked)
                 .apply()
+            updatePermissions("phone", binding.phonePermissionSwitch.isChecked)
             maintainBackgroundService()
         }
 
@@ -6022,16 +6025,25 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             result.onSuccess { response ->
                 val permissions = response.optJSONObject("permissions")
                 val phoneEnabled = permissions?.optBoolean("phone") ?: false
+                val autoAnswerKnown = permissions?.optBoolean("autoAnswerKnownContacts") ?: false
+                val autoAnswerAny = permissions?.optBoolean("autoAnswerAnyNonSpam") ?: false
+                val autoDeclineSpam = permissions?.optBoolean("autoDeclineSpam") ?: true
                 phoneBackendEnabled = phoneEnabled
                 getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean(KEY_PHONE_BACKEND_ENABLED, phoneEnabled)
+                    .putBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, autoAnswerKnown)
+                    .putBoolean(KEY_AUTO_ANSWER_ANY_NON_SPAM, autoAnswerAny)
+                    .putBoolean(KEY_AUTO_DECLINE_SPAM, autoDeclineSpam)
                     .apply()
                 applyPermissions(
                     mapOf(
                         "phone" to phoneEnabled,
                         "calendar" to (permissions?.optBoolean("calendar") ?: false),
-                        "notifications" to (permissions?.optBoolean("notifications") ?: false)
+                        "notifications" to (permissions?.optBoolean("notifications") ?: false),
+                        "autoAnswerKnownContacts" to autoAnswerKnown,
+                        "autoAnswerAnyNonSpam" to autoAnswerAny,
+                        "autoDeclineSpam" to autoDeclineSpam
                     )
                 )
                 binding.permissionsMessage.text = getString(R.string.permissions_synced)
@@ -6648,11 +6660,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .apply()
         refreshCallMonitorState()
         val payload = JSONObject().apply {
-            put("permissions", JSONObject().apply {
-                put("phone", binding.phonePermissionSwitch.isChecked)
-                put("calendar", binding.calendarPermissionSwitch.isChecked)
-                put("notifications", binding.notificationsPermissionSwitch.isChecked)
-            })
+                put("permissions", JSONObject().apply {
+                    put("phone", binding.phonePermissionSwitch.isChecked)
+                    put("calendar", binding.calendarPermissionSwitch.isChecked)
+                    put("notifications", binding.notificationsPermissionSwitch.isChecked)
+                    put("autoAnswerKnownContacts", binding.autoAnswerKnownContactsSwitch.isChecked)
+                    put("autoAnswerAnyNonSpam", binding.autoAnswerAnyCallerSwitch.isChecked)
+                    put("autoDeclineSpam", binding.autoDeclineSpamSwitch.isChecked)
+                })
         }
 
         setPermissionsLoading(true)
@@ -6683,10 +6698,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.phonePermissionSwitch.isChecked = phoneBackendEnabled
         binding.calendarPermissionSwitch.isChecked = permissions["calendar"] == true
         binding.notificationsPermissionSwitch.isChecked = permissions["notifications"] == true
+        binding.autoAnswerKnownContactsSwitch.isChecked = permissions["autoAnswerKnownContacts"] == true
+        binding.autoAnswerAnyCallerSwitch.isChecked = permissions["autoAnswerAnyNonSpam"] == true
+        binding.autoDeclineSpamSwitch.isChecked = permissions["autoDeclineSpam"] != false
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_PHONE_BACKEND_ENABLED, phoneBackendEnabled)
             .putBoolean(KEY_NOTIFICATIONS_ENABLED, permissions["notifications"] == true)
+            .putBoolean(KEY_AUTO_ANSWER_KNOWN_CONTACTS, permissions["autoAnswerKnownContacts"] == true)
+            .putBoolean(KEY_AUTO_ANSWER_ANY_NON_SPAM, permissions["autoAnswerAnyNonSpam"] == true)
+            .putBoolean(KEY_AUTO_DECLINE_SPAM, permissions["autoDeclineSpam"] != false)
             .apply()
     }
 

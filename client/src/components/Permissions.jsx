@@ -77,6 +77,33 @@ export default function Permissions() {
       <label>
         <input
           type="checkbox"
+          name="autoAnswerKnownContacts"
+          checked={!!permissions.autoAnswerKnownContacts}
+          onChange={handleChange}
+        />
+        Let Dex answer known contacts and take a message when I am busy
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          name="autoAnswerAnyNonSpam"
+          checked={!!permissions.autoAnswerAnyNonSpam}
+          onChange={handleChange}
+        />
+        Let Dex answer any non-spam caller and take a message
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          name="autoDeclineSpam"
+          checked={permissions.autoDeclineSpam !== false}
+          onChange={handleChange}
+        />
+        Let Dex decline likely spam calls
+      </label>
+      <label>
+        <input
+          type="checkbox"
           name="calendar"
           checked={!!permissions.calendar}
           onChange={handleChange}

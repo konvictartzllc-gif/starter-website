@@ -1571,7 +1571,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ?: lastIncomingNumber
             ?: getString(R.string.unknown_number_label)
         val caller = chooseSavedCallerLabel(baseCaller, parsedMessage.callerName)
-        postCallEvent("message", "$caller: ${parsedMessage.message}")
+        postCallEvent("message", caller, parsedMessage.message, lastIncomingNumber)
         MainActivity.appendPersistentCallMessageLog(
             context = this,
             caller = caller,
@@ -2258,6 +2258,10 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun postCallEvent(event: String, caller: String) {
+        postCallEvent(event, caller, null, null)
+    }
+
+    private fun postCallEvent(event: String, caller: String, message: String?, phoneNumber: String?) {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val token = prefs.getString(MainActivity.KEY_TOKEN, null) ?: return
         val serverUrl = prefs.getString(MainActivity.KEY_SERVER_URL, MainActivity.DEFAULT_SERVER_URL)?.trimEnd('/') ?: return
@@ -2268,6 +2272,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     put("event", event)
                     put("caller", caller)
                     put("timestamp", System.currentTimeMillis())
+                    if (!message.isNullOrBlank()) put("message", message)
+                    if (!phoneNumber.isNullOrBlank()) put("phoneNumber", phoneNumber)
                 }
                 val request = Request.Builder()
                     .url("$serverUrl/dex/call-event")

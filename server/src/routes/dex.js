@@ -96,6 +96,20 @@ async function ensureCallEventsTable(db) {
         );
 }
 
+async function ensureCallMessagesTable(db) {
+        await db.run(
+                `CREATE TABLE IF NOT EXISTS call_messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        caller TEXT,
+                        phone_number TEXT,
+                        message TEXT NOT NULL,
+                        handled INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )`
+        );
+}
+
 async function ensureLearningTables(db) {
         await db.run(
                 `CREATE TABLE IF NOT EXISTS learning_lessons (
@@ -786,6 +800,7 @@ router.get("/follow-ups", requireUser, async (req, res) => {
 router.get("/communications", requireUser, async (req, res) => {
         const db = getDb();
         await ensureCommunicationDraftsTable(db);
+        await ensureCallMessagesTable(db);
         const drafts = await db.all(
                 `SELECT *
                    FROM communication_drafts
@@ -808,8 +823,17 @@ router.get("/communications", requireUser, async (req, res) => {
                   LIMIT 10`,
                 [req.user.id]
         );
+        const callMessages = await db.all(
+                `SELECT id, caller, phone_number, message, handled, created_at
+                   FROM call_messages
+                  WHERE user_id = ?
+                  ORDER BY handled ASC, created_at DESC
+                  LIMIT 20`,
+                [req.user.id]
+        );
         res.json({
                 drafts,
+                callMessages,
                 voicemailSummary: buildVoicemailStyleSummary(recentCallEvents),
         });
 });
@@ -964,7 +988,7 @@ router.get("/call-events", requireUser, async (req, res) => {
 router.post("/call-event", requireUser, async (req, res) => {
         const db = getDb();
         const userId = req.user.id;
-        const { event, caller, timestamp } = req.body;
+        const { event, caller, timestamp, message, phoneNumber } = req.body;
         if (!event || !caller) return res.status(400).json({ error: "Missing event or caller" });
         // Check phone permission
         await db.run(
@@ -993,6 +1017,28 @@ router.post("/call-event", requireUser, async (req, res) => {
                 `INSERT INTO call_events (user_id, event, caller, timestamp) VALUES (?, ?, ?, ?)`,
                 [userId, event, caller, timestamp || new Date().toISOString()]
         );
+
+        if (event === "message") {
+                const parsed = parseCallerMessage({ caller, message });
+                if (parsed.message) {
+                        await ensureCallMessagesTable(db);
+                        await db.run(
+                                `INSERT INTO call_messages (user_id, caller, phone_number, message)
+                                 VALUES (?, ?, ?, ?)`,
+                                [userId, parsed.caller, phoneNumber || null, parsed.message]
+                        );
+                        await ensureTaskItemsTable(db);
+                        await db.run(
+                                `INSERT INTO task_items (user_id, title, details, kind, source)
+                                 VALUES (?, ?, ?, 'call_follow_up', 'dex_call_screening')`,
+                                [
+                                        userId,
+                                        `Follow up with ${parsed.caller}`,
+                                        `Caller: ${parsed.caller}${phoneNumber ? `\nNumber: ${phoneNumber}` : ""}\nMessage: ${parsed.message}`,
+                                ]
+                        );
+                }
+        }
 
         // â”€â”€ AUTO-LEARN FAVORITE CONTACTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (event === "incoming" && caller) {
@@ -1421,6 +1467,22 @@ function defaultDexColors() {
                 hatPrimary: "#22d3ee",
                 hatSecondary: "#facc15",
         };
+}
+
+function parseCallerMessage({ caller, message }) {
+        const explicitMessage = String(message || "").trim();
+        const rawCaller = String(caller || "").trim();
+        if (explicitMessage) {
+                return { caller: rawCaller || "Unknown caller", message: explicitMessage };
+        }
+        const match = rawCaller.match(/^([^:]{1,120}):\s*([\s\S]+)$/);
+        if (match) {
+                return {
+                        caller: match[1].trim() || "Unknown caller",
+                        message: match[2].trim(),
+                };
+        }
+        return { caller: rawCaller || "Unknown caller", message: "" };
 }
 
 function normalizeDexColors(input = {}) {

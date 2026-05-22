@@ -8,12 +8,14 @@ export default function CommunicationsCenter() {
   const [message, setMessage] = useState("");
   const [drafts, setDrafts] = useState([]);
   const [voicemailSummary, setVoicemailSummary] = useState(null);
+  const [callMessages, setCallMessages] = useState([]);
 
   async function loadCommunications() {
     try {
       setError("");
       const data = await api.getCommunications();
       setDrafts(data.drafts || []);
+      setCallMessages(data.callMessages || []);
       setVoicemailSummary(data.voicemailSummary || null);
     } catch (err) {
       setError(err?.message || "Dex could not load the communications center right now.");
@@ -142,6 +144,35 @@ export default function CommunicationsCenter() {
           ) : (
             <div className="rounded-md border border-gray-800 bg-gray-900 p-4 text-sm text-gray-400">
               No communication drafts yet. When Dex drafts texts or emails for approval, they will show up here.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-800 bg-gray-950 p-4">
+        <div className="text-xs uppercase tracking-wide text-gray-500">Call screening</div>
+        <h3 className="mt-1 text-lg font-semibold text-white">Caller messages Dex saved</h3>
+        <div className="mt-4 space-y-3">
+          {callMessages.length ? (
+            callMessages.map((item) => (
+              <div key={item.id} className="rounded-md border border-gray-800 bg-gray-900 p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-white">{item.caller || "Unknown caller"}</div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      {item.phone_number || "No number saved"} - {new Date(item.created_at).toLocaleString()}
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap text-sm text-gray-200">{item.message}</div>
+                  </div>
+                  <span className={`w-fit rounded-md border px-3 py-1 text-xs font-semibold ${item.handled ? "border-gray-700 text-gray-400" : "border-green-700/60 text-green-300"}`}>
+                    {item.handled ? "handled" : "new"}
+                  </span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-md border border-gray-800 bg-gray-900 p-4 text-sm text-gray-400">
+              No caller messages saved yet. Turn on phone permissions and call screening so Dex can answer and take messages when you are busy.
             </div>
           )}
         </div>
