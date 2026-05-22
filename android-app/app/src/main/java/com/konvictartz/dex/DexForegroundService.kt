@@ -48,6 +48,7 @@ private enum class BackgroundListenMode {
     NOTIFICATION_COMMAND,
     SAFETY_CHECK_IN,
     CALLER_MESSAGE,
+    CALL_OWNER_DECISION,
     REMINDER_CHECK_IN,
 }
 
@@ -85,6 +86,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var wakeWordEngine: DexWakeWordEngine? = null
     private var autoTakeMessageRunnable: Runnable? = null
     private var callMessageCaptureAttempts = 0
+    private var callOwnerDecisionAttempts = 0
+    private var pendingScreenedCaller: String? = null
+    private var pendingScreenedMessage: String? = null
     private var notificationCommandAttempts = 0
     private var callScreeningPhraseIndex = 0
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -451,6 +455,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             TelephonyManager.CALL_STATE_RINGING -> {
                 clearPendingAutoTakeMessage()
                 callMessageCaptureAttempts = 0
+                clearPendingCallScreeningDecision()
                 currentCallWasAnswered = false
                 lastIncomingNumber = rawNumber.ifBlank { null }
                 lastCaller = resolvedCaller
@@ -477,6 +482,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             TelephonyManager.CALL_STATE_IDLE -> {
                 clearPendingAutoTakeMessage()
                 callMessageCaptureAttempts = 0
+                clearPendingCallScreeningDecision()
                 dismissNotification(CALL_NOTIFICATION_ID)
                 if (lastCallState == TelephonyManager.CALL_STATE_RINGING && !currentCallWasAnswered) {
                     postCallEvent("declined", resolvedCaller)
@@ -550,6 +556,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun clearPendingAutoTakeMessage() {
         autoTakeMessageRunnable?.let(mainHandler::removeCallbacks)
         autoTakeMessageRunnable = null
+    }
+
+    private fun clearPendingCallScreeningDecision() {
+        callOwnerDecisionAttempts = 0
+        pendingScreenedCaller = null
+        pendingScreenedMessage = null
     }
 
     private fun lookupContactName(phoneNumber: String): String? {
@@ -875,6 +887,10 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 if (!handled) repromptBackgroundListenMode(mode)
             }
             BackgroundListenMode.CALLER_MESSAGE -> handleCallerMessage(cleaned.first())
+            BackgroundListenMode.CALL_OWNER_DECISION -> {
+                val handled = cleaned.any { handleCallOwnerDecisionCommand(it.lowercase(Locale.US)) }
+                if (!handled) repromptBackgroundListenMode(mode)
+            }
             BackgroundListenMode.REMINDER_CHECK_IN -> {
                 val handled = cleaned.any { handleBackgroundReminderCheckIn(it.lowercase(Locale.US)) }
                 if (!handled) repromptBackgroundListenMode(mode)
@@ -955,6 +971,19 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                         else -> getString(R.string.call_message_answer_give_up_alt_2)
                     }
                     speakShortStatus(giveUp)
+                    mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
+                }
+            BackgroundListenMode.CALL_OWNER_DECISION ->
+                if (callOwnerDecisionAttempts < MAX_CALL_OWNER_DECISION_ATTEMPTS) {
+                    callOwnerDecisionAttempts += 1
+                    speakAndThenListen(
+                        getString(R.string.call_owner_decision_retry),
+                        BackgroundListenMode.CALL_OWNER_DECISION
+                    )
+                } else {
+                    val caller = pendingScreenedCaller ?: lastCaller
+                    clearPendingCallScreeningDecision()
+                    speakShortStatus(getString(R.string.call_owner_decision_give_up, caller))
                     mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
                 }
             BackgroundListenMode.REMINDER_CHECK_IN ->
@@ -1593,13 +1622,76 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             message = parsedMessage.message
         )
         callMessageCaptureAttempts = 0
-        val savedReply = when (nextCallScreeningPhraseVariant()) {
-            0 -> getString(R.string.call_message_saved, caller)
-            1 -> getString(R.string.call_message_saved_alt_1, caller)
-            else -> getString(R.string.call_message_saved_alt_2, caller)
+        speakShortStatus(getString(R.string.call_screening_hold_prompt))
+        pendingScreenedCaller = caller
+        pendingScreenedMessage = parsedMessage.message
+        callOwnerDecisionAttempts = 0
+        mainHandler.postDelayed({
+            if (lastCallState == TelephonyManager.CALL_STATE_OFFHOOK) {
+                speakAndThenListen(
+                    getString(R.string.call_screening_owner_prompt, caller, parsedMessage.message),
+                    BackgroundListenMode.CALL_OWNER_DECISION
+                )
+            }
+        }, CALL_OWNER_PROMPT_DELAY_MS)
+    }
+
+    private fun handleCallOwnerDecisionCommand(normalized: String): Boolean {
+        val caller = pendingScreenedCaller ?: lastCaller
+        val message = pendingScreenedMessage.orEmpty()
+        return when {
+            normalized.contains("connect") ||
+                normalized.contains("put them through") ||
+                normalized.contains("let me talk") ||
+                normalized.contains("i'll take") ||
+                normalized.contains("ill take") ||
+                normalized.contains("take the call") ||
+                normalized.contains("answer") -> {
+                postCallEvent("screening_connected", caller, message.ifBlank { null }, lastIncomingNumber)
+                clearPendingCallScreeningDecision()
+                enableSpeakerForActiveCall()
+                speakShortStatus(getString(R.string.call_owner_decision_connect, caller))
+                true
+            }
+            normalized.contains("text") ||
+                normalized.contains("message them") -> {
+                val number = lastIncomingNumber.orEmpty()
+                if (number.isNotBlank()) {
+                    sendPhoneSms(number, getString(R.string.call_message_text_back_body, caller), caller)
+                } else {
+                    speakShortStatus(getString(R.string.call_message_action_unavailable, caller))
+                }
+                postCallEvent("screening_text_back", caller, message.ifBlank { null }, lastIncomingNumber)
+                clearPendingCallScreeningDecision()
+                mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
+                true
+            }
+            normalized.contains("save") ||
+                normalized.contains("take a message") ||
+                normalized.contains("call back") ||
+                normalized.contains("later") ||
+                normalized.contains("busy") ||
+                normalized.contains("can't talk") ||
+                normalized.contains("cant talk") -> {
+                postCallEvent("screening_saved", caller, message.ifBlank { null }, lastIncomingNumber)
+                clearPendingCallScreeningDecision()
+                speakShortStatus(getString(R.string.call_owner_decision_saved, caller))
+                mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
+                true
+            }
+            normalized.contains("end") ||
+                normalized.contains("hang up") ||
+                normalized.contains("decline") ||
+                normalized.contains("not available") ||
+                normalized.contains("ignore") -> {
+                postCallEvent("screening_ended", caller, message.ifBlank { null }, lastIncomingNumber)
+                clearPendingCallScreeningDecision()
+                speakShortStatus(getString(R.string.call_owner_decision_end, caller))
+                mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
+                true
+            }
+            else -> false
         }
-        speakShortStatus(savedReply)
-        mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
     }
 
     private fun normalizeCallerMessageTranscript(transcript: String): ParsedCallerMessage? {
@@ -1993,6 +2085,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 BackgroundListenMode.SAFETY_CHECK_IN -> addAll(
                     listOf("i'm good", "im good", "i feel better", "i'm okay", "stay with me", "check back later", "not really", "still upset", "still stressed", "still sad")
                 )
+                BackgroundListenMode.CALL_OWNER_DECISION -> addAll(
+                    listOf("connect them", "put them through", "let me talk", "take a message", "save it", "call back later", "text them", "end the call", "hang up")
+                )
                 BackgroundListenMode.REMINDER_CHECK_IN -> addAll(
                     listOf("remind me again", "check back", "ten minutes", "not now")
                 )
@@ -2022,6 +2117,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             BackgroundListenMode.SMS_REPLY -> 6000L
             BackgroundListenMode.GENERAL_COMMAND -> 4200L
             BackgroundListenMode.CALLER_MESSAGE -> 6500L
+            BackgroundListenMode.CALL_OWNER_DECISION -> 5200L
             BackgroundListenMode.SAFETY_CHECK_IN -> 5200L
             else -> 3600L
         }
@@ -2029,6 +2125,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             BackgroundListenMode.SMS_REPLY -> 3800L
             BackgroundListenMode.GENERAL_COMMAND -> 2800L
             BackgroundListenMode.CALLER_MESSAGE -> 4600L
+            BackgroundListenMode.CALL_OWNER_DECISION -> 3400L
             BackgroundListenMode.SAFETY_CHECK_IN -> 3400L
             else -> 2400L
         }
@@ -2036,6 +2133,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             BackgroundListenMode.SMS_REPLY -> 14000L
             BackgroundListenMode.GENERAL_COMMAND -> 9000L
             BackgroundListenMode.CALLER_MESSAGE -> 18000L
+            BackgroundListenMode.CALL_OWNER_DECISION -> 12000L
             BackgroundListenMode.SAFETY_CHECK_IN -> 15000L
             else -> 5000L
         }
@@ -2142,6 +2240,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             BackgroundListenMode.NOTIFICATION_COMMAND -> "notification listening"
             BackgroundListenMode.SAFETY_CHECK_IN -> "safety check-in listening"
             BackgroundListenMode.CALLER_MESSAGE -> "caller message listening"
+            BackgroundListenMode.CALL_OWNER_DECISION -> "call owner decision listening"
             BackgroundListenMode.REMINDER_CHECK_IN -> "reminder check-in listening"
         }
     }
@@ -2335,7 +2434,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val KEY_REMOTE_REPLY_TEXT = "dex_remote_reply_text"
         private const val AUTO_TAKE_MESSAGE_DELAY_MS = 5500L
         private const val CALL_MESSAGE_END_DELAY_MS = 1200L
+        private const val CALL_OWNER_PROMPT_DELAY_MS = 3500L
         private const val MAX_CALL_MESSAGE_CAPTURE_ATTEMPTS = 2
+        private const val MAX_CALL_OWNER_DECISION_ATTEMPTS = 2
         private const val MAX_NOTIFICATION_COMMAND_ATTEMPTS = 2
         private const val MAX_SAFETY_CHECK_IN_ATTEMPTS = 2
         private const val SAFETY_MEMORY_WINDOW_MS = 6 * 60 * 60 * 1000L
