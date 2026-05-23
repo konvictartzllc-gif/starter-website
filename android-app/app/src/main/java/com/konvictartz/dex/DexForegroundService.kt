@@ -88,6 +88,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private var callMessageCaptureAttempts = 0
     private var callOwnerDecisionAttempts = 0
     private var pendingScreenedCaller: String? = null
+    private var pendingScreenedNumber: String? = null
     private var pendingScreenedMessage: String? = null
     private var notificationCommandAttempts = 0
     private var callScreeningPhraseIndex = 0
@@ -482,7 +483,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             TelephonyManager.CALL_STATE_IDLE -> {
                 clearPendingAutoTakeMessage()
                 callMessageCaptureAttempts = 0
-                clearPendingCallScreeningDecision()
+                if (pendingScreenedMessage == null) {
+                    clearPendingCallScreeningDecision()
+                }
                 dismissNotification(CALL_NOTIFICATION_ID)
                 if (lastCallState == TelephonyManager.CALL_STATE_RINGING && !currentCallWasAnswered) {
                     postCallEvent("declined", resolvedCaller)
@@ -561,6 +564,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun clearPendingCallScreeningDecision() {
         callOwnerDecisionAttempts = 0
         pendingScreenedCaller = null
+        pendingScreenedNumber = null
         pendingScreenedMessage = null
     }
 
@@ -1552,6 +1556,23 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun placeDirectCall(phoneNumber: String, spokenTarget: String) {
+        if (!hasPermission(Manifest.permission.CALL_PHONE)) {
+            speakShortStatus(getString(R.string.call_phone_permission_missing))
+            return
+        }
+        val intent = Intent(Intent.ACTION_CALL).apply {
+            data = Uri.parse("tel:$phoneNumber")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            startActivity(intent)
+            speakShortStatus(getString(R.string.call_owner_decision_connect, spokenTarget))
+        } catch (_: Exception) {
+            speakShortStatus(getString(R.string.action_open_failed))
+        }
+    }
+
     private fun sendReminderText(target: String, body: String) {
         val phoneNumber = findPhoneNumberByContactName(target)
         if (phoneNumber.isNullOrBlank()) {
@@ -1622,61 +1643,65 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             message = parsedMessage.message
         )
         callMessageCaptureAttempts = 0
-        speakShortStatus(getString(R.string.call_screening_hold_prompt))
+        speakShortStatus(getString(R.string.call_answering_machine_caller_done))
         pendingScreenedCaller = caller
+        pendingScreenedNumber = lastIncomingNumber
         pendingScreenedMessage = parsedMessage.message
         callOwnerDecisionAttempts = 0
         mainHandler.postDelayed({
-            if (lastCallState == TelephonyManager.CALL_STATE_OFFHOOK) {
-                speakAndThenListen(
-                    getString(R.string.call_screening_owner_prompt, caller, parsedMessage.message),
-                    BackgroundListenMode.CALL_OWNER_DECISION
-                )
-            }
+            endCurrentCall()
+        }, CALL_ANSWERING_MACHINE_END_DELAY_MS)
+        mainHandler.postDelayed({
+            speakAndThenListen(
+                getString(R.string.call_screening_owner_prompt, caller, parsedMessage.message),
+                BackgroundListenMode.CALL_OWNER_DECISION
+            )
         }, CALL_OWNER_PROMPT_DELAY_MS)
     }
 
     private fun handleCallOwnerDecisionCommand(normalized: String): Boolean {
         val caller = pendingScreenedCaller ?: lastCaller
+        val number = pendingScreenedNumber.orEmpty()
         val message = pendingScreenedMessage.orEmpty()
         return when {
             normalized.contains("connect") ||
                 normalized.contains("put them through") ||
+                normalized.contains("call back") ||
+                normalized.contains("call them") ||
                 normalized.contains("let me talk") ||
                 normalized.contains("i'll take") ||
                 normalized.contains("ill take") ||
                 normalized.contains("take the call") ||
                 normalized.contains("answer") -> {
-                postCallEvent("screening_connected", caller, message.ifBlank { null }, lastIncomingNumber)
+                postCallEvent("screening_callback", caller, message.ifBlank { null }, number.ifBlank { null })
                 clearPendingCallScreeningDecision()
-                enableSpeakerForActiveCall()
-                speakShortStatus(getString(R.string.call_owner_decision_connect, caller))
+                if (number.isNotBlank()) {
+                    placeDirectCall(number, caller)
+                } else {
+                    speakShortStatus(getString(R.string.call_message_action_unavailable, caller))
+                }
                 true
             }
             normalized.contains("text") ||
                 normalized.contains("message them") -> {
-                val number = lastIncomingNumber.orEmpty()
                 if (number.isNotBlank()) {
                     sendPhoneSms(number, getString(R.string.call_message_text_back_body, caller), caller)
                 } else {
                     speakShortStatus(getString(R.string.call_message_action_unavailable, caller))
                 }
-                postCallEvent("screening_text_back", caller, message.ifBlank { null }, lastIncomingNumber)
+                postCallEvent("screening_text_back", caller, message.ifBlank { null }, number.ifBlank { null })
                 clearPendingCallScreeningDecision()
-                mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
                 true
             }
             normalized.contains("save") ||
                 normalized.contains("take a message") ||
-                normalized.contains("call back") ||
                 normalized.contains("later") ||
                 normalized.contains("busy") ||
                 normalized.contains("can't talk") ||
                 normalized.contains("cant talk") -> {
-                postCallEvent("screening_saved", caller, message.ifBlank { null }, lastIncomingNumber)
+                postCallEvent("screening_saved", caller, message.ifBlank { null }, number.ifBlank { null })
                 clearPendingCallScreeningDecision()
                 speakShortStatus(getString(R.string.call_owner_decision_saved, caller))
-                mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
                 true
             }
             normalized.contains("end") ||
@@ -1684,10 +1709,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 normalized.contains("decline") ||
                 normalized.contains("not available") ||
                 normalized.contains("ignore") -> {
-                postCallEvent("screening_ended", caller, message.ifBlank { null }, lastIncomingNumber)
+                postCallEvent("screening_ignored", caller, message.ifBlank { null }, number.ifBlank { null })
                 clearPendingCallScreeningDecision()
                 speakShortStatus(getString(R.string.call_owner_decision_end, caller))
-                mainHandler.postDelayed({ endCurrentCall() }, CALL_MESSAGE_END_DELAY_MS)
                 true
             }
             else -> false
@@ -2434,7 +2458,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val KEY_REMOTE_REPLY_TEXT = "dex_remote_reply_text"
         private const val AUTO_TAKE_MESSAGE_DELAY_MS = 5500L
         private const val CALL_MESSAGE_END_DELAY_MS = 1200L
-        private const val CALL_OWNER_PROMPT_DELAY_MS = 3500L
+        private const val CALL_OWNER_PROMPT_DELAY_MS = 5200L
+        private const val CALL_ANSWERING_MACHINE_END_DELAY_MS = 3000L
         private const val MAX_CALL_MESSAGE_CAPTURE_ATTEMPTS = 2
         private const val MAX_CALL_OWNER_DECISION_ATTEMPTS = 2
         private const val MAX_NOTIFICATION_COMMAND_ATTEMPTS = 2
