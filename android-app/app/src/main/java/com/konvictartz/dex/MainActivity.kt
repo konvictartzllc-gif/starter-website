@@ -4987,13 +4987,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionCard.setCardBackgroundColor(ColorUtils.setAlphaComponent(skinColors.card, 220))
         binding.dexCompanionCard.strokeColor = cardTint
         binding.dexCompanionCard.strokeWidth = dpToPx(if (unlockLevel >= 3) 2 else 1)
-        binding.dexCompanionFace.setCardBackgroundColor(faceTint)
+        binding.dexCompanionFace.setCardBackgroundColor(ColorUtils.blendARGB(faceTint, android.graphics.Color.WHITE, 0.2f))
         binding.dexCompanionFace.strokeColor = labelTint
         binding.dexCompanionFace.radius = dpToPx(
             when (currentDexCompanionSize.lowercase(Locale.US)) {
-                DEX_COMPANION_SIZE_SMALL -> if (isPixelFace) 18 else 28
-                DEX_COMPANION_SIZE_LARGE -> if (isPixelFace) 24 else 44
-                else -> if (isPixelFace) 20 else 36
+                DEX_COMPANION_SIZE_SMALL -> if (isPixelFace) 18 else 24
+                DEX_COMPANION_SIZE_LARGE -> if (isPixelFace) 26 else 34
+                else -> if (isPixelFace) 22 else 30
             }
         ).toFloat()
         binding.dexCompanionLabel.setTextColor(labelTint)
@@ -5027,14 +5027,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         val faceSize = dpToPx(
             when (currentDexCompanionSize.lowercase(Locale.US)) {
-                DEX_COMPANION_SIZE_SMALL -> 56
-                DEX_COMPANION_SIZE_LARGE -> 88
-                else -> 72
+                DEX_COMPANION_SIZE_SMALL -> 70
+                DEX_COMPANION_SIZE_LARGE -> 96
+                else -> 82
             }
         )
         binding.dexCompanionFace.layoutParams = binding.dexCompanionFace.layoutParams.apply {
             width = faceSize
-            height = faceSize
+            height = (faceSize * 1.12f).toInt()
         }
 
         val mouthWidth = dpToPx(companionMouthWidthDp(activeState))
@@ -5050,8 +5050,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val eyeScale = companionEyeScale(activeState)
         binding.dexCompanionEyeLeft.scaleY = eyeScale
         binding.dexCompanionEyeRight.scaleY = if (isWinkFace && activeState == DEX_COMPANION_STATE_IDLE) 0.35f else eyeScale
-        binding.dexCompanionEyeLeft.scaleX = if (isPixelFace) 1.25f else 1f
-        binding.dexCompanionEyeRight.scaleX = if (isPixelFace) 1.25f else 1f
+        binding.dexCompanionEyeLeft.scaleX = if (isPixelFace) 1.25f else if (activeState == DEX_COMPANION_STATE_TALKING) 1.08f else 1f
+        binding.dexCompanionEyeRight.scaleX = if (isPixelFace) 1.25f else if (activeState == DEX_COMPANION_STATE_TALKING) 1.08f else 1f
         binding.dexCompanionFace.scaleX = companionFaceScale(activeState)
         binding.dexCompanionFace.scaleY = companionFaceScale(activeState)
         binding.dexCompanionCard.alpha = if (activeState == DEX_COMPANION_STATE_PENDING) 1f else 0.98f
@@ -5581,6 +5581,32 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
         }
+        val faceDriftAnimator = ObjectAnimator.ofFloat(
+            binding.dexCompanionFace,
+            View.TRANSLATION_X,
+            0f,
+            when {
+                motionKey == DEX_COMPANION_MOOD_PLAYFUL -> dpToPx(4).toFloat()
+                dexCompanionState == DEX_COMPANION_STATE_ALERT -> -dpToPx(2).toFloat()
+                else -> dpToPx(2).toFloat()
+            },
+            0f
+        ).apply {
+            this.duration = duration + 450L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+        }
+        val faceTiltAnimator = ObjectAnimator.ofFloat(
+            binding.dexCompanionFace,
+            View.ROTATION,
+            -2.5f,
+            if (motionKey == DEX_COMPANION_MOOD_PLAYFUL) 3.5f else 2f,
+            -2.5f
+        ).apply {
+            this.duration = duration + 700L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+        }
         val bubbleAnimator = ObjectAnimator.ofFloat(
             binding.dexCompanionBubble,
             View.TRANSLATION_Y,
@@ -5607,8 +5633,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
         }
+        val eyePulse = ObjectAnimator.ofFloat(
+            binding.dexCompanionEyeLeft,
+            View.ALPHA,
+            0.72f,
+            1f,
+            0.78f
+        ).apply {
+            this.duration = duration - 120L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+        }
+        val eyePulseRight = ObjectAnimator.ofFloat(
+            binding.dexCompanionEyeRight,
+            View.ALPHA,
+            0.78f,
+            1f,
+            0.72f
+        ).apply {
+            this.duration = duration - 120L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+        }
         dexCompanionFloatAnimator = AnimatorSet().apply {
-            playTogether(faceAnimator, bubbleAnimator, labelAnimator)
+            playTogether(faceAnimator, faceDriftAnimator, faceTiltAnimator, bubbleAnimator, labelAnimator, eyePulse, eyePulseRight)
             start()
         }
     }
@@ -5693,6 +5741,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         dexCompanionEventAnimator?.cancel()
         dexCompanionEventAnimator = null
         binding.dexCompanionFace.translationY = 0f
+        binding.dexCompanionFace.translationX = 0f
+        binding.dexCompanionFace.rotation = 0f
         binding.dexCompanionBubble.translationY = 0f
         binding.dexCompanionLabel.translationX = 0f
         binding.dexCompanionLabel.translationY = 0f
@@ -5700,6 +5750,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.dexCompanionBubble.scaleY = 1f
         binding.dexCompanionEyeLeft.scaleY = 1f
         binding.dexCompanionEyeRight.scaleY = 1f
+        binding.dexCompanionEyeLeft.alpha = 1f
+        binding.dexCompanionEyeRight.alpha = 1f
     }
 
     private fun scheduleDexCompanionBlink() {

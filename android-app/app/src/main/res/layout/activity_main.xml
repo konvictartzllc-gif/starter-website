@@ -4185,10 +4185,10 @@
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/dexCompanionFace"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
+                    android:layout_width="78dp"
+                    android:layout_height="88dp"
                     app:cardBackgroundColor="@color/dex_accent_soft"
-                    app:cardCornerRadius="36dp"
+                    app:cardCornerRadius="30dp"
                     app:strokeColor="@color/dex_accent"
                     app:strokeWidth="1dp">
 
@@ -4199,17 +4199,37 @@
                         android:clipToPadding="false">
 
                         <View
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:alpha="0.92"
+                            android:background="@drawable/dex_companion_shell" />
+
+                        <View
                             android:id="@+id/dexCompanionHalo"
-                            android:layout_width="52dp"
-                            android:layout_height="52dp"
+                            android:layout_width="68dp"
+                            android:layout_height="68dp"
                             android:layout_gravity="top|center_horizontal"
-                            android:layout_marginTop="-8dp"
+                            android:layout_marginTop="-10dp"
                             android:background="@drawable/dex_companion_ring"
                             android:visibility="gone" />
 
                         <View
+                            android:layout_width="30dp"
+                            android:layout_height="6dp"
+                            android:layout_gravity="top|center_horizontal"
+                            android:layout_marginTop="-2dp"
+                            android:background="@drawable/dex_companion_bar" />
+
+                        <View
+                            android:layout_width="10dp"
+                            android:layout_height="10dp"
+                            android:layout_gravity="top|center_horizontal"
+                            android:layout_marginTop="-8dp"
+                            android:background="@drawable/dex_companion_feature" />
+
+                        <View
                             android:id="@+id/dexCompanionHeadphonesBand"
-                            android:layout_width="44dp"
+                            android:layout_width="50dp"
                             android:layout_height="10dp"
                             android:layout_gravity="top|center_horizontal"
                             android:layout_marginTop="8dp"
@@ -4218,21 +4238,28 @@
 
                         <View
                             android:id="@+id/dexCompanionHeadphonesLeft"
-                            android:layout_width="8dp"
-                            android:layout_height="22dp"
+                            android:layout_width="12dp"
+                            android:layout_height="26dp"
                             android:layout_gravity="center_vertical|start"
-                            android:layout_marginStart="3dp"
-                            android:background="@drawable/dex_companion_bar"
-                            android:visibility="gone" />
+                            android:layout_marginStart="-4dp"
+                            android:background="@drawable/dex_companion_ear" />
 
                         <View
                             android:id="@+id/dexCompanionHeadphonesRight"
-                            android:layout_width="8dp"
-                            android:layout_height="22dp"
+                            android:layout_width="12dp"
+                            android:layout_height="26dp"
                             android:layout_gravity="center_vertical|end"
-                            android:layout_marginEnd="3dp"
-                            android:background="@drawable/dex_companion_bar"
-                            android:visibility="gone" />
+                            android:layout_marginEnd="-4dp"
+                            android:background="@drawable/dex_companion_ear" />
+
+                        <View
+                            android:layout_width="22dp"
+                            android:layout_height="16dp"
+                            android:layout_gravity="top|start"
+                            android:layout_marginStart="10dp"
+                            android:layout_marginTop="7dp"
+                            android:alpha="0.62"
+                            android:background="@drawable/dex_companion_gloss" />
 
                         <LinearLayout
                             android:id="@+id/dexCompanionGlassesRow"
@@ -4265,37 +4292,78 @@
                                 android:background="@drawable/dex_companion_lens" />
                         </LinearLayout>
 
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
+                        <FrameLayout
+                            android:layout_width="56dp"
+                            android:layout_height="44dp"
                             android:gravity="center"
-                            android:orientation="vertical">
+                            android:layout_gravity="top|center_horizontal"
+                            android:layout_marginTop="21dp"
+                            android:background="@drawable/dex_companion_faceplate">
 
                             <LinearLayout
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:layout_gravity="center_horizontal"
+                                android:layout_marginTop="12dp"
                                 android:gravity="center"
                                 android:orientation="horizontal">
 
                                 <View
                                     android:id="@+id/dexCompanionEyeLeft"
-                                    android:layout_width="8dp"
-                                    android:layout_height="8dp"
-                                    android:background="@drawable/dex_companion_feature" />
+                                    android:layout_width="10dp"
+                                    android:layout_height="13dp"
+                                    android:background="@drawable/dex_companion_eye" />
 
                                 <View
                                     android:id="@+id/dexCompanionEyeRight"
-                                    android:layout_width="8dp"
-                                    android:layout_height="8dp"
-                                    android:layout_marginStart="12dp"
-                                    android:background="@drawable/dex_companion_feature" />
+                                    android:layout_width="10dp"
+                                    android:layout_height="13dp"
+                                    android:layout_marginStart="16dp"
+                                    android:background="@drawable/dex_companion_eye" />
                             </LinearLayout>
 
                             <View
                                 android:id="@+id/dexCompanionMouth"
                                 android:layout_width="18dp"
-                                android:layout_height="4dp"
-                                android:layout_marginTop="12dp"
+                                android:layout_height="3dp"
+                                android:layout_gravity="bottom|center_horizontal"
+                                android:layout_marginBottom="8dp"
+                                android:background="@drawable/dex_companion_feature" />
+
+                            <View
+                                android:layout_width="15dp"
+                                android:layout_height="8dp"
+                                android:layout_gravity="top|start"
+                                android:layout_marginStart="8dp"
+                                android:layout_marginTop="4dp"
+                                android:alpha="0.34"
+                                android:background="@drawable/dex_companion_gloss" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="48dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="bottom|center_horizontal"
+                            android:layout_marginBottom="7dp"
+                            android:background="@drawable/dex_companion_body_panel"
+                            android:gravity="center"
+                            android:orientation="horizontal">
+
+                            <View
+                                android:layout_width="5dp"
+                                android:layout_height="5dp"
+                                android:background="@drawable/dex_companion_feature" />
+
+                            <View
+                                android:layout_width="5dp"
+                                android:layout_height="5dp"
+                                android:layout_marginStart="7dp"
+                                android:layout_marginEnd="7dp"
+                                android:background="@drawable/dex_companion_feature" />
+
+                            <View
+                                android:layout_width="5dp"
+                                android:layout_height="5dp"
                                 android:background="@drawable/dex_companion_feature" />
                         </LinearLayout>
                     </FrameLayout>
