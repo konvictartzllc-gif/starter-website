@@ -786,7 +786,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             .map { it.trim().lowercase(Locale.US) }
                             .firstNotNullOfOrNull { parseCallVoiceAction(it) }
                         when {
-                            action == CallVoiceAction.ANSWER -> answerRingingCall()
+                            action == CallVoiceAction.ANSWER -> takeMessageForCurrentCaller()
                             action == CallVoiceAction.ANSWER_ON_SPEAKER -> {
                                 enableSpeakerAfterAnswer = true
                                 answerRingingCall()
@@ -887,7 +887,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         binding.answerCallButton.setOnClickListener {
-            answerRingingCall()
+            takeMessageForCurrentCaller()
         }
 
         binding.declineCallButton.setOnClickListener {
@@ -7217,11 +7217,28 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized == "answer" ||
                 normalized.startsWith("answer ") ||
                 normalized == "answer it" ||
+                normalized == "answer the call" ||
+                normalized == "answer phone" ||
+                normalized == "answer the phone" ||
+                normalized.contains("answer it for me") ||
+                normalized.contains("dex answer") ||
+                normalized.contains("answer as dex") ||
+                normalized.contains("answer like voicemail") ||
+                normalized.contains("answering machine") ||
+                normalized.contains("get their name") ||
+                normalized.contains("get the name") ||
+                normalized.contains("get a reason") ||
+                normalized.contains("get the reason") ||
+                normalized.contains("ask their name") ||
+                normalized.contains("ask for their name") ||
+                normalized.contains("ask who is calling") ||
+                normalized.contains("ask why they") ||
+                normalized.contains("ask what they want") ||
+                normalized.contains("find out who") ||
+                normalized.contains("find out why") ||
                 normalized == "pick it up" ||
                 normalized == "accept" ||
-                normalized.startsWith("accept ") ||
-                normalized.contains("pick up") ||
-                normalized.contains("take the call") -> CallVoiceAction.ANSWER
+                normalized.startsWith("accept ") -> CallVoiceAction.ANSWER
             normalized == "no" ||
                 normalized.startsWith("no ") ||
             normalized == "decline" ||
@@ -7230,6 +7247,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 normalized == "reject" ||
                 normalized.startsWith("reject ") ||
                 normalized == "send it away" ||
+                normalized == "ignore" ||
+                normalized == "ignore it" ||
+                normalized.contains("don't answer") ||
+                normalized.contains("do not answer") ||
+                normalized.contains("dont answer") ||
+                normalized.contains("let it ring") ||
+                normalized.contains("leave it") ||
+                normalized.contains("dismiss it") ||
                 normalized.contains("hang up") ||
                 normalized.contains("ignore the call") -> CallVoiceAction.DECLINE
             else -> null

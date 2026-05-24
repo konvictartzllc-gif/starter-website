@@ -798,8 +798,8 @@
     <string name="call_not_ringing">Dex did not find a ringing call to answer.</string>
     <string name="call_decline_failed">Dex could not decline the ringing call.</string>
     <string name="call_listening">Dex is listening for a call command.</string>
-    <string name="call_listening_retry">Still listening. Say answer, decline, speaker, or take a message.</string>
-    <string name="call_command_retry_prompt">I missed that. Say answer, decline, speaker, or take a message.</string>
+    <string name="call_listening_retry">Still listening. Say answer it, ignore it, speaker, or take a message.</string>
+    <string name="call_command_retry_prompt">I missed that. Say answer it, ignore it, speaker, or take a message.</string>
     <string name="call_voice_unavailable">Voice commands are not available on this device right now.</string>
     <string name="call_spam_blocked">Dex blocked a likely spam call.</string>
     <string name="call_speaker_enabled">I turned on speaker for this call.</string>
@@ -834,7 +834,7 @@
     <string name="call_owner_decision_connect">Calling %1$s back now.</string>
     <string name="call_owner_decision_saved">I saved %1$s\'s message for later.</string>
     <string name="call_owner_decision_end">Okay. I saved %1$s\'s message and will leave it there.</string>
-    <string name="answer_call">Answer</string>
+    <string name="answer_call">Dex answer</string>
     <string name="take_message_call">Take message</string>
     <string name="decline_call">Decline</string>
     <string name="logged_in_message">You are connected to Dex on this phone.</string>

@@ -161,7 +161,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ACTION_ANNOUNCE_NOTIFICATION -> handleIncomingNotification(intent)
             ACTION_SAFETY_CHECK_IN -> handleSafetyCheckIn(intent)
             ACTION_REMINDER_CHECK_IN -> handleReminderCheckIn(intent)
-            ACTION_CALL_ANSWER -> handleCallAnswerAction()
+            ACTION_CALL_ANSWER -> handleCallTakeMessageAction()
             ACTION_CALL_DECLINE -> handleCallDeclineAction()
             ACTION_CALL_TAKE_MESSAGE -> handleCallTakeMessageAction()
             ACTION_SMS_READ -> handleSmsReadAction()
