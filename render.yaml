@@ -52,6 +52,8 @@ services:
         value: "999"
       - key: DEX_CURRENCY
         value: usd
+      - key: DEX_ANDROID_APK_URL
+        sync: false
       - key: RC_CLIENT_ID
         sync: false
       - key: RC_CLIENT_SECRET

@@ -13,19 +13,50 @@ function getToken() {
   return localStorage.getItem("dex_token");
 }
 
-async function request(path, options = {}) {
+function authHeaders(extra = {}) {
   const token = getToken();
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extra,
+  };
+}
+
+async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...authHeaders(),
       ...(options.headers || {}),
     },
   });
   const data = await res.json();
   if (!res.ok) throw { status: res.status, ...data };
   return data;
+}
+
+async function download(path, filename) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    let error = { status: res.status, error: "Download failed" };
+    try {
+      error = { ...error, ...(await res.json()) };
+    } catch {}
+    throw error;
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 export const api = {
@@ -89,6 +120,7 @@ export const api = {
 
   // Affiliate
   getAffiliateDashboard: () => request("/affiliate/dashboard"),
+  downloadAffiliateAndroid: () => download("/affiliate/android/download", "Dex-Assistant.apk"),
 
   // Admin
   getAdminStats: () => request("/admin/stats"),

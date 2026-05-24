@@ -12,6 +12,8 @@ export default function AffiliateDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState("");
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -25,6 +27,19 @@ export default function AffiliateDashboard() {
     navigator.clipboard.writeText(data.referralLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function downloadDexAssistant() {
+    setDownloading(true);
+    setDownloadStatus("");
+    try {
+      await api.downloadAffiliateAndroid();
+      setDownloadStatus("Download started. Open the APK on your phone and allow install if Android asks.");
+    } catch (err) {
+      setDownloadStatus(err.detail || err.error || "Dex download is not ready yet.");
+    } finally {
+      setDownloading(false);
+    }
   }
 
   if (!user) {
@@ -87,6 +102,35 @@ export default function AffiliateDashboard() {
               {copied ? "Copied!" : "Copy"}
             </button>
           </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl p-4 mb-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-brand mb-1">Affiliate Only</p>
+              <h2 className="text-xl font-bold">Download Dex Assistant</h2>
+              <p className="text-sm text-gray-400 mt-1">
+                Install Dex on your Android phone so your affiliate account has the same assistant tools from the site.
+              </p>
+            </div>
+            <button
+              onClick={downloadDexAssistant}
+              disabled={downloading}
+              className="bg-brand hover:bg-brand-light disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg px-5 py-3 font-semibold transition-all"
+            >
+              {downloading ? "Preparing..." : "Download APK"}
+            </button>
+          </div>
+          {downloadStatus && (
+            <p className={`mt-3 text-sm ${downloadStatus.includes("not ready") || downloadStatus.includes("configured") ? "text-amber-300" : "text-green-300"}`}>
+              {downloadStatus}
+            </p>
+          )}
+          {!data.androidDownloadAvailable && (
+            <p className="mt-3 text-xs text-gray-500">
+              The affiliate download button is protected and ready. Add the APK URL on the backend to turn on live downloads.
+            </p>
+          )}
         </div>
 
         {/* How it works */}
