@@ -7,9 +7,23 @@ import LearningHub from "../components/LearningHub.jsx";
 import Permissions from "../components/Permissions.jsx";
 import Preferences from "../components/Preferences.jsx";
 
+const ADMIN_TABS = ["stats", "dex tools", "flags", "inventory", "affiliates", "promo", "users"];
+
+function normalizeAdminTab(value) {
+  const tab = String(value || "")
+    .replace(/-/g, " ")
+    .trim()
+    .toLowerCase();
+  return ADMIN_TABS.includes(tab) ? tab : "dex tools";
+}
+
 export default function AdminPortal() {
   const { user, login, logout } = useAuth();
-  const [tab, setTab] = useState("stats");
+  const [tab, setTab] = useState(() => {
+    const urlTab = new URLSearchParams(window.location.search).get("tab");
+    return normalizeAdminTab(urlTab || localStorage.getItem("dex_admin_tab"));
+  });
+  const [previousTab, setPreviousTab] = useState(null);
   const [stats, setStats] = useState(null);
   const [inventory, setInventory] = useState([]);
   const [affiliates, setAffiliates] = useState([]);
@@ -43,6 +57,20 @@ export default function AdminPortal() {
   const [testEmail, setTestEmail] = useState("");
 
   const isAdmin = user?.role === "admin";
+
+  function updateAdminTab(nextTab, options = {}) {
+    const normalized = normalizeAdminTab(nextTab);
+    if (normalized === tab && !options.replace) return;
+
+    setPreviousTab(options.trackPrevious === false ? previousTab : tab);
+    setTab(normalized);
+    localStorage.setItem("dex_admin_tab", normalized);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", normalized.replace(/\s+/g, "-"));
+    const method = options.replace ? "replaceState" : "pushState";
+    window.history[method]({ adminTab: normalized }, "", url);
+  }
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -93,6 +121,25 @@ export default function AdminPortal() {
     loadAffiliateInvites();
     loadUsers();
     loadFeatureFlags();
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab.replace(/\s+/g, "-"));
+    window.history.replaceState({ adminTab: tab }, "", url);
+    localStorage.setItem("dex_admin_tab", tab);
+
+    function handlePopState() {
+      const nextTab = normalizeAdminTab(new URLSearchParams(window.location.search).get("tab"));
+      setPreviousTab(tab);
+      setTab(nextTab);
+      localStorage.setItem("dex_admin_tab", nextTab);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [isAdmin]);
 
   async function handleAddInventory(e) {
@@ -279,8 +326,6 @@ export default function AdminPortal() {
     );
   }
 
-  const tabs = ["stats", "dex tools", "flags", "inventory", "affiliates", "promo", "users"];
-
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <div className="bg-gray-900 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
@@ -292,10 +337,10 @@ export default function AdminPortal() {
       </div>
 
       <div className="flex gap-1 px-6 pt-4 overflow-x-auto">
-        {tabs.map((t) => (
+        {ADMIN_TABS.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => updateAdminTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all ${
               tab === t ? "bg-brand text-white" : "bg-gray-800 text-gray-400 hover:text-white"
             }`}
@@ -312,6 +357,25 @@ export default function AdminPortal() {
       )}
 
       <div className="p-6">
+        {tab !== "dex tools" && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => updateAdminTab(previousTab || "dex tools")}
+              className="bg-gray-800 hover:bg-gray-700 text-white rounded-lg px-4 py-2 text-sm font-semibold transition-all"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => updateAdminTab("dex tools")}
+              className="bg-brand hover:bg-brand-light text-white rounded-lg px-4 py-2 text-sm font-semibold transition-all"
+            >
+              Dex Tools
+            </button>
+          </div>
+        )}
+
         {tab === "stats" && stats && (
           <div>
             <h2 className="text-lg font-bold mb-4">Dashboard Overview</h2>
