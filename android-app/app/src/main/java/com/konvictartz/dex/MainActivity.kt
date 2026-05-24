@@ -6944,6 +6944,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.CALL_PHONE,
+            Manifest.permission.SEND_SMS,
             Manifest.permission.RECEIVE_SMS,
             Manifest.permission.RECORD_AUDIO
         )
@@ -6957,13 +6958,48 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun updateAndroidPermissionStatus() {
         val ready = hasAllAndroidPermissions()
-        binding.androidPermissionStatus.text =
-            if (ready) getString(R.string.android_permissions_ready)
-            else getString(R.string.android_permissions_missing)
+        binding.androidPermissionStatus.text = buildAllAccessAssistantChecklist(ready)
         if (!ready) autoWakeStarted = false
         refreshSafetyDiagnostics()
         refreshInteractionStates()
         updateAdvancedDeviceAccessStatus()
+    }
+
+    private fun buildAllAccessAssistantChecklist(runtimeReady: Boolean): String {
+        val overlayReady = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(this) else true
+        val accessibilityReady = isDexAccessibilityEnabled() || DexAccessibilityService.isRunning()
+        val notificationReady = hasNotificationPermissionForReminder()
+        val backgroundReady = shouldRunBackgroundService()
+        val lines = listOf(
+            permissionStatusLine(getString(R.string.all_access_account_phone), phoneBackendEnabled),
+            permissionStatusLine(getString(R.string.all_access_phone_state), hasRuntimePermission(Manifest.permission.READ_PHONE_STATE)),
+            permissionStatusLine(getString(R.string.all_access_call_log), hasRuntimePermission(Manifest.permission.READ_CALL_LOG)),
+            permissionStatusLine(getString(R.string.all_access_contacts), hasRuntimePermission(Manifest.permission.READ_CONTACTS)),
+            permissionStatusLine(getString(R.string.all_access_answer_calls), hasRuntimePermission(Manifest.permission.ANSWER_PHONE_CALLS)),
+            permissionStatusLine(getString(R.string.all_access_place_calls), hasRuntimePermission(Manifest.permission.CALL_PHONE)),
+            permissionStatusLine(getString(R.string.all_access_sms_send), hasRuntimePermission(Manifest.permission.SEND_SMS)),
+            permissionStatusLine(getString(R.string.all_access_sms_receive), hasRuntimePermission(Manifest.permission.RECEIVE_SMS)),
+            permissionStatusLine(getString(R.string.all_access_microphone), hasRuntimePermission(Manifest.permission.RECORD_AUDIO)),
+            permissionStatusLine(getString(R.string.all_access_notifications), notificationReady),
+            permissionStatusLine(getString(R.string.all_access_floating_dex), overlayReady),
+            permissionStatusLine(getString(R.string.all_access_assistant_control), accessibilityReady),
+            permissionStatusLine(getString(R.string.all_access_background_service), backgroundReady)
+        )
+        val header = if (runtimeReady && overlayReady && accessibilityReady && backgroundReady && phoneBackendEnabled) {
+            getString(R.string.android_permissions_ready)
+        } else {
+            getString(R.string.android_permissions_missing)
+        }
+        return "$header\n\n${lines.joinToString("\n")}"
+    }
+
+    private fun hasRuntimePermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun permissionStatusLine(label: String, ready: Boolean): String {
+        val mark = if (ready) getString(R.string.access_status_ready_mark) else getString(R.string.access_status_missing_mark)
+        return "$mark $label"
     }
 
     private fun updateAdvancedDeviceAccessStatus() {
