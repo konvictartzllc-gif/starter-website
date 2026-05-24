@@ -340,6 +340,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexCompanionFloatAnimator: AnimatorSet? = null
     private var dexCompanionEventAnimator: AnimatorSet? = null
     private var advancedDeviceAccessStatusView: TextView? = null
+    private var fixNextAccessButton: MaterialButton? = null
     private var dexCompanionBlinkScheduled = false
     private var dexCompanionDragDownRawX = 0f
     private var dexCompanionDragDownRawY = 0f
@@ -1836,6 +1837,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val parent = binding.backgroundAccessMessage.parent as? LinearLayout ?: return
         val insertIndex = parent.indexOfChild(binding.backgroundAccessMessage).coerceAtLeast(0)
 
+        val fixAccessParent = binding.androidPermissionStatus.parent as? LinearLayout
+        val fixAccessIndex = fixAccessParent?.indexOfChild(binding.androidPermissionStatus)?.coerceAtLeast(0) ?: 0
+        fixNextAccessButton = MaterialButton(this).apply {
+            text = getString(R.string.fix_next_access_step)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dpToPx(8) }
+            setOnClickListener { openNextMissingAssistantAccessStep() }
+        }
+        fixAccessParent?.addView(fixNextAccessButton, fixAccessIndex)
+
         val overlayButton = MaterialButton(
             this,
             null,
@@ -2047,6 +2060,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         applyActionButtonState(binding.setupWakeWordButton, true, muted)
         applyActionButtonState(binding.wakeModeButton, true, if (wakeModeEnabled) roleSignal else accent, android.graphics.Color.BLACK)
         applyActionButtonState(binding.requestAndroidPermissionsButton, binding.requestAndroidPermissionsButton.isEnabled, muted)
+        fixNextAccessButton?.let { button ->
+            applyActionButtonState(button, button.isEnabled, accent, android.graphics.Color.BLACK)
+        }
         applyActionButtonState(binding.answerCallButton, binding.answerCallButton.isEnabled, healthy)
         applyActionButtonState(binding.declineCallButton, binding.declineCallButton.isEnabled, warn)
         applyActionButtonState(binding.approveActionButton, binding.approveActionButton.isEnabled, healthy)
@@ -6873,6 +6889,36 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .show()
     }
 
+    private fun openNextMissingAssistantAccessStep() {
+        when {
+            !phoneBackendEnabled -> {
+                binding.permissionsMessage.text = getString(R.string.all_access_next_enable_phone)
+                binding.phonePermissionSwitch.requestFocus()
+            }
+            !hasAllAndroidPermissions() -> {
+                binding.permissionsMessage.text = getString(R.string.all_access_next_runtime)
+                requestAndroidPermissions()
+            }
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this) -> {
+                binding.permissionsMessage.text = getString(R.string.all_access_next_overlay)
+                openOverlaySettings()
+            }
+            !isDexAccessibilityEnabled() && !DexAccessibilityService.isRunning() -> {
+                binding.permissionsMessage.text = getString(R.string.all_access_next_accessibility)
+                openAccessibilitySettings()
+            }
+            !shouldRunBackgroundService() -> {
+                binding.permissionsMessage.text = getString(R.string.all_access_next_background)
+                openBatterySettings()
+            }
+            else -> {
+                binding.permissionsMessage.text = getString(R.string.all_access_complete)
+                updateAndroidPermissionStatus()
+                refreshCallMonitorState()
+            }
+        }
+    }
+
     private fun openAppSettings() {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.fromParts("package", packageName, null)
@@ -11458,6 +11504,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         binding.calendarPermissionSwitch.isEnabled = enabled
         binding.notificationsPermissionSwitch.isEnabled = enabled
         binding.requestAndroidPermissionsButton.isEnabled = !loading
+        fixNextAccessButton?.isEnabled = !loading
         refreshInteractionStates()
     }
 
