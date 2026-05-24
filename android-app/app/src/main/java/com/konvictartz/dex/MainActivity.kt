@@ -339,6 +339,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var dexCompanionRewardsLastTapAt = 0L
     private var dexCompanionFloatAnimator: AnimatorSet? = null
     private var dexCompanionEventAnimator: AnimatorSet? = null
+    private var advancedDeviceAccessStatusView: TextView? = null
     private var dexCompanionBlinkScheduled = false
     private var dexCompanionDragDownRawX = 0f
     private var dexCompanionDragDownRawY = 0f
@@ -817,6 +818,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun setupUi() {
+        installAdvancedDeviceAccessControls()
         binding.authModeToggle.check(binding.loginModeButton.id)
         binding.authModeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
@@ -1827,6 +1829,50 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         "admin" -> getString(R.string.billing_detail_unknown_admin)
         "affiliate" -> getString(R.string.billing_detail_unknown_affiliate)
         else -> getString(R.string.billing_detail_unknown_user)
+    }
+
+    private fun installAdvancedDeviceAccessControls() {
+        if (advancedDeviceAccessStatusView != null) return
+        val parent = binding.backgroundAccessMessage.parent as? LinearLayout ?: return
+        val insertIndex = parent.indexOfChild(binding.backgroundAccessMessage).coerceAtLeast(0)
+
+        val overlayButton = MaterialButton(
+            this,
+            null,
+            com.google.android.material.R.attr.materialButtonOutlinedStyle
+        ).apply {
+            text = getString(R.string.open_overlay_settings)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dpToPx(8) }
+            setOnClickListener { openOverlaySettings() }
+        }
+        parent.addView(overlayButton, insertIndex)
+
+        val accessibilityButton = MaterialButton(
+            this,
+            null,
+            com.google.android.material.R.attr.materialButtonOutlinedStyle
+        ).apply {
+            text = getString(R.string.open_accessibility_settings)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dpToPx(8) }
+            setOnClickListener { openAccessibilitySettings() }
+        }
+        parent.addView(accessibilityButton, insertIndex + 1)
+
+        advancedDeviceAccessStatusView = TextView(this).apply {
+            setTextColor(getColorCompat(R.color.dex_text_secondary))
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dpToPx(10) }
+        }
+        parent.addView(advancedDeviceAccessStatusView, insertIndex + 2)
     }
 
     private fun dashboardHintCopy(): String =
@@ -6860,6 +6906,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         openSettingsIntent(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
     }
 
+    private fun openOverlaySettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                data = Uri.parse("package:$packageName")
+            }
+        } else {
+            Intent(Settings.ACTION_SETTINGS)
+        }
+        openSettingsIntent(intent)
+    }
+
+    private fun openAccessibilitySettings() {
+        openSettingsIntent(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    }
+
     private fun openSettingsIntent(intent: Intent) {
         runCatching {
             startActivity(intent)
@@ -6902,6 +6963,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!ready) autoWakeStarted = false
         refreshSafetyDiagnostics()
         refreshInteractionStates()
+        updateAdvancedDeviceAccessStatus()
+    }
+
+    private fun updateAdvancedDeviceAccessStatus() {
+        val overlayReady = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(this) else true
+        val accessibilityReady = isDexAccessibilityEnabled() || DexAccessibilityService.isRunning()
+        advancedDeviceAccessStatusView?.text = getString(
+            R.string.advanced_device_access_status,
+            if (overlayReady) getString(R.string.access_status_on) else getString(R.string.access_status_off),
+            if (accessibilityReady) getString(R.string.access_status_on) else getString(R.string.access_status_off)
+        )
+    }
+
+    private fun isDexAccessibilityEnabled(): Boolean {
+        val enabledServices = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ).orEmpty()
+        val expected = "$packageName/${DexAccessibilityService::class.java.name}"
+        return enabledServices.split(':').any { it.equals(expected, ignoreCase = true) }
     }
 
     private fun autoStartWakeModeIfReady() {
