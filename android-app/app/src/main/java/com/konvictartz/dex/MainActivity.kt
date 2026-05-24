@@ -397,6 +397,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         conversationActive = false
         if (wakeModeEnabled) {
             binding.conversationStatus.text = getString(R.string.wake_mode_session_ended)
+            restartOfflineWakeWordEngine()
         }
     }
 
@@ -7969,6 +7970,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         maintainBackgroundService()
     }
 
+    private fun restartOfflineWakeWordEngine() {
+        if (!wakeModeEnabled || awaitingWakeCommand || conversationActive || isListeningForCallCommand) return
+        if (lastCallState == TelephonyManager.CALL_STATE_RINGING) return
+        if (wakeWordEngineActive && wakeWordEngine?.isRunning() == true) return
+        wakeWordEngineActive = wakeWordEngine?.start() == true
+        binding.conversationStatus.text = when {
+            wakeWordEngineActive -> getString(R.string.wake_mode_hotword_ready)
+            wakeWordEngine?.isConfigured() == true -> getString(R.string.wake_engine_start_failed)
+            else -> getString(R.string.wake_mode_waiting)
+        }
+    }
+
     private fun stopWakeMode() {
         wakeModeEnabled = false
         awaitingWakeCommand = false
@@ -8009,6 +8022,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun handleWakeWordEngineDetection() {
         if (!wakeModeEnabled || isListeningForCallCommand || lastCallState == TelephonyManager.CALL_STATE_RINGING) return
         if (awaitingWakeCommand || conversationActive) return
+        wakeWordEngine?.stop()
+        wakeWordEngineActive = false
         wakeSpeechRecognizer?.cancel()
         binding.lastHeardValue.text = getString(R.string.wake_mode_detected)
         awaitingWakeCommand = true

@@ -87,7 +87,10 @@ class DexWakeWordEngine(
 
     private fun startRecognition(activeModel: Model): Boolean {
         return runCatching {
-            val grammar = "[\"${wakePhrase().replace("\"", "\\\"")}\"]"
+            val grammar = recognizedWakePhrases()
+                .joinToString(prefix = "[", postfix = "]") { phrase ->
+                    "\"${phrase.replace("\"", "\\\"")}\""
+                }
             val activeRecognizer = Recognizer(activeModel, 16000.0f, grammar)
             val activeSpeechService = SpeechService(activeRecognizer, 16000.0f)
             recognizer = activeRecognizer
@@ -102,6 +105,13 @@ class DexWakeWordEngine(
     }
 
     private fun normalizedWakePhrase(): String = normalizeSpeechFragment(wakePhrase())
+
+    private fun recognizedWakePhrases(): Set<String> {
+        val phrase = normalizedWakePhrase()
+        if (phrase.isBlank()) return emptySet()
+        val variants = wakeVariants()
+        return (setOf(phrase) + variants).filter { it.isNotBlank() }.toSet()
+    }
 
     private fun normalizeSpeechFragment(value: String): String {
         return value
