@@ -1099,8 +1099,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun handleBackgroundSmsCommand(normalized: String): Boolean {
+        val command = canonicalPromptCommand(normalized)
         return when {
-            isAffirmativeCommand(normalized) -> {
+            isAffirmativeCommand(command) -> {
                 if (awaitingSmsReplyChoice) {
                     promptForPendingSmsReply()
                 } else {
@@ -1108,19 +1109,15 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 }
                 true
             }
-            normalized.contains("read") -> {
+            isReadPromptCommand(command) -> {
                 handleSmsReadAction()
                 true
             }
-            normalized.contains("reply") ||
-                normalized.contains("text back") ||
-                normalized.contains("respond") -> {
+            isReplyPromptCommand(command) -> {
                 promptForPendingSmsReply()
                 true
             }
-            isNegativeCommand(normalized) ||
-                normalized.contains("ignore") ||
-                normalized.contains("leave it") -> {
+            isIgnorePromptCommand(command) -> {
                 handleSmsIgnoreAction()
                 true
             }
@@ -1141,23 +1138,64 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun handleBackgroundNotificationCommand(normalized: String): Boolean {
+        val command = canonicalPromptCommand(normalized)
         return when {
-            isAffirmativeCommand(normalized) -> {
+            isAffirmativeCommand(command) -> {
                 handleNotificationReadAction()
                 true
             }
-            normalized.contains("read") -> {
+            isReadPromptCommand(command) -> {
                 handleNotificationReadAction()
                 true
             }
-            isNegativeCommand(normalized) ||
-                normalized.contains("ignore") ||
-                normalized.contains("leave it") -> {
+            isIgnorePromptCommand(command) -> {
                 handleNotificationIgnoreAction()
                 true
             }
             else -> false
         }
+    }
+
+    private fun canonicalPromptCommand(raw: String): String {
+        return raw.lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9' ]+"), " ")
+            .replace(Regex("\\b(red|reed|rid)\\b"), "read")
+            .replace(Regex("\\b(ignored|ignoring|ignore\\s+that|ignore\\s+this|forget\\s+it|skip\\s+it|dismiss\\s+it)\\b"), "ignore it")
+            .replace(Regex("\\b(dont|don't|do not)\\s+(read|tell|say)\\b"), "ignore it")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun isReadPromptCommand(command: String): Boolean {
+        return command == "read" ||
+            command == "read it" ||
+            command == "read that" ||
+            command == "read this" ||
+            command.contains("read the") ||
+            command.contains("tell me what") ||
+            command.contains("what does it say") ||
+            command.contains("say it")
+    }
+
+    private fun isReplyPromptCommand(command: String): Boolean {
+        return command == "reply" ||
+            command.contains("reply to") ||
+            command.contains("text back") ||
+            command.contains("respond") ||
+            command.contains("answer it")
+    }
+
+    private fun isIgnorePromptCommand(command: String): Boolean {
+        return isNegativeCommand(command) ||
+            command == "ignore" ||
+            command == "ignore it" ||
+            command == "ignore that" ||
+            command == "ignore this" ||
+            command == "skip" ||
+            command == "skip it" ||
+            command == "leave it" ||
+            command == "dismiss it" ||
+            command == "cancel"
     }
 
     private fun handleBackgroundSafetyCheckIn(normalized: String): Boolean {

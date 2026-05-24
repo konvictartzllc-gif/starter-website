@@ -8740,6 +8740,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun consumePendingIncomingSms(normalized: String): Boolean? {
+        val command = canonicalPromptCommand(normalized)
         val sender = pendingIncomingSmsSender
             ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_INCOMING_SMS_SENDER, null)
         val senderValue = pendingIncomingSmsValue
@@ -8747,14 +8748,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val body = pendingIncomingSmsBody
             ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_INCOMING_SMS_BODY, null)
         if (sender.isNullOrBlank() || body.isNullOrBlank()) return null
-        if (!isLikelySmsPromptReply(normalized)) return null
+        if (!isLikelySmsPromptReply(command)) return null
 
         return when {
-            normalized == "read it" ||
-                normalized == "read the text" ||
-                normalized == "read the message" ||
-                normalized == "yes read it" ||
-                normalized == "yes read the text" -> {
+            isReadPromptCommand(command) ||
+                command == "yes read it" ||
+                command == "yes read the text" -> {
                 pendingIncomingSmsReplyChoice = true
                 val reply = getString(R.string.incoming_sms_readback_with_reply_offer, sender, body)
                 binding.conversationStatus.text = reply
@@ -8762,21 +8761,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
                 true
             }
-            normalized == "read it again" ||
-                normalized == "read that again" ||
-                normalized == "say it again" -> {
+            command == "read it again" ||
+                command == "read that again" ||
+                command == "say it again" -> {
                 val reply = getString(R.string.incoming_sms_readback_again, sender, body)
                 binding.conversationStatus.text = reply
                 binding.lastReplyValue.text = reply
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
                 true
             }
-            normalized == "reply to it" ||
-                normalized == "reply to that" ||
-                normalized == "text them back" ||
-                normalized == "reply back" ||
-                normalized == "answer it" ||
-                (pendingIncomingSmsReplyChoice && isPromptAffirmativeVoiceReply(normalized)) -> {
+            isReplyPromptCommand(command) ||
+                (pendingIncomingSmsReplyChoice && isPromptAffirmativeVoiceReply(command)) -> {
                 val number = senderValue?.trim().orEmpty()
                 if (number.isBlank()) {
                     val reply = getString(R.string.contact_not_found_phone, sender)
@@ -8795,11 +8790,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     true
                 }
             }
-            normalized == "ignore it" ||
-                normalized == "ignore the text" ||
-                normalized == "ignore the message" ||
-                isPromptNegativeVoiceReply(normalized) ||
-                normalized == "cancel" -> {
+            isIgnorePromptCommand(command) -> {
                 val reply = getString(R.string.incoming_sms_ignored, sender)
                 pendingIncomingSmsReplyChoice = false
                 binding.conversationStatus.text = reply
@@ -9336,6 +9327,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun consumePendingNotification(normalized: String): Boolean? {
+        val command = canonicalPromptCommand(normalized)
         val app = pendingNotificationApp
             ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_APP, null)
         val title = pendingNotificationTitle
@@ -9343,16 +9335,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val text = pendingNotificationText
             ?: getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PENDING_NOTIFICATION_TEXT, null)
         if (app.isNullOrBlank() || text.isNullOrBlank()) return null
-        if (!isLikelyNotificationPromptReply(normalized)) return null
+        if (!isLikelyNotificationPromptReply(command)) return null
         val senderName = title?.takeUnless { it.isBlank() || it.equals(app, ignoreCase = true) }
         val replyContact = senderName?.let { findPhoneContactByName(resolveContactAlias(it)) }
 
         return when {
-            normalized == "read it" ||
-                normalized == "read the notification" ||
-                normalized == "read that notification" ||
-                normalized == "yes read it" ||
-                isPromptAffirmativeVoiceReply(normalized) -> {
+            isReadPromptCommand(command) ||
+                command == "yes read it" ||
+                isPromptAffirmativeVoiceReply(command) -> {
                 pendingNotificationReplyChoice = replyContact != null
                 val reply =
                     if (replyContact != null) {
@@ -9367,12 +9357,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
                 true
             }
-            normalized == "reply" ||
-            normalized == "reply to it" ||
-                normalized == "reply to that" ||
-                normalized == "text them back" ||
-                normalized == "respond" ||
-                (pendingNotificationReplyChoice && isPromptAffirmativeVoiceReply(normalized)) -> {
+            isReplyPromptCommand(command) ||
+                (pendingNotificationReplyChoice && isPromptAffirmativeVoiceReply(command)) -> {
                 if (replyContact == null) {
                     pendingNotificationReplyChoice = false
                     val reply = getString(R.string.notification_reply_unavailable)
@@ -9391,11 +9377,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     true
                 }
             }
-            normalized == "ignore it" ||
-                normalized == "ignore the notification" ||
-                normalized == "ignore that" ||
-                isPromptNegativeVoiceReply(normalized) ||
-                normalized == "cancel" -> {
+            isIgnorePromptCommand(command) -> {
                 val reply = getString(R.string.notification_ignored)
                 pendingNotificationReplyChoice = false
                 binding.conversationStatus.text = reply
@@ -9494,42 +9476,76 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             normalized == "cancel"
     }
 
+    private fun canonicalPromptCommand(raw: String): String {
+        return raw.lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9' ]+"), " ")
+            .replace(Regex("\\b(red|reed|rid)\\b"), "read")
+            .replace(Regex("\\b(ignored|ignoring|ignore\\s+that|ignore\\s+this|forget\\s+it|skip\\s+it|dismiss\\s+it)\\b"), "ignore it")
+            .replace(Regex("\\b(dont|don't|do not)\\s+(read|tell|say)\\b"), "ignore it")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun isReadPromptCommand(command: String): Boolean {
+        return command == "read" ||
+            command == "read it" ||
+            command == "read that" ||
+            command == "read this" ||
+            command == "read the text" ||
+            command == "read the message" ||
+            command == "read the notification" ||
+            command == "read that notification" ||
+            command.contains("tell me what") ||
+            command.contains("what does it say") ||
+            command.contains("say it")
+    }
+
+    private fun isReplyPromptCommand(command: String): Boolean {
+        return command == "reply" ||
+            command == "reply back" ||
+            command.contains("reply to") ||
+            command.contains("text them back") ||
+            command.contains("text back") ||
+            command.contains("respond") ||
+            command.contains("answer it")
+    }
+
+    private fun isIgnorePromptCommand(command: String): Boolean {
+        return isPromptNegativeVoiceReply(command) ||
+            command == "ignore" ||
+            command == "ignore it" ||
+            command == "ignore that" ||
+            command == "ignore this" ||
+            command == "ignore the text" ||
+            command == "ignore the message" ||
+            command == "ignore the notification" ||
+            command == "skip" ||
+            command == "skip it" ||
+            command == "leave it" ||
+            command == "dismiss it" ||
+            command == "cancel"
+    }
+
     private fun isLikelySmsPromptReply(normalized: String): Boolean {
-        return normalized == "read it" ||
-            normalized == "read the text" ||
-            normalized == "read the message" ||
-            normalized == "yes read it" ||
-            normalized == "yes read the text" ||
-            normalized == "read it again" ||
-            normalized == "read that again" ||
-            normalized == "say it again" ||
-            normalized == "reply to it" ||
-            normalized == "reply to that" ||
-            normalized == "text them back" ||
-            normalized == "reply back" ||
-            normalized == "answer it" ||
-            normalized == "ignore it" ||
-            normalized == "ignore the text" ||
-            normalized == "ignore the message" ||
-            isPromptAffirmativeVoiceReply(normalized) ||
-            isPromptNegativeVoiceReply(normalized)
+        val command = canonicalPromptCommand(normalized)
+        return isReadPromptCommand(command) ||
+            command == "yes read it" ||
+            command == "yes read the text" ||
+            command == "read it again" ||
+            command == "read that again" ||
+            command == "say it again" ||
+            isReplyPromptCommand(command) ||
+            isIgnorePromptCommand(command) ||
+            isPromptAffirmativeVoiceReply(command)
     }
 
     private fun isLikelyNotificationPromptReply(normalized: String): Boolean {
-        return normalized == "read it" ||
-            normalized == "read the notification" ||
-            normalized == "read that notification" ||
-            normalized == "yes read it" ||
-            normalized == "reply" ||
-            normalized == "reply to it" ||
-            normalized == "reply to that" ||
-            normalized == "text them back" ||
-            normalized == "respond" ||
-            normalized == "ignore it" ||
-            normalized == "ignore the notification" ||
-            normalized == "ignore that" ||
-            isPromptAffirmativeVoiceReply(normalized) ||
-            isPromptNegativeVoiceReply(normalized)
+        val command = canonicalPromptCommand(normalized)
+        return isReadPromptCommand(command) ||
+            command == "yes read it" ||
+            isReplyPromptCommand(command) ||
+            isIgnorePromptCommand(command) ||
+            isPromptAffirmativeVoiceReply(command)
     }
 
     private fun buildDashboardSectionIntent(message: String): Triple<String, String, String>? {
