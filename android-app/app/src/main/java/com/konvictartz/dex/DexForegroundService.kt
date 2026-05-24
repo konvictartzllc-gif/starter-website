@@ -1006,46 +1006,51 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun handleBackgroundCallCommand(normalized: String): Boolean {
+        val command = canonicalCallCommand(normalized)
         return when {
-            normalized.contains("answer on speaker") ||
-                normalized.contains("pick up on speaker") ||
-                normalized.contains("speaker phone") -> {
+            isSpeakerAnswerCallCommand(command) -> {
                 val answered = answerRingingCall()
                 currentCallWasAnswered = answered
                 if (answered) enableSpeakerForActiveCall()
                 speakShortStatus(if (answered) getString(R.string.call_answered) else getString(R.string.call_answer_failed))
                 true
             }
-            isCallScreeningCommand(normalized) ||
-                isAffirmativeCommand(normalized) ||
-                normalized.contains("take a message") ||
-                normalized.contains("take the message") ||
-                normalized.contains("take their message") ||
-                normalized.contains("ask who") ||
-                normalized.contains("ask them") ||
-                normalized.contains("ask what") ||
-                normalized.contains("ask why") ||
-                normalized.contains("screen") -> {
+            isCallScreeningCommand(command) ||
+                isAffirmativeCommand(command) -> {
                 handleCallTakeMessageAction()
                 true
             }
-            isDirectAnswerCommand(normalized) ||
-                normalized.contains("pick up") ||
-                normalized.contains("take the call") -> {
+            isDirectAnswerCommand(command) -> {
                 handleCallAnswerAction()
                 true
             }
-            isIgnoreCallCommand(normalized) ||
-                normalized == "decline" ||
-                normalized.startsWith("decline ") ||
-                normalized.contains("reject") ||
-                normalized.contains("hang up") ||
-                normalized.contains("ignore") -> {
+            isIgnoreCallCommand(command) -> {
                 handleCallDeclineAction()
                 true
             }
             else -> false
         }
+    }
+
+    private fun canonicalCallCommand(raw: String): String {
+        return raw.lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9' ]+"), " ")
+            .replace(Regex("\\b(pic|pickup|pick\\s+it\\s+up|pick\\s+up\\s+the\\s+phone)\\b"), "pick up")
+            .replace(Regex("\\b(answere|answering|anser|answer\\s+that|answer\\s+this)\\b"), "answer")
+            .replace(Regex("\\b(voicemail|voice\\s+mail)\\b"), "voicemail")
+            .replace(Regex("\\b(ignored|ignoring|ignore\\s+that|ignore\\s+this|skip\\s+it|dismiss\\s+it)\\b"), "ignore it")
+            .replace(Regex("\\b(dont|don't|do not)\\s+(answer|pick\\s+up|connect)\\b"), "ignore it")
+            .replace(Regex("\\b(take|get|grab)\\s+(a\\s+)?(msg|message)\\b"), "take a message")
+            .replace(Regex("\\b(find\\s+out|ask)\\s+(who|why|what)\\b"), "screen the call")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun isSpeakerAnswerCallCommand(command: String): Boolean {
+        return command.contains("answer on speaker") ||
+            command.contains("pick up on speaker") ||
+            command.contains("speaker phone") ||
+            command.contains("speakerphone")
     }
 
     private fun isCallScreeningCommand(normalized: String): Boolean {
@@ -1059,6 +1064,16 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             normalized.contains("answer as dex") ||
             normalized.contains("answer like voicemail") ||
             normalized.contains("answering machine") ||
+            normalized.contains("take a message") ||
+            normalized.contains("take the message") ||
+            normalized.contains("take their message") ||
+            normalized.contains("take caller message") ||
+            normalized.contains("get a message") ||
+            normalized.contains("ask who") ||
+            normalized.contains("ask them") ||
+            normalized.contains("ask what") ||
+            normalized.contains("ask why") ||
+            normalized.contains("screen") ||
             normalized.contains("get their name") ||
             normalized.contains("get the name") ||
             normalized.contains("get a reason") ||
@@ -1079,7 +1094,9 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             normalized.contains("i'll take it") ||
             normalized.contains("ill take it") ||
             normalized.contains("i will take it") ||
-            normalized.contains("pick it up for me")
+            normalized.contains("pick it up for me") ||
+            normalized.contains("pick up") ||
+            normalized.contains("take the call")
     }
 
     private fun isIgnoreCallCommand(normalized: String): Boolean {
@@ -1092,10 +1109,15 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             normalized.contains("dont answer") ||
             normalized.contains("send to voicemail") ||
             normalized.contains("send it to voicemail") ||
+            normalized.contains("voicemail") ||
             normalized.contains("let it ring") ||
+            normalized.contains("reject") ||
+            normalized.contains("hang up") ||
             normalized.contains("leave it") ||
             normalized.contains("dismiss it") ||
-            normalized.contains("not now")
+            normalized.contains("not now") ||
+            normalized == "decline" ||
+            normalized.startsWith("decline ")
     }
 
     private fun handleBackgroundSmsCommand(normalized: String): Boolean {
@@ -1751,23 +1773,12 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun handleCallOwnerDecisionCommand(normalized: String): Boolean {
+        val command = canonicalOwnerDecisionCommand(normalized)
         val caller = pendingScreenedCaller ?: lastCaller
         val number = pendingScreenedNumber.orEmpty()
         val message = pendingScreenedMessage.orEmpty()
         return when {
-            normalized.contains("connect") ||
-                normalized.contains("put them through") ||
-                normalized.contains("call back") ||
-                normalized.contains("call him back") ||
-                normalized.contains("call her back") ||
-                normalized.contains("call that person back") ||
-                normalized.contains("call them") ||
-                normalized.contains("return the call") ||
-                normalized.contains("let me talk") ||
-                normalized.contains("i'll take") ||
-                normalized.contains("ill take") ||
-                normalized.contains("take the call") ||
-                normalized.contains("answer") -> {
+            isOwnerDecisionCallBack(command) -> {
                 postCallEvent("screening_callback", caller, message.ifBlank { null }, number.ifBlank { null })
                 clearPendingCallScreeningDecision()
                 if (number.isNotBlank()) {
@@ -1777,12 +1788,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 }
                 true
             }
-            normalized.contains("text") ||
-                normalized.contains("send a text") ||
-                normalized.contains("message back") ||
-                normalized.contains("text back") ||
-                normalized.contains("reply to them") ||
-                normalized.contains("message them") -> {
+            isOwnerDecisionTextBack(command) -> {
                 if (number.isNotBlank()) {
                     sendPhoneSms(number, getString(R.string.call_message_text_back_body, caller), caller)
                 } else {
@@ -1792,26 +1798,13 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 clearPendingCallScreeningDecision()
                 true
             }
-            normalized.contains("save") ||
-                normalized.contains("take a message") ||
-                normalized.contains("keep the message") ||
-                normalized.contains("save the message") ||
-                normalized.contains("later") ||
-                normalized.contains("busy") ||
-                normalized.contains("can't talk") ||
-                normalized.contains("cant talk") -> {
+            isOwnerDecisionSave(command) -> {
                 postCallEvent("screening_saved", caller, message.ifBlank { null }, number.ifBlank { null })
                 clearPendingCallScreeningDecision()
                 speakShortStatus(getString(R.string.call_owner_decision_saved, caller))
                 true
             }
-            normalized.contains("end") ||
-                normalized.contains("hang up") ||
-                normalized.contains("decline") ||
-                normalized.contains("not available") ||
-                normalized.contains("never mind") ||
-                normalized.contains("leave it") ||
-                normalized.contains("ignore") -> {
+            isOwnerDecisionIgnore(command) -> {
                 postCallEvent("screening_ignored", caller, message.ifBlank { null }, number.ifBlank { null })
                 clearPendingCallScreeningDecision()
                 speakShortStatus(getString(R.string.call_owner_decision_end, caller))
@@ -1819,6 +1812,61 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             }
             else -> false
         }
+    }
+
+    private fun canonicalOwnerDecisionCommand(raw: String): String {
+        return raw.lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9' ]+"), " ")
+            .replace(Regex("\\b(call\\s+em|call\\s+them\\s+back|call\\s+him\\s+back|call\\s+her\\s+back|return\\s+the\\s+call)\\b"), "call back")
+            .replace(Regex("\\b(answer\\s+it|answer\\s+that|take\\s+it|take\\s+the\\s+call|let\\s+me\\s+talk)\\b"), "call back")
+            .replace(Regex("\\b(txt|text\\s+them|message\\s+them|message\\s+back|reply\\s+to\\s+them)\\b"), "text back")
+            .replace(Regex("\\b(save\\s+it|keep\\s+it|keep\\s+the\\s+message|take\\s+a\\s+message|tell\\s+them\\s+i\\s+am\\s+busy|tell\\s+them\\s+i'm\\s+busy)\\b"), "save it")
+            .replace(Regex("\\b(can't|cant|cannot)\\s+(talk|answer)\\b"), "save it")
+            .replace(Regex("\\b(ignore\\s+that|ignore\\s+it|leave\\s+it|forget\\s+it|never\\s+mind|dismiss\\s+it|hang\\s+up)\\b"), "ignore it")
+            .replace(Regex("\\b(dont|don't|do not)\\s+(call|text|answer)\\b"), "ignore it")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun isOwnerDecisionCallBack(command: String): Boolean {
+        return command == "call back" ||
+            command.contains("connect") ||
+            command.contains("put them through") ||
+            command.contains("call back") ||
+            command.contains("call them") ||
+            command.contains("let me talk") ||
+            command.contains("i'll take") ||
+            command.contains("ill take") ||
+            command.contains("answer")
+    }
+
+    private fun isOwnerDecisionTextBack(command: String): Boolean {
+        return command == "text back" ||
+            command.contains("text") ||
+            command.contains("send a text") ||
+            command.contains("message back") ||
+            command.contains("reply")
+    }
+
+    private fun isOwnerDecisionSave(command: String): Boolean {
+        return command == "save it" ||
+            command.contains("save") ||
+            command.contains("keep the message") ||
+            command.contains("later") ||
+            command.contains("busy") ||
+            command.contains("can't talk") ||
+            command.contains("cant talk")
+    }
+
+    private fun isOwnerDecisionIgnore(command: String): Boolean {
+        return command == "ignore it" ||
+            command.contains("end") ||
+            command.contains("hang up") ||
+            command.contains("decline") ||
+            command.contains("not available") ||
+            command.contains("never mind") ||
+            command.contains("leave it") ||
+            command.contains("ignore")
     }
 
     private fun normalizeCallerMessageTranscript(transcript: String): ParsedCallerMessage? {
