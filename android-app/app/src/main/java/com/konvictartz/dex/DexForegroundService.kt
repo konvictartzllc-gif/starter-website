@@ -738,6 +738,18 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun callAnswerFailureMessage(): String {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val phoneAccessEnabled = prefs.getBoolean(MainActivity.KEY_PHONE_BACKEND_ENABLED, false)
+        return when {
+            !phoneAccessEnabled -> getString(R.string.call_answer_failed_phone_access)
+            !hasPermission(Manifest.permission.ANSWER_PHONE_CALLS) -> getString(R.string.call_answer_failed_runtime_permission)
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.O -> getString(R.string.call_answer_failed_android_version)
+            telecomManager == null -> getString(R.string.call_answer_failed_system_blocked)
+            else -> getString(R.string.call_answer_failed_system_blocked)
+        }
+    }
+
     @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     private fun declineRingingCall() {
@@ -768,7 +780,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         val answered = answerRingingCall()
         currentCallWasAnswered = answered
         dismissNotification(CALL_NOTIFICATION_ID)
-        speakShortStatus(if (answered) getString(R.string.call_answered) else getString(R.string.call_answer_failed))
+        speakShortStatus(if (answered) getString(R.string.call_answered) else callAnswerFailureMessage())
     }
 
     private fun handleCallDeclineAction() {
@@ -784,7 +796,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
         val answered = answerRingingCall()
         if (!answered) {
-            speakShortStatus(getString(R.string.call_answer_failed))
+            speakShortStatus(callAnswerFailureMessage())
             return
         }
         currentCallWasAnswered = true
@@ -1012,7 +1024,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 val answered = answerRingingCall()
                 currentCallWasAnswered = answered
                 if (answered) enableSpeakerForActiveCall()
-                speakShortStatus(if (answered) getString(R.string.call_answered) else getString(R.string.call_answer_failed))
+                speakShortStatus(if (answered) getString(R.string.call_answered) else callAnswerFailureMessage())
                 true
             }
             isCallScreeningCommand(command) ||

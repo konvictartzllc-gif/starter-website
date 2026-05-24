@@ -11423,16 +11423,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.callMonitorStatus.text = getString(R.string.call_not_ringing)
             return
         }
+        if (!phoneBackendEnabled) {
+            binding.callMonitorStatus.text = getString(R.string.call_answer_failed_phone_access)
+            return
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED) {
-            binding.callMonitorStatus.text = getString(R.string.call_answer_permission_missing)
+            binding.callMonitorStatus.text = getString(R.string.call_answer_failed_runtime_permission)
             return
         }
         val manager = telecomManager ?: run {
-            binding.callMonitorStatus.text = getString(R.string.call_answer_failed)
+            binding.callMonitorStatus.text = getString(R.string.call_answer_failed_system_blocked)
             return
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            binding.callMonitorStatus.text = getString(R.string.call_answer_failed)
+            binding.callMonitorStatus.text = getString(R.string.call_answer_failed_android_version)
             return
         }
         binding.callMonitorStatus.text = getString(R.string.call_answering)
@@ -11446,12 +11450,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.callMonitorStatus.text = getString(R.string.call_answered)
             postCallEvent("answered", lastCaller)
         } catch (_: SecurityException) {
-            binding.callMonitorStatus.text = getString(R.string.call_answer_permission_missing)
+            binding.callMonitorStatus.text = getString(R.string.call_answer_failed_runtime_permission)
         } catch (_: Exception) {
             if (attempt < MAX_CALL_ANSWER_RETRIES && lastCallState == TelephonyManager.CALL_STATE_RINGING) {
                 mainHandler.postDelayed({ attemptAnswerCall(manager, attempt + 1) }, CALL_ANSWER_RETRY_DELAY_MS)
             } else {
-                binding.callMonitorStatus.text = getString(R.string.call_answer_failed)
+                binding.callMonitorStatus.text = getString(R.string.call_answer_failed_system_blocked)
             }
         }
     }

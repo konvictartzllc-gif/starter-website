@@ -823,6 +823,10 @@
     <string name="call_answered">Dex answered the ringing call.</string>
     <string name="call_declined">Dex declined the ringing call.</string>
     <string name="call_answer_failed">Dex could not answer the ringing call.</string>
+    <string name="call_answer_failed_phone_access">Dex could not answer because phone access is off in Dex settings. Turn on Dex phone access, then try again.</string>
+    <string name="call_answer_failed_runtime_permission">Dex could not answer because Android call-answer permission is missing. Tap Fix next missing access in Dex permissions.</string>
+    <string name="call_answer_failed_android_version">Dex could not answer because this Android version does not allow app-based call answering.</string>
+    <string name="call_answer_failed_system_blocked">Dex tried to answer, but Android blocked the call control. Check default phone or call screening settings, battery access, and Dex assistant control.</string>
     <string name="call_answer_permission_missing">Dex is missing the Android call-answer permission on this device.</string>
     <string name="call_not_ringing">Dex did not find a ringing call to answer.</string>
     <string name="call_decline_failed">Dex could not decline the ringing call.</string>
