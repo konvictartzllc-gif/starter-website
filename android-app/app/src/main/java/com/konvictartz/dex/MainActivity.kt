@@ -2517,7 +2517,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun saveSafetyProfile() {
         val emergencyPersonName = binding.safetyNameInput.text?.toString()?.trim().orEmpty()
-        val emergencyBirthday = binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty()
+        val emergencyBirthday = normalizeBirthdayInput(binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty())
         val emergencyContact = binding.safetyContactInput.text?.toString()?.trim().orEmpty()
         val contactPermission = binding.safetyNotifyTrustedContactSwitch.isChecked
         val comfortStyle = binding.safetyComfortInput.text?.toString()?.trim().orEmpty()
@@ -2533,6 +2533,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .putString(KEY_SAFETY_GROUNDING_STYLE, groundingStyle)
             .putBoolean(KEY_SAFETY_FOLLOW_UP_OPT_IN, followUpOptIn)
             .apply()
+        if (binding.safetyBirthdayInput.text?.toString()?.trim().orEmpty() != emergencyBirthday) {
+            binding.safetyBirthdayInput.setText(emergencyBirthday)
+        }
         val confirmedName = emergencyPersonName.ifBlank { resolveEmergencyPersonName() }
         val confirmedBirthday = emergencyBirthday.ifBlank { getString(R.string.safety_birthday_unknown) }
         val localSaveReply = getString(R.string.safety_profile_saved_named, confirmedName, confirmedBirthday)
@@ -2692,20 +2695,37 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
-    private fun formatBirthdayForSpeech(value: String): String {
+    private fun normalizeBirthdayInput(value: String): String {
         val trimmed = value.trim()
+        if (trimmed.isBlank() || trimmed == getString(R.string.safety_birthday_unknown)) return trimmed
+        val digits = trimmed.filter { it.isDigit() }
+        if (digits.length == 8 && trimmed.none { it == '/' || it == '-' }) {
+            val month = digits.substring(0, 2)
+            val day = digits.substring(2, 4)
+            val year = digits.substring(4, 8)
+            return "$month/$day/$year"
+        }
+        val numericMatch = Regex("""^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$""").matchEntire(trimmed)
+        if (numericMatch != null) {
+            val month = numericMatch.groupValues[1].padStart(2, '0')
+            val day = numericMatch.groupValues[2].padStart(2, '0')
+            val rawYear = numericMatch.groupValues[3]
+            val year = if (rawYear.length == 2) "19$rawYear" else rawYear
+            return "$month/$day/$year"
+        }
+        return trimmed
+    }
+
+    private fun formatBirthdayForSpeech(value: String): String {
+        val trimmed = normalizeBirthdayInput(value)
         if (trimmed.isBlank() || trimmed == getString(R.string.safety_birthday_unknown)) return trimmed
         val numericMatch = Regex("""^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$""").matchEntire(trimmed)
         if (numericMatch != null) {
-            val monthIndex = numericMatch.groupValues[1].toIntOrNull()?.minus(1) ?: -1
-            val day = numericMatch.groupValues[2].toIntOrNull()
+            val month = numericMatch.groupValues[1].padStart(2, '0')
+            val day = numericMatch.groupValues[2].padStart(2, '0')
             val rawYear = numericMatch.groupValues[3]
             val year = if (rawYear.length == 2) "19$rawYear" else rawYear
-            val months = arrayOf(
-                "January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December"
-            )
-            if (monthIndex in months.indices && day != null) return "${months[monthIndex]} $day, $year"
+            return "$month/$day/$year"
         }
         return trimmed.replace(Regex(""",(?=\S)"""), ", ")
     }
@@ -6225,7 +6245,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             result.onSuccess { response ->
                 val preferences = response.optJSONObject("preferences") ?: JSONObject()
                 val emergencyPersonName = preferences.optString("safety_person_name")
-                val emergencyBirthday = preferences.optString("safety_birthday")
+                val emergencyBirthday = normalizeBirthdayInput(preferences.optString("safety_birthday"))
                 val emergencyContact = preferences.optString("emergency_contact")
                 val comfortStyle = preferences.optString("comfort_style").ifBlank { "calm" }
                 val groundingPreference = preferences.optString("grounding_preference").ifBlank { "gentle" }
