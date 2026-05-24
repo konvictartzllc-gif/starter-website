@@ -110,7 +110,8 @@ class DexWakeWordEngine(
         val phrase = normalizedWakePhrase()
         if (phrase.isBlank()) return emptySet()
         val variants = wakeVariants()
-        return (setOf(phrase) + variants).filter { it.isNotBlank() }.toSet()
+        val bareDexVariants = setOf("dex", "decks", "deks", "decs", "dix")
+        return (setOf(phrase) + variants + bareDexVariants).filter { it.isNotBlank() }.toSet()
     }
 
     private fun normalizeSpeechFragment(value: String): String {
@@ -139,6 +140,7 @@ class DexWakeWordEngine(
         if (phrase.isBlank()) return false
         if (normalizedCandidate == phrase) return true
         if (normalizedCandidate.contains(phrase)) return true
+        if (normalizedCandidate in setOf("dex", "decks", "deks", "decs", "dix")) return true
         return wakeVariants().any { variant ->
             normalizedCandidate == variant || normalizedCandidate.contains(variant)
         }

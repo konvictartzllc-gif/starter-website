@@ -441,7 +441,6 @@ export default function DexChat() {
     setOpen(true);
     const message = "Wake mode is on. Say Hey Dex once, then keep talking naturally.";
     showToast(message);
-    speak(message);
   }
 
   function submitGameAnswer(e) {
@@ -640,7 +639,16 @@ export default function DexChat() {
         <div className="dex-mascot-bubble" aria-live="polite">{mascotLine}</div>
         <button
           type="button"
-          onClick={() => setOpen((prev) => !prev)}
+          onClick={() => {
+            setOpen((prev) => {
+              const nextOpen = !prev;
+              if (nextOpen) {
+                setGameOpen(false);
+                setShopOpen(false);
+              }
+              return nextOpen;
+            });
+          }}
           className={`dex-companion dex-robot-button ${dexSizeClass} ${dexHeightClass} text-white shadow-lg transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
           style={dexColorStyle}
           aria-label={open ? "Close Dex chat" : "Open Dex chat"}
