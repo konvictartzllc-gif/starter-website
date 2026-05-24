@@ -1007,33 +1007,36 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun handleBackgroundCallCommand(normalized: String): Boolean {
         return when {
-            isAffirmativeCommand(normalized) -> {
-                handleCallAnswerAction()
-                true
-            }
-            normalized.contains("take a message") ||
-                normalized.contains("take the message") ||
-                normalized.contains("ask who") ||
-                normalized.contains("ask them") -> {
-                handleCallTakeMessageAction()
-                true
-            }
             normalized.contains("answer on speaker") ||
-                normalized.contains("pick up on speaker") -> {
+                normalized.contains("pick up on speaker") ||
+                normalized.contains("speaker phone") -> {
                 val answered = answerRingingCall()
                 currentCallWasAnswered = answered
                 if (answered) enableSpeakerForActiveCall()
                 speakShortStatus(if (answered) getString(R.string.call_answered) else getString(R.string.call_answer_failed))
                 true
             }
-            normalized == "answer" ||
-                normalized.startsWith("answer ") ||
+            isCallScreeningCommand(normalized) ||
+                isAffirmativeCommand(normalized) ||
+                normalized.contains("take a message") ||
+                normalized.contains("take the message") ||
+                normalized.contains("take their message") ||
+                normalized.contains("ask who") ||
+                normalized.contains("ask them") ||
+                normalized.contains("ask what") ||
+                normalized.contains("ask why") ||
+                normalized.contains("screen") -> {
+                handleCallTakeMessageAction()
+                true
+            }
+            isDirectAnswerCommand(normalized) ||
                 normalized.contains("pick up") ||
                 normalized.contains("take the call") -> {
                 handleCallAnswerAction()
                 true
             }
-            normalized == "decline" ||
+            isIgnoreCallCommand(normalized) ||
+                normalized == "decline" ||
                 normalized.startsWith("decline ") ||
                 normalized.contains("reject") ||
                 normalized.contains("hang up") ||
@@ -1043,6 +1046,56 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             }
             else -> false
         }
+    }
+
+    private fun isCallScreeningCommand(normalized: String): Boolean {
+        return normalized == "answer" ||
+            normalized == "answer it" ||
+            normalized == "answer the call" ||
+            normalized == "answer phone" ||
+            normalized == "answer the phone" ||
+            normalized.contains("answer it for me") ||
+            normalized.contains("dex answer") ||
+            normalized.contains("answer as dex") ||
+            normalized.contains("answer like voicemail") ||
+            normalized.contains("answering machine") ||
+            normalized.contains("get their name") ||
+            normalized.contains("get the name") ||
+            normalized.contains("get a reason") ||
+            normalized.contains("get the reason") ||
+            normalized.contains("ask their name") ||
+            normalized.contains("ask for their name") ||
+            normalized.contains("ask why they") ||
+            normalized.contains("ask what they want") ||
+            normalized.contains("find out who") ||
+            normalized.contains("find out why")
+    }
+
+    private fun isDirectAnswerCommand(normalized: String): Boolean {
+        return normalized.contains("let me talk") ||
+            normalized.contains("put them through") ||
+            normalized.contains("connect me") ||
+            normalized.contains("connect them") ||
+            normalized.contains("i'll take it") ||
+            normalized.contains("ill take it") ||
+            normalized.contains("i will take it") ||
+            normalized.contains("pick it up for me")
+    }
+
+    private fun isIgnoreCallCommand(normalized: String): Boolean {
+        return isNegativeCommand(normalized) ||
+            normalized == "ignore" ||
+            normalized == "ignore it" ||
+            normalized == "ignore the call" ||
+            normalized.contains("don't answer") ||
+            normalized.contains("do not answer") ||
+            normalized.contains("dont answer") ||
+            normalized.contains("send to voicemail") ||
+            normalized.contains("send it to voicemail") ||
+            normalized.contains("let it ring") ||
+            normalized.contains("leave it") ||
+            normalized.contains("dismiss it") ||
+            normalized.contains("not now")
     }
 
     private fun handleBackgroundSmsCommand(normalized: String): Boolean {
@@ -1667,7 +1720,11 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             normalized.contains("connect") ||
                 normalized.contains("put them through") ||
                 normalized.contains("call back") ||
+                normalized.contains("call him back") ||
+                normalized.contains("call her back") ||
+                normalized.contains("call that person back") ||
                 normalized.contains("call them") ||
+                normalized.contains("return the call") ||
                 normalized.contains("let me talk") ||
                 normalized.contains("i'll take") ||
                 normalized.contains("ill take") ||
@@ -1683,6 +1740,10 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 true
             }
             normalized.contains("text") ||
+                normalized.contains("send a text") ||
+                normalized.contains("message back") ||
+                normalized.contains("text back") ||
+                normalized.contains("reply to them") ||
                 normalized.contains("message them") -> {
                 if (number.isNotBlank()) {
                     sendPhoneSms(number, getString(R.string.call_message_text_back_body, caller), caller)
@@ -1695,6 +1756,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             }
             normalized.contains("save") ||
                 normalized.contains("take a message") ||
+                normalized.contains("keep the message") ||
+                normalized.contains("save the message") ||
                 normalized.contains("later") ||
                 normalized.contains("busy") ||
                 normalized.contains("can't talk") ||
@@ -1708,6 +1771,8 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 normalized.contains("hang up") ||
                 normalized.contains("decline") ||
                 normalized.contains("not available") ||
+                normalized.contains("never mind") ||
+                normalized.contains("leave it") ||
                 normalized.contains("ignore") -> {
                 postCallEvent("screening_ignored", caller, message.ifBlank { null }, number.ifBlank { null })
                 clearPendingCallScreeningDecision()
@@ -2094,7 +2159,21 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     listOf("weather", "forecast", "temperature", "what is", "what's", "tell me", "remind me")
                 )
                 BackgroundListenMode.CALL_COMMAND -> addAll(
-                    listOf("answer it", "answer on speaker", "pick up", "decline it", "take a message")
+                    listOf(
+                        "answer it",
+                        "dex answer it",
+                        "answer it for me",
+                        "take a message",
+                        "ask who is calling",
+                        "ask why they are calling",
+                        "screen the call",
+                        "ignore it",
+                        "don't answer",
+                        "send it to voicemail",
+                        "decline it",
+                        "answer on speaker",
+                        "put them through"
+                    )
                 )
                 BackgroundListenMode.SMS_COMMAND -> addAll(
                     listOf("read it", "reply", "text back", "ignore it")
@@ -2110,7 +2189,17 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                     listOf("i'm good", "im good", "i feel better", "i'm okay", "stay with me", "check back later", "not really", "still upset", "still stressed", "still sad")
                 )
                 BackgroundListenMode.CALL_OWNER_DECISION -> addAll(
-                    listOf("connect them", "put them through", "let me talk", "take a message", "save it", "call back later", "text them", "end the call", "hang up")
+                    listOf(
+                        "call them back",
+                        "return the call",
+                        "text them",
+                        "text them back",
+                        "save it",
+                        "save the message",
+                        "ignore it",
+                        "leave it",
+                        "end the call"
+                    )
                 )
                 BackgroundListenMode.REMINDER_CHECK_IN -> addAll(
                     listOf("remind me again", "check back", "ten minutes", "not now")
