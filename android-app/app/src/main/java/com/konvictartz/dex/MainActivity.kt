@@ -397,9 +397,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         conversationActive = false
         if (wakeModeEnabled) {
             binding.conversationStatus.text = getString(R.string.wake_mode_session_ended)
-            if (!wakeWordEngineActive) {
-                scheduleWakeListeningRestart()
-            }
         }
     }
 
@@ -407,8 +404,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (wakeModeEnabled && !isListeningForCallCommand && lastCallState != TelephonyManager.CALL_STATE_RINGING) {
             if (awaitingWakeCommand || conversationActive) {
                 startDexCommandListening()
-            } else if (!wakeWordEngineActive) {
-                startWakeWordListening()
             }
         }
     }
@@ -7972,9 +7967,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         restoreDexCompanionState()
         updateWakeUi()
         maintainBackgroundService()
-        if (!wakeWordEngineActive) {
-            scheduleWakeListeningRestart(1200)
-        }
     }
 
     private fun stopWakeMode() {
@@ -8002,28 +7994,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!wakeModeEnabled || isListeningForCallCommand) return
         if (awaitingWakeCommand || conversationActive) {
             startDexCommandListening()
-            return
-        }
-        val recognizer = wakeSpeechRecognizer ?: return
-        val intent = buildRecognitionIntent(
-            maxResults = 5,
-            completeSilenceMs = 5500L,
-            possibleSilenceMs = 3500L,
-            minimumMs = 15000L,
-            biasingPhrases = listOf("hey dex", "dex")
-        )
-        try {
-            recognizer.cancel()
-            lastWakeListenStartedAt = SystemClock.elapsedRealtime()
-            restoreDexCompanionState()
-            recognizer.startListening(intent)
-        } catch (_: Exception) {
-            binding.conversationStatus.text = getString(R.string.wake_mode_unavailable)
         }
     }
 
     private fun scheduleWakeListeningRestart(delayMs: Long = 3500L) {
         if (!wakeModeEnabled) return
+        if (!awaitingWakeCommand && !conversationActive) return
         val elapsed = SystemClock.elapsedRealtime() - lastWakeListenStartedAt
         val adjustedDelay = max(delayMs, WAKE_LISTEN_MIN_GAP_MS - elapsed)
         mainHandler.removeCallbacks(restartWakeListeningRunnable)
@@ -8057,7 +8033,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (wakeModeEnabled) {
             binding.conversationStatus.text = message?.takeIf { it.isNotBlank() }
                 ?: getString(R.string.wake_engine_start_failed)
-            scheduleWakeListeningRestart(1200)
         } else {
             refreshVoiceStatus()
         }
