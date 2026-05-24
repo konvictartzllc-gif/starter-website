@@ -575,6 +575,7 @@
     <string name="access_status_ready_mark">READY</string>
     <string name="access_status_missing_mark">MISSING</string>
     <string name="all_access_account_phone">Dex account phone access is enabled</string>
+    <string name="all_access_call_screening_role">Dex is selected as the Android call screening assistant</string>
     <string name="all_access_phone_state">Phone state monitoring for incoming calls</string>
     <string name="all_access_call_log">Call log access for caller details</string>
     <string name="all_access_contacts">Contacts access for names and callbacks</string>
@@ -589,6 +590,7 @@
     <string name="all_access_background_service">Background assistant service is ready</string>
     <string name="all_access_next_enable_phone">Turn on Dex phone access first, then Dex can request the Android call controls.</string>
     <string name="all_access_next_runtime">Opening the Android permission prompt for phone, SMS, microphone, contacts, and notifications.</string>
+    <string name="all_access_next_call_screening">Opening Android call screening setup. Choose Dex as the call screening assistant.</string>
     <string name="all_access_next_overlay">Opening floating Dex access. Turn on display over other apps for Dex.</string>
     <string name="all_access_next_accessibility">Opening assistant control access. Turn on Dex assistant control.</string>
     <string name="all_access_next_background">Opening battery settings. Set Dex to unrestricted so it can keep listening and screening calls.</string>
@@ -614,6 +616,7 @@
     <string name="background_access_tip">On Samsung, remove Dex from sleeping apps and set Battery to Unrestricted for the best outside-the-app results.</string>
     <string name="background_settings_open_failed">Dex could not open that settings screen.</string>
     <string name="notification_access_label">Dex notification access</string>
+    <string name="call_screening_service_label">Dex call screening</string>
     <string name="accessibility_service_label">Dex assistant control</string>
     <string name="accessibility_service_description">Allows Dex to read on-screen text and perform assistant actions you approve, such as Back, Home, taps, and typing.</string>
     <string name="voice_title">Dex voice</string>

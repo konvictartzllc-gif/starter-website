@@ -3,6 +3,7 @@ package com.konvictartz.dex
 import android.Manifest
 import android.app.Activity
 import android.app.PendingIntent
+import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -6899,6 +6900,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 binding.permissionsMessage.text = getString(R.string.all_access_next_runtime)
                 requestAndroidPermissions()
             }
+            !isCallScreeningRoleReady() -> {
+                binding.permissionsMessage.text = getString(R.string.all_access_next_call_screening)
+                openCallScreeningSettings()
+            }
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this) -> {
                 binding.permissionsMessage.text = getString(R.string.all_access_next_overlay)
                 openOverlaySettings()
@@ -6950,6 +6955,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun openNotificationAccessSettings() {
         openSettingsIntent(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+    }
+
+    private fun openCallScreeningSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            if (roleManager?.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) == true &&
+                !roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+            ) {
+                openSettingsIntent(roleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
+                return
+            }
+        }
+        openSettingsIntent(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
     }
 
     private fun openOverlaySettings() {
@@ -7018,6 +7036,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val backgroundReady = shouldRunBackgroundService()
         val lines = listOf(
             permissionStatusLine(getString(R.string.all_access_account_phone), phoneBackendEnabled),
+            permissionStatusLine(getString(R.string.all_access_call_screening_role), isCallScreeningRoleReady()),
             permissionStatusLine(getString(R.string.all_access_phone_state), hasRuntimePermission(Manifest.permission.READ_PHONE_STATE)),
             permissionStatusLine(getString(R.string.all_access_call_log), hasRuntimePermission(Manifest.permission.READ_CALL_LOG)),
             permissionStatusLine(getString(R.string.all_access_contacts), hasRuntimePermission(Manifest.permission.READ_CONTACTS)),
@@ -7031,7 +7050,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             permissionStatusLine(getString(R.string.all_access_assistant_control), accessibilityReady),
             permissionStatusLine(getString(R.string.all_access_background_service), backgroundReady)
         )
-        val header = if (runtimeReady && overlayReady && accessibilityReady && backgroundReady && phoneBackendEnabled) {
+        val header = if (runtimeReady && overlayReady && accessibilityReady && backgroundReady && phoneBackendEnabled && isCallScreeningRoleReady()) {
             getString(R.string.android_permissions_ready)
         } else {
             getString(R.string.android_permissions_missing)
@@ -7041,6 +7060,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun hasRuntimePermission(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun isCallScreeningRoleReady(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
+        val roleManager = getSystemService(RoleManager::class.java) ?: return false
+        return !roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING) ||
+            roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
     }
 
     private fun permissionStatusLine(label: String, ready: Boolean): String {

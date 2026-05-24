@@ -50,6 +50,17 @@
             android:exported="false"
             android:foregroundServiceType="dataSync|microphone" />
 
+        <service
+            android:name=".DexCallScreeningService"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/call_screening_service_label"
+            android:permission="android.permission.BIND_SCREENING_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.CallScreeningService" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".DexBootReceiver"
             android:enabled="true"

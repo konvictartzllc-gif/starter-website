@@ -161,6 +161,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ACTION_ANNOUNCE_NOTIFICATION -> handleIncomingNotification(intent)
             ACTION_SAFETY_CHECK_IN -> handleSafetyCheckIn(intent)
             ACTION_REMINDER_CHECK_IN -> handleReminderCheckIn(intent)
+            ACTION_CALL_SCREENED -> handleScreenedIncomingCall()
             ACTION_CALL_ANSWER -> handleCallTakeMessageAction()
             ACTION_CALL_DECLINE -> handleCallDeclineAction()
             ACTION_CALL_TAKE_MESSAGE -> handleCallTakeMessageAction()
@@ -186,6 +187,19 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?: lastIncomingNumber
+    }
+
+    private fun handleScreenedIncomingCall() {
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(MainActivity.KEY_PHONE_BACKEND_ENABLED, false)) return
+        if (lastCallState != TelephonyManager.CALL_STATE_RINGING) return
+        clearPendingCallScreeningDecision()
+        currentCallWasAnswered = false
+        callMessageCaptureAttempts = 0
+        showIncomingCallNotification(lastCaller)
+        if (!scheduleAutoTakeMessageIfNeeded(prefs, lastIncomingNumber.orEmpty(), lastCaller)) {
+            speakIncomingCallPrompt(lastCaller)
+        }
     }
 
     override fun onDestroy() {
@@ -2629,6 +2643,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val ACTION_CALL_ANSWER = "com.konvictartz.dex.action.CALL_ANSWER"
         const val ACTION_CALL_DECLINE = "com.konvictartz.dex.action.CALL_DECLINE"
         const val ACTION_CALL_TAKE_MESSAGE = "com.konvictartz.dex.action.CALL_TAKE_MESSAGE"
+        const val ACTION_CALL_SCREENED = "com.konvictartz.dex.action.CALL_SCREENED"
         const val EXTRA_CALLER_NAME = "com.konvictartz.dex.extra.CALLER_NAME"
         const val EXTRA_CALLER_NUMBER = "com.konvictartz.dex.extra.CALLER_NUMBER"
         const val EXTRA_CALL_IS_RINGING = "com.konvictartz.dex.extra.CALL_IS_RINGING"
