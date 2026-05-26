@@ -651,7 +651,7 @@ export default function DexChat() {
 
   return (
     <>
-      <div className={`dex-mascot fixed bottom-5 right-5 z-[70] ${open ? "" : "dex-mascot-roam"}`}>
+      <div className="dex-mascot fixed bottom-5 right-5 z-[9999]">
         <button
           type="button"
           onClick={openDexPanel}
@@ -691,13 +691,13 @@ export default function DexChat() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-32 right-5 z-[70] max-w-xs rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 shadow-lg">
+        <div className="fixed bottom-32 right-5 z-[9999] max-w-xs rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 shadow-lg">
           {toast}
         </div>
       )}
 
       {open && (
-        <section className="fixed bottom-24 right-5 z-[70] flex h-[34rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-gray-800 bg-gray-950 shadow-2xl">
+        <section className="fixed bottom-24 right-5 z-[9999] flex h-[34rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-gray-800 bg-gray-950 shadow-2xl">
           <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
             <div>
               <div className="text-sm font-semibold text-white">Dex</div>
