@@ -278,6 +278,7 @@ export default function DexChat() {
   const [mascotLineIndex, setMascotLineIndex] = useState(0);
   const messagesEndRef = useRef(null);
   const memoryTimerRef = useRef(null);
+  const chatInputRef = useRef(null);
 
   const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking, startListening, sleep } = useDexVoice({
     enabled: wakeEnabled,
@@ -457,6 +458,26 @@ export default function DexChat() {
     if (!isSupported) {
       showToast("Voice is not supported in this browser. You can still type to Dex.");
     }
+  }
+
+  function openDexTextPanel() {
+    openDexPanel();
+    window.setTimeout(() => chatInputRef.current?.focus(), 80);
+  }
+
+  function openDexGamesPanel() {
+    setWakeEnabled(true);
+    setShopOpen(false);
+    setOpen(true);
+    pickGame();
+  }
+
+  function openDexStorePanel() {
+    setWakeEnabled(true);
+    setGameOpen(false);
+    setShopOpen(true);
+    setOpen(true);
+    loadShop();
   }
 
   function submitGameAnswer(e) {
@@ -662,7 +683,7 @@ export default function DexChat() {
         </button>
         <button
           type="button"
-          onClick={open ? () => setOpen(false) : openDexPanel}
+          onClick={openDexPanel}
           className={`dex-companion dex-robot-button ${dexSizeClass} ${dexHeightClass} text-white shadow-lg transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
           style={dexColorStyle}
           aria-label={open ? "Close Dex chat" : "Open Dex chat"}
@@ -725,14 +746,13 @@ export default function DexChat() {
             </button>
           </div>
 
-          <div className="flex gap-2 border-b border-gray-800 px-3 py-2">
+          <div className="grid grid-cols-4 gap-2 border-b border-gray-800 px-3 py-2 sm:flex">
             <button
               type="button"
-              onClick={startVoiceCommand}
-              disabled={voiceBusy}
-              className="rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand-light disabled:opacity-60"
+              onClick={openDexTextPanel}
+              className="rounded-md bg-gray-800 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-700"
             >
-              {voiceBusy ? "Listening..." : "Talk"}
+              Text
             </button>
             <button
               type="button"
@@ -744,21 +764,28 @@ export default function DexChat() {
             </button>
             <button
               type="button"
-              onClick={() => pickGame()}
+              onClick={openDexGamesPanel}
               className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
             >
-              Play
+              Games
             </button>
             <button
               type="button"
-              onClick={() => {
-                setShopOpen((prev) => !prev);
-                setOpen(true);
-                loadShop();
-              }}
+              onClick={openDexStorePanel}
               className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
             >
-              Shop
+              Store
+            </button>
+          </div>
+
+          <div className="flex gap-2 border-b border-gray-800 px-3 py-2">
+            <button
+              type="button"
+              onClick={startVoiceCommand}
+              disabled={voiceBusy}
+              className="rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand-light disabled:opacity-60"
+            >
+              {voiceBusy ? "Listening..." : "Talk"}
             </button>
             <button
               type="button"
@@ -949,6 +976,7 @@ export default function DexChat() {
           <form onSubmit={handleSubmit} className="border-t border-gray-800 p-3">
             <div className="flex gap-2">
               <input
+                ref={chatInputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
