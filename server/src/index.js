@@ -14,6 +14,7 @@ import dexRoutes from "./routes/dex.js";
 import paymentsRoutes from "./routes/payments.js";
 import adminRoutes from "./routes/admin.js";
 import affiliateRoutes from "./routes/affiliate.js";
+import twilioVoiceRoutes from "./routes/twilioVoice.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -107,6 +108,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
+app.use("/api/twilio", express.urlencoded({ extended: false }));
 app.use(express.json());
 
 // Rate limiting
@@ -133,6 +135,7 @@ app.use("/api/dex", dexRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/affiliate", affiliateRoutes);
+app.use("/api/twilio/voice", twilioVoiceRoutes);
 
 // Health check
 app.get("/", (req, res) => {

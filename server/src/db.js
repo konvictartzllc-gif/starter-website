@@ -210,6 +210,17 @@
       );
     `);
     await db.exec(`
+      CREATE TABLE IF NOT EXISTS call_messages (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id      INTEGER NOT NULL REFERENCES users(id),
+        caller       TEXT,
+        phone_number TEXT,
+        message      TEXT NOT NULL,
+        handled      INTEGER NOT NULL DEFAULT 0,
+        created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS user_google_calendar_connections (
         user_id       INTEGER PRIMARY KEY REFERENCES users(id),
         google_email  TEXT,
