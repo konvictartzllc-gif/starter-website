@@ -60,6 +60,8 @@
   padding: 0.65rem 0.8rem;
   font-size: 0.82rem;
   line-height: 1.25;
+  border-style: solid;
+  cursor: pointer;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
   animation: dex-bubble-in 0.28s ease both;
 }

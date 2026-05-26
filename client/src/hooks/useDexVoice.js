@@ -308,6 +308,18 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
     try { recognitionRef.current?.start(); } catch {}
   }, [clearConversationTimers]);
 
+  const startListening = useCallback(() => {
+    if (!enabled) return;
+    if (isSpeakingRef.current) return;
+    try {
+      recognitionRef.current?.start();
+      setError("");
+      setStatus("listening");
+    } catch {
+      // The recognizer throws if it is already running; that state is fine.
+    }
+  }, [enabled]);
+
   const sleep = useCallback(() => {
     clearWakeTimeout();
     clearCommandTimeout();
@@ -319,5 +331,5 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
     setStatus(enabled ? "listening" : "idle");
   }, [clearCommandTimeout, clearConversationTimers, clearWakeTimeout, enabled]);
 
-  return { status, isSupported, lastHeard, error, speak, stopSpeaking, sleep };
+  return { status, isSupported, lastHeard, error, speak, stopSpeaking, startListening, sleep };
 }

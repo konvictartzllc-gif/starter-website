@@ -5,6 +5,7 @@ import { useDexVoice } from "../hooks/useDexVoice.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 
 const DEX_AVATAR = "D";
+const WAKE_ENABLED_STORAGE_KEY = "dex_wake_enabled";
 const MASCOT_LINES = [
   "Say Hey Dex",
   "Need help?",
@@ -265,7 +266,7 @@ export default function DexChat() {
   const [accessError, setAccessError] = useState(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
-  const [wakeEnabled, setWakeEnabled] = useState(false);
+  const [wakeEnabled, setWakeEnabled] = useState(() => window.localStorage.getItem(WAKE_ENABLED_STORAGE_KEY) !== "0");
   const [gameOpen, setGameOpen] = useState(false);
   const [gamePrompt, setGamePrompt] = useState(() => buildGameRound("Riddle"));
   const [gameAnswer, setGameAnswer] = useState("");
@@ -278,7 +279,7 @@ export default function DexChat() {
   const messagesEndRef = useRef(null);
   const memoryTimerRef = useRef(null);
 
-  const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking, sleep } = useDexVoice({
+  const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking, startListening, sleep } = useDexVoice({
     enabled: wakeEnabled,
     stayAwake: true,
     onWakeWord: ({ spokenCommand } = {}) => {
@@ -390,6 +391,10 @@ export default function DexChat() {
   useEffect(() => () => window.clearTimeout(memoryTimerRef.current), []);
 
   useEffect(() => {
+    window.localStorage.setItem(WAKE_ENABLED_STORAGE_KEY, wakeEnabled ? "1" : "0");
+  }, [wakeEnabled]);
+
+  useEffect(() => {
     if (open || toast) return;
     const interval = window.setInterval(() => {
       setMascotLineIndex((index) => (index + 1) % MASCOT_LINES.length);
@@ -441,6 +446,17 @@ export default function DexChat() {
     setOpen(true);
     const message = "Wake mode is on. Say Hey Dex once, then keep talking naturally.";
     showToast(message);
+  }
+
+  function openDexPanel() {
+    setWakeEnabled(true);
+    setGameOpen(false);
+    setShopOpen(false);
+    setOpen(true);
+    window.setTimeout(() => startListening(), 50);
+    if (!isSupported) {
+      showToast("Voice is not supported in this browser. You can still type to Dex.");
+    }
   }
 
   function submitGameAnswer(e) {
@@ -635,20 +651,18 @@ export default function DexChat() {
 
   return (
     <>
-      <div className={`dex-mascot fixed bottom-5 right-5 z-40 ${open ? "" : "dex-mascot-roam"}`}>
-        <div className="dex-mascot-bubble" aria-live="polite">{mascotLine}</div>
+      <div className={`dex-mascot fixed bottom-5 right-5 z-[70] ${open ? "" : "dex-mascot-roam"}`}>
         <button
           type="button"
-          onClick={() => {
-            setOpen((prev) => {
-              const nextOpen = !prev;
-              if (nextOpen) {
-                setGameOpen(false);
-                setShopOpen(false);
-              }
-              return nextOpen;
-            });
-          }}
+          onClick={openDexPanel}
+          className="dex-mascot-bubble text-left"
+          aria-live="polite"
+        >
+          {mascotLine}
+        </button>
+        <button
+          type="button"
+          onClick={open ? () => setOpen(false) : openDexPanel}
           className={`dex-companion dex-robot-button ${dexSizeClass} ${dexHeightClass} text-white shadow-lg transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
           style={dexColorStyle}
           aria-label={open ? "Close Dex chat" : "Open Dex chat"}
@@ -677,13 +691,13 @@ export default function DexChat() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-32 right-5 z-40 max-w-xs rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 shadow-lg">
+        <div className="fixed bottom-32 right-5 z-[70] max-w-xs rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 shadow-lg">
           {toast}
         </div>
       )}
 
       {open && (
-        <section className="fixed bottom-24 right-5 z-40 flex h-[34rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-gray-800 bg-gray-950 shadow-2xl">
+        <section className="fixed bottom-24 right-5 z-[70] flex h-[34rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-gray-800 bg-gray-950 shadow-2xl">
           <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
             <div>
               <div className="text-sm font-semibold text-white">Dex</div>
