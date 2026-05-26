@@ -841,7 +841,7 @@
     <string name="call_speaker_enabled">I turned on speaker for this call.</string>
     <string name="call_speaker_unavailable">There is no active call for me to put on speaker.</string>
     <string name="call_message_unavailable">There is no ringing call for me to take a message from right now.</string>
-    <string name="call_message_taking">Dex is answering for you and asking the caller for their message.</string>
+    <string name="call_message_taking">Dex is keeping your line free and asking the caller to leave the message by text.</string>
     <string name="call_message_log_entry">%1$s said: %2$s</string>
     <string name="call_message_log_entry_handled">%1$s said: %2$s (%3$s)</string>
     <string name="call_message_text_back_body">Hey %1$s, Dex took your call while I was busy. I got your message and will get back to you soon.</string>
@@ -850,11 +850,13 @@
     <string name="call_message_task_title">Follow up with %1$s</string>
     <string name="call_message_draft_summary">I saved a follow-up task and drafted a text for %1$s.</string>
     <string name="call_message_draft_detail">Approve this and Android will open a text draft asking %1$s to send their message.</string>
-    <string name="call_message_sms_body">I am tied up right now. Please text me the message you wanted to leave and I will get back to you as soon as I can.</string>
+    <string name="call_message_sms_body">This is Dex. They are busy right now. Please text the name and message you wanted to leave, and I will pass it along.</string>
+    <string name="call_message_requested_log">Dex asked this caller to leave their name and message by text so your phone stayed free.</string>
+    <string name="call_message_sms_permission_needed">I declined the call from %1$s and saved it, but Dex needs SMS permission to text them for the message.</string>
     <string name="call_message_answer_prompt">This is Dex. Who is calling, and what message would you like to leave?</string>
     <string name="call_message_answer_prompt_alt_1">Hi, this is Dex answering for them. Please say your name and the message you want to leave.</string>
     <string name="call_message_answer_prompt_alt_2">Dex here. Go ahead and tell me who is calling and what message you would like passed along.</string>
-    <string name="call_answering_machine_scheduled">Dex will answer %1$s and ask for a name and message.</string>
+    <string name="call_answering_machine_scheduled">Dex will keep your phone free and ask %1$s to leave their name and message by text.</string>
     <string name="call_message_answer_retry">I did not catch enough of that. Please say your name and your message one more time.</string>
     <string name="call_message_answer_retry_alt_1">I missed part of that. Please say your name and message again a little more clearly.</string>
     <string name="call_message_answer_retry_alt_2">I did not get a clear message. Please try once more with your name and message together.</string>

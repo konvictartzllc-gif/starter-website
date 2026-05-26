@@ -818,25 +818,32 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             speakShortStatus(getString(R.string.call_message_unavailable))
             return
         }
-        val answered = answerRingingCall()
-        if (!answered) {
-            speakShortStatus(callAnswerFailureMessage())
-            return
-        }
-        currentCallWasAnswered = true
+        val caller = lastCaller.takeUnless { it.isBlank() || it == "Unknown caller" }
+            ?: lastIncomingNumber
+            ?: getString(R.string.unknown_number_label)
+        val normalizedNumber = normalizeSmsPhoneNumber(lastIncomingNumber)
+        currentCallWasAnswered = false
         callMessageCaptureAttempts = 0
-        enableSpeakerForActiveCall()
         dismissNotification(CALL_NOTIFICATION_ID)
-        postCallEvent("taking_message", lastCaller)
-        val prompt = when (nextCallScreeningPhraseVariant()) {
-            0 -> getString(R.string.call_message_answer_prompt)
-            1 -> getString(R.string.call_message_answer_prompt_alt_1)
-            else -> getString(R.string.call_message_answer_prompt_alt_2)
-        }
-        speakAndThenListen(
-            prompt,
-            BackgroundListenMode.CALLER_MESSAGE
+        declineRingingCall()
+        postCallEvent("message_requested", caller, null, normalizedNumber.ifBlank { lastIncomingNumber })
+        MainActivity.appendPersistentCallMessageLog(
+            context = this,
+            caller = caller,
+            phoneNumber = normalizedNumber.ifBlank { lastIncomingNumber },
+            message = getString(R.string.call_message_requested_log)
         )
+        if (normalizedNumber.isNotBlank() && hasPermission(Manifest.permission.SEND_SMS)) {
+            sendPhoneSms(normalizedNumber, getString(R.string.call_message_sms_body), caller)
+        } else {
+            speakShortStatus(
+                if (normalizedNumber.isBlank()) {
+                    getString(R.string.call_message_taken_no_number, caller)
+                } else {
+                    getString(R.string.call_message_sms_permission_needed, caller)
+                }
+            )
+        }
     }
 
     private fun handleSmsReadAction() {
