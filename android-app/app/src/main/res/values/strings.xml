@@ -854,6 +854,7 @@
     <string name="call_message_answer_prompt">This is Dex. Who is calling, and what message would you like to leave?</string>
     <string name="call_message_answer_prompt_alt_1">Hi, this is Dex answering for them. Please say your name and the message you want to leave.</string>
     <string name="call_message_answer_prompt_alt_2">Dex here. Go ahead and tell me who is calling and what message you would like passed along.</string>
+    <string name="call_answering_machine_scheduled">Dex will answer %1$s and ask for a name and message.</string>
     <string name="call_message_answer_retry">I did not catch enough of that. Please say your name and your message one more time.</string>
     <string name="call_message_answer_retry_alt_1">I missed part of that. Please say your name and message again a little more clearly.</string>
     <string name="call_message_answer_retry_alt_2">I did not get a clear message. Please try once more with your name and message together.</string>

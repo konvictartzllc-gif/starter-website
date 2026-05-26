@@ -197,9 +197,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         currentCallWasAnswered = false
         callMessageCaptureAttempts = 0
         showIncomingCallNotification(lastCaller)
-        if (!scheduleAutoTakeMessageIfNeeded(prefs, lastIncomingNumber.orEmpty(), lastCaller)) {
-            speakIncomingCallPrompt(lastCaller)
-        }
+        scheduleAnsweringMachineTakeMessage(lastCaller)
     }
 
     override fun onDestroy() {
@@ -481,9 +479,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 } else {
                     postCallEvent("incoming", resolvedCaller)
                     showIncomingCallNotification(resolvedCaller)
-                    if (!scheduleAutoTakeMessageIfNeeded(prefs, rawNumber, resolvedCaller)) {
-                        speakIncomingCallPrompt(resolvedCaller)
-                    }
+                    scheduleAnsweringMachineTakeMessage(resolvedCaller)
                 }
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
@@ -568,6 +564,20 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         }
         mainHandler.postDelayed(autoTakeMessageRunnable!!, AUTO_TAKE_MESSAGE_DELAY_MS)
         return true
+    }
+
+    private fun scheduleAnsweringMachineTakeMessage(resolvedCaller: String) {
+        MainActivity.appendPersistentActivityLog(
+            this,
+            "Call",
+            getString(R.string.call_answering_machine_scheduled, resolvedCaller)
+        )
+        autoTakeMessageRunnable = Runnable {
+            autoTakeMessageRunnable = null
+            if (lastCallState != TelephonyManager.CALL_STATE_RINGING || currentCallWasAnswered) return@Runnable
+            handleCallTakeMessageAction()
+        }
+        mainHandler.postDelayed(autoTakeMessageRunnable!!, ANSWERING_MACHINE_PICKUP_DELAY_MS)
     }
 
     private fun clearPendingAutoTakeMessage() {
@@ -2659,6 +2669,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
         const val EXTRA_NOTIFICATION_TEXT = "extra_notification_text"
         const val KEY_REMOTE_REPLY_TEXT = "dex_remote_reply_text"
         private const val AUTO_TAKE_MESSAGE_DELAY_MS = 5500L
+        private const val ANSWERING_MACHINE_PICKUP_DELAY_MS = 1200L
         private const val CALL_MESSAGE_END_DELAY_MS = 1200L
         private const val CALL_OWNER_PROMPT_DELAY_MS = 5200L
         private const val CALL_ANSWERING_MACHINE_END_DELAY_MS = 3000L
