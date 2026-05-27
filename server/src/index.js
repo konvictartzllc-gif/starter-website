@@ -163,6 +163,24 @@ app.get("/api", (req, res) => {
 });
 app.get("/health", (req, res) => res.json({ status: "ok", service: "Konvict Artz - Dex AI Backend" }));
 app.get("/api/health", (req, res) => res.json({ status: "ok", service: "Konvict Artz - Dex AI Backend" }));
+app.get("/oauth/callback", (req, res) => {
+  const hasCode = typeof req.query.code === "string" && req.query.code.trim().length > 0;
+  const error = typeof req.query.error === "string" ? req.query.error : null;
+  const state = typeof req.query.state === "string" ? req.query.state : null;
+
+  res.status(error ? 400 : 200).json({
+    status: error ? "error" : "ok",
+    provider: "ringcentral",
+    message: error
+      ? "RingCentral returned an OAuth error."
+      : hasCode
+        ? "RingCentral OAuth callback reached Dex. JWT auth is still used for server-side RingCentral actions."
+        : "RingCentral OAuth callback is reachable.",
+    hasCode,
+    error,
+    state,
+  });
+});
 app.get("/api/diagnostics/providers", (req, res) => {
   const providers = {
     ai: getAIStatus(),
