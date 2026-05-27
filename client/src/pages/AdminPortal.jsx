@@ -62,7 +62,9 @@ export default function AdminPortal() {
     const normalized = normalizeAdminTab(nextTab);
     if (normalized === tab && !options.replace) return;
 
-    setPreviousTab(options.trackPrevious === false ? previousTab : tab);
+    if (options.trackPrevious !== false) {
+      setPreviousTab(tab);
+    }
     setTab(normalized);
     localStorage.setItem("dex_admin_tab", normalized);
 
@@ -140,7 +142,7 @@ export default function AdminPortal() {
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [isAdmin]);
+  }, [isAdmin, tab]);
 
   async function handleAddInventory(e) {
     e.preventDefault();
@@ -333,7 +335,16 @@ export default function AdminPortal() {
           <h1 className="text-xl font-bold">Konvict Artz Admin</h1>
           <p className="text-gray-400 text-xs">Logged in as {user.email}</p>
         </div>
-        <button onClick={logout} className="text-sm text-gray-400 hover:text-white">Log Out</button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => updateAdminTab("dex tools", { replace: tab === "dex tools" })}
+            className="text-sm font-semibold text-brand hover:text-brand-light"
+          >
+            Dex Tools
+          </button>
+          <button onClick={logout} className="text-sm text-gray-400 hover:text-white">Log Out</button>
+        </div>
       </div>
 
       <div className="flex gap-1 px-6 pt-4 overflow-x-auto">
@@ -351,8 +362,8 @@ export default function AdminPortal() {
       </div>
 
       {msg && (
-        <div className="mx-6 mt-4 bg-gray-800 border border-gray-600 rounded-xl px-4 py-2 text-sm text-green-400">
-          {msg} <button onClick={() => setMsg("")} className="ml-2 text-gray-500">x</button>
+        <div className="mx-6 mt-4 break-words rounded-xl border border-gray-600 bg-gray-800 px-4 py-3 text-sm text-green-400">
+          {msg} <button onClick={() => setMsg("")} className="ml-2 text-gray-500 hover:text-gray-200">Dismiss</button>
         </div>
       )}
 

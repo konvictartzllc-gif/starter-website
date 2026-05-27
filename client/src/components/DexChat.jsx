@@ -686,7 +686,7 @@ export default function DexChat() {
           onClick={openDexPanel}
           className={`dex-companion dex-robot-button ${dexSizeClass} ${dexHeightClass} text-white shadow-lg transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
           style={dexColorStyle}
-          aria-label={open ? "Close Dex chat" : "Open Dex chat"}
+          aria-label="Open Dex quick actions"
         >
           <span className="dex-robot-antenna" aria-hidden="true" />
           <span className="dex-robot-ear dex-robot-ear-left" aria-hidden="true" />
@@ -863,7 +863,7 @@ export default function DexChat() {
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
                     <p className="font-medium text-white">Dex Game: {gamePrompt.type}</p>
-                    <p className="text-xs text-gray-400">Played {gameStats.played} • Streak {gameStats.streak}</p>
+                    <p className="text-xs text-gray-400">Played {gameStats.played} / Streak {gameStats.streak}</p>
                   </div>
                   <div className="flex gap-2">
                     <button

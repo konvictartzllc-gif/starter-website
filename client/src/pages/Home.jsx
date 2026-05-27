@@ -1,12 +1,18 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth.jsx";
 
 const services = [
-  { icon: "🌿", title: "Lawn Care", desc: "Mowing, trimming, edging, and full yard maintenance." },
-  { icon: "🧹", title: "Cleaning Services", desc: "Residential and commercial deep cleaning." },
-  { icon: "🔧", title: "Handyman Repair", desc: "Repairs, installations, and home improvements." },
-  { icon: "📱", title: "Electronics", desc: "Refurbished and new electronics at great prices." },
+  { marker: "LC", title: "Lawn Care", desc: "Mowing, trimming, edging, and full yard maintenance." },
+  { marker: "CL", title: "Cleaning", desc: "Residential and commercial cleaning for regular or one-time jobs." },
+  { marker: "HD", title: "Handyman", desc: "Repairs, installs, and practical home improvements." },
+  { marker: "EL", title: "Electronics", desc: "Refurbished and new electronics with straightforward checkout." },
+];
+
+const dexFeatures = [
+  { marker: "VO", title: "Voice Ready", desc: 'Say "Hey Dex" when wake mode is enabled.' },
+  { marker: "ME", title: "Memory", desc: "Dex can remember preferences, lessons, and saved workflows." },
+  { marker: "PL", title: "Planning", desc: "Use Dex for lessons, reminders, calls, and daily planning." },
 ];
 
 function Home() {
@@ -18,168 +24,192 @@ function Home() {
   const [installStatus, setInstallStatus] = useState("");
 
   useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
+    const handler = (event) => {
+      event.preventDefault();
+      setDeferredPrompt(event);
       setShowInstall(true);
     };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  const handleInstall = async () => {
+  async function handleInstall() {
     if (!deferredPrompt) {
-      setInstallStatus("Install prompt not available. Try refreshing the page.");
+      setInstallStatus("Install prompt is not available yet. Try refreshing the page.");
       return;
     }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === "accepted") {
       setShowInstall(false);
-      setInstallStatus("App installed! You can now launch it from your home screen or apps menu.");
+      setInstallStatus("App installed. You can launch it from your home screen or apps menu.");
     } else {
       setInstallStatus("Install dismissed. You can try again later.");
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Hero */}
       {showInstall && (
-        <div className="flex flex-col items-center mb-4">
-          <button
-            onClick={handleInstall}
-            className="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-2 rounded-xl shadow-lg transition-all mb-2"
-          >
-            Install App (Phone/Computer)
-          </button>
-          {installStatus && (
-            <div className="text-sm text-yellow-300 mt-1">{installStatus}</div>
-          )}
+        <div className="border-b border-green-500/30 bg-green-500/10 px-6 py-3">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-green-100">Install Dex for faster access from this device.</p>
+            <button
+              type="button"
+              onClick={handleInstall}
+              className="rounded-md bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700"
+            >
+              Install App
+            </button>
+          </div>
+          {installStatus && <p className="mx-auto mt-2 max-w-6xl text-sm text-green-100">{installStatus}</p>}
         </div>
       )}
-      <section className="relative overflow-hidden px-6 py-20 text-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-brand/20 to-transparent pointer-events-none" />
-        <h1 className="text-4xl md:text-6xl font-extrabold mb-4">
-          Konvict <span className="text-brand">Artz</span>
-        </h1>
-        <p className="text-gray-400 text-lg md:text-xl mb-2 max-w-xl mx-auto">
-          Lawn care, cleaning, handyman services, and electronics — all in one place.
-        </p>
-        <p className="text-brand font-semibold mb-8">Powered by Dex AI — just say "Hey Dex" to get started.</p>
-        {user ? (
-          <div className="flex flex-col items-center gap-3">
-            <p className="text-sm text-gray-300">Signed in as {user.name || user.email}</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link to="/shop" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
-                Shop Products
-              </Link>
-              <Link to="/settings" className="bg-brand hover:bg-brand-light text-white font-bold px-8 py-3 rounded-xl transition-all">
-                Open Dex Dashboard
-              </Link>
-              {user.role === "affiliate" && (
-                <Link to="/affiliate" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
-                  Affiliate Dashboard
+
+      <section className="relative overflow-hidden border-b border-gray-800 px-6 py-16">
+        <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div>
+            <p className="mb-3 text-sm font-bold uppercase tracking-[0.28em] text-brand">Konvict Artz</p>
+            <h1 className="max-w-3xl text-4xl font-black leading-tight md:text-6xl">
+              Services, products, and Dex in one clean place.
+            </h1>
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-gray-300">
+              Book services, shop inventory, learn with Dex, and manage your assistant from the same account.
+            </p>
+            <p className="mt-3 text-sm font-semibold text-brand">Powered by Dex AI. Say "Hey Dex" when wake mode is enabled.</p>
+
+            {refCode && (
+              <div className="mt-5 rounded-md border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-100">
+                Referral code <strong>{refCode}</strong> is applied.
+              </div>
+            )}
+
+            {user ? (
+              <div className="mt-8">
+                <p className="mb-3 text-sm text-gray-300">Signed in as {user.name || user.email}</p>
+                <div className="flex flex-wrap gap-3">
+                  <Link to="/settings" className="rounded-md bg-brand px-5 py-3 font-bold text-white hover:bg-brand-light">
+                    Open Dex Dashboard
+                  </Link>
+                  <Link to="/shop" className="rounded-md border border-gray-700 px-5 py-3 font-bold text-gray-200 hover:border-brand">
+                    Shop Products
+                  </Link>
+                  {user.role === "affiliate" && (
+                    <Link to="/affiliate" className="rounded-md border border-gray-700 px-5 py-3 font-bold text-gray-200 hover:border-brand">
+                      Affiliate Dashboard
+                    </Link>
+                  )}
+                  {user.role === "admin" && (
+                    <Link to="/admin" className="rounded-md border border-gray-700 px-5 py-3 font-bold text-gray-200 hover:border-brand">
+                      Admin Portal
+                    </Link>
+                  )}
+                  <button type="button" onClick={logout} className="rounded-md border border-gray-700 px-5 py-3 font-bold text-gray-200 hover:border-brand">
+                    Log Out
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  to={`/register${refCode ? `?ref=${refCode}` : ""}`}
+                  className="rounded-md bg-brand px-5 py-3 font-bold text-white hover:bg-brand-light"
+                >
+                  Start Free Trial
                 </Link>
-              )}
-              {user.role === "admin" && (
-                <Link to="/admin" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
-                  Admin Portal
+                <Link to="/login" className="rounded-md border border-gray-700 px-5 py-3 font-bold text-gray-200 hover:border-brand">
+                  Log In
                 </Link>
-              )}
-              <button onClick={logout} className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
-                Log Out
-              </button>
+                <Link to="/shop" className="rounded-md border border-gray-700 px-5 py-3 font-bold text-gray-200 hover:border-brand">
+                  Shop Products
+                </Link>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-6">
+            <div className="flex items-center gap-4 border-b border-gray-800 pb-5">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-brand/60 bg-brand/20 text-2xl font-black text-white">
+                D
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Dex Assistant</h2>
+                <p className="text-sm text-gray-400">Chat, voice, lessons, games, shop, and account tools.</p>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3">
+              {dexFeatures.map((feature) => (
+                <div key={feature.title} className="flex gap-3 rounded-md bg-gray-950/70 p-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand/20 text-xs font-black text-brand">
+                    {feature.marker}
+                  </span>
+                  <div>
+                    <h3 className="font-semibold">{feature.title}</h3>
+                    <p className="text-sm text-gray-400">{feature.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link to="/shop" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
-              Shop Products
-            </Link>
-            <Link to={`/register${refCode ? `?ref=${refCode}` : ""}`}
-              className="bg-brand hover:bg-brand-light text-white font-bold px-8 py-3 rounded-xl transition-all">
-              Start Free 3-Day Trial
-            </Link>
-            <Link to="/login" className="border border-gray-600 hover:border-brand text-gray-300 font-bold px-8 py-3 rounded-xl transition-all">
-              Log In
-            </Link>
-          </div>
-        )}
-        {refCode && (
-          <p className="mt-4 text-sm text-green-400">🎁 Referral code <strong>{refCode}</strong> applied!</p>
-        )}
+        </div>
       </section>
 
-      {/* Services */}
-      <section className="px-6 py-12 max-w-4xl mx-auto">
-        <h2 className="text-2xl font-bold text-center mb-8">Our Services</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {services.map((s) => (
-            <div key={s.title} className="bg-gray-800 rounded-2xl p-6 hover:border-brand border border-transparent transition-all">
-              <span className="text-4xl">{s.icon}</span>
-              <h3 className="text-lg font-bold mt-3 mb-1">{s.title}</h3>
-              <p className="text-gray-400 text-sm">{s.desc}</p>
-            </div>
+      <section className="mx-auto max-w-6xl px-6 py-12">
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.22em] text-brand">What You Can Do</p>
+            <h2 className="mt-2 text-2xl font-bold">Services and shopping</h2>
+          </div>
+          <Link to="/shop" className="text-sm font-bold text-brand hover:text-brand-light">View shop</Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {services.map((service) => (
+            <article key={service.title} className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gray-800 text-xs font-black text-brand">
+                {service.marker}
+              </span>
+              <h3 className="mt-4 text-lg font-bold">{service.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-gray-400">{service.desc}</p>
+            </article>
           ))}
         </div>
       </section>
 
-      {/* Dex AI Feature */}
-      <section className="px-6 py-12 bg-gray-900">
-        <div className="max-w-3xl mx-auto text-center">
-          <span className="text-5xl">🤖</span>
-          <h2 className="text-2xl font-bold mt-4 mb-3">Meet Dex AI</h2>
-          <p className="text-gray-400 mb-6">
-            Just say <strong className="text-white">"Hey Dex"</strong> — no clicking, no typing required. Dex handles bookings, answers questions, manages your appointments, and remembers everything about you.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-            {[
-              { icon: "🎤", title: "Voice Activated", desc: 'Say "Hey Dex" to wake him up instantly' },
-              { icon: "🧠", title: "Remembers You", desc: "Dex recalls your history and preferences" },
-              { icon: "📅", title: "Books Appointments", desc: "Schedule services with just your voice" },
-            ].map((f) => (
-              <div key={f.title} className="bg-gray-800 rounded-xl p-4">
-                <span className="text-2xl">{f.icon}</span>
-                <h4 className="font-bold mt-2 mb-1">{f.title}</h4>
-                <p className="text-gray-400 text-xs">{f.desc}</p>
+      <section className="border-y border-gray-800 bg-gray-900 px-6 py-12">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-sm font-bold uppercase tracking-[0.22em] text-brand">Dex Access</p>
+          <h2 className="mt-2 text-3xl font-black">Simple pricing</h2>
+          <p className="mt-3 text-gray-400">Start with a free 3-day trial. Continue with Dex for $9.99/month when you are ready.</p>
+          <div className="mt-8 rounded-lg border border-brand/60 bg-gray-950 p-6 text-left">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-wide text-brand">Dex AI Subscription</p>
+                <p className="mt-2 text-4xl font-black">$9.99 <span className="text-base font-semibold text-gray-400">/ month</span></p>
               </div>
-            ))}
+              <Link to={user ? "/settings" : "/register"} className="rounded-md bg-brand px-5 py-3 text-center font-bold text-white hover:bg-brand-light">
+                {user ? "Manage Account" : "Start Free Trial"}
+              </Link>
+            </div>
+            <ul className="mt-6 grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
+              {["Voice and text assistant", "Learning and quizzes", "Saved preferences", "Games and Dex shop", "Permissions center", "Cancel anytime"].map((feature) => (
+                <li key={feature} className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-green-400" />
+                  {feature}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section className="px-6 py-12 max-w-xl mx-auto text-center">
-        <h2 className="text-2xl font-bold mb-8">Simple Pricing</h2>
-        <div className="bg-gray-800 border border-brand rounded-2xl p-8">
-          <p className="text-brand font-bold text-sm uppercase tracking-wider mb-2">Dex AI Subscription</p>
-          <p className="text-5xl font-extrabold mb-1">$9.99<span className="text-xl text-gray-400">/mo</span></p>
-          <p className="text-gray-400 text-sm mb-6">Start with a free 3-day trial — no credit card required</p>
-          <ul className="text-sm text-gray-300 space-y-2 text-left mb-6">
-            {["Voice-activated AI assistant", "Appointment booking & reminders", "Service inquiries & support", "Chat history & memory", "Cancel anytime"].map(f => (
-              <li key={f} className="flex items-center gap-2"><span className="text-green-400">✓</span>{f}</li>
-            ))}
-          </ul>
-          {user ? (
-            <Link to="/settings" className="block w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all">
-              Manage Your Dex Account
-            </Link>
-          ) : (
-            <Link to="/register" className="block w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all">
-              Start Free Trial
-            </Link>
-          )}
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-800 px-6 py-6 text-center text-gray-500 text-sm">
-        <p>© 2026 Konvict Artz. All rights reserved.</p>
-        <div className="flex justify-center gap-4 mt-2">
-          <Link to="/admin" className="hover:text-gray-300">Admin</Link>
+      <footer className="px-6 py-6 text-center text-sm text-gray-500">
+        <p>Copyright 2026 Konvict Artz. All rights reserved.</p>
+        <div className="mt-3 flex flex-wrap justify-center gap-4">
           <Link to="/shop" className="hover:text-gray-300">Shop</Link>
+          <Link to="/settings" className="hover:text-gray-300">Dex Dashboard</Link>
           <Link to="/affiliate" className="hover:text-gray-300">Affiliate Dashboard</Link>
+          <Link to="/privacy" className="hover:text-gray-300">Privacy</Link>
+          <Link to="/terms" className="hover:text-gray-300">Terms</Link>
         </div>
       </footer>
     </div>

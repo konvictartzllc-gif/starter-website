@@ -10,8 +10,6 @@ import DexChat from "./components/DexChat.jsx";
 import Onboarding from "./components/Onboarding.jsx";
 import BannerAds from "./components/BannerAds.jsx";
 import PrivacyBanner from "./components/PrivacyBanner.jsx";
-
-// New imports added
 import Privacy from "./pages/Privacy.jsx";
 import Terms from "./pages/Terms.jsx";
 
@@ -27,9 +25,8 @@ export default function App() {
         <Route path="/shop" element={<Shop />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
-      <Route path="/settings" element={<Settings />} />
-    </Routes>
-      {/* Dex AI is always present on every page */}
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
       <PrivacyBanner />
       <BannerAds location="USA" />
       <Onboarding />
