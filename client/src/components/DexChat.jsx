@@ -660,7 +660,7 @@ export default function DexChat() {
 
     try {
       const data = await api.chat(trimmed);
-      setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: data.reply, webAction: data.webAction || null }]);
       speak(data.reply);
 
       if (data.appointmentIntent) {
@@ -959,7 +959,17 @@ export default function DexChat() {
                     : "bg-gray-900 text-gray-100 border border-gray-800"
                 }`}
               >
-                {message.content}
+                  {message.content}
+                  {message.webAction?.url && (
+                    <a
+                      href={message.webAction.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block rounded-md border border-brand/60 px-3 py-2 text-center text-xs font-semibold text-brand hover:bg-brand/10"
+                    >
+                      {message.webAction.type === "youtube" ? "Open YouTube" : "Open Search"}
+                    </a>
+                  )}
               </div>
             ))}
 

@@ -22,6 +22,7 @@ const CHAT_MEMORY_RETENTION_DAYS = 3;
 const SENSITIVE_INFO_WARNING =
         "I won't save sensitive information like bank details, card numbers, passwords, or Social Security numbers. Please remove that information and try again.";
 const WORKFLOW_PREFIX = "pref:workflow:";
+const WEB_SEARCH_TIMEOUT_MS = 5500;
 const DEX_SHOP_ITEMS = [
         { id: "size-small", name: "Pocket Dex", price: 0, slot: "size" },
         { id: "size-big", name: "Big Dex", price: 0, slot: "size" },
@@ -63,6 +64,95 @@ function isEmergencyContactAlertRequest(message = "") {
                 /\b(alert|notify|text|message|call|contact|tell)\b.*\b(my )?(emergency|trusted)\b.*\b(contact|person|support)\b/i.test(text) ||
                 /\b(my )?(emergency|trusted)\b.*\b(contact|person)\b.*\b(now|help|alert|notify|message|text|call)\b/i.test(text)
         );
+}
+
+function extractWebRequest(message = "") {
+        const text = String(message || "").trim();
+        const youtubeMatch = text.match(/\b(?:search|look up|find|pull up|open)\s+(?:on\s+)?youtube\s+(?:for\s+)?(.+)/i);
+        if (youtubeMatch?.[1]) {
+                return { type: "youtube", query: youtubeMatch[1].trim() };
+        }
+        if (/\b(open|pull up)\s+youtube\b/i.test(text)) {
+                return { type: "youtube", query: "" };
+        }
+        const webMatch =
+                text.match(/\b(?:search|look up|google|find)\s+(?:the\s+web\s+)?(?:for\s+)?(.+)/i) ||
+                text.match(/\b(?:what is|who is|where is|when is|how do i|how to)\s+(.+)/i);
+        if (webMatch?.[0] && /\b(search|look up|google|find|latest|today|current|youtube)\b/i.test(text)) {
+                return { type: "web", query: (webMatch[1] || text).trim() };
+        }
+        return null;
+}
+
+function withTimeout(promise, timeoutMs = WEB_SEARCH_TIMEOUT_MS) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        return Promise.resolve(promise(controller.signal)).finally(() => clearTimeout(timeout));
+}
+
+function stripHtml(value = "") {
+        return String(value)
+                .replace(/<[^>]+>/g, " ")
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/&amp;/g, "&")
+                .replace(/\s+/g, " ")
+                .trim();
+}
+
+async function fetchDuckDuckGoInstantAnswer(query) {
+        const url = new URL("https://api.duckduckgo.com/");
+        url.searchParams.set("q", query);
+        url.searchParams.set("format", "json");
+        url.searchParams.set("no_html", "1");
+        url.searchParams.set("skip_disambig", "1");
+        return withTimeout(async (signal) => {
+                const response = await fetch(url, { signal });
+                if (!response.ok) throw new Error(`Web search failed: ${response.status}`);
+                return response.json();
+        });
+}
+
+function buildSearchReply(request, searchData = null) {
+        const query = request.query || "YouTube";
+        if (request.type === "youtube") {
+                const url = request.query
+                        ? `https://www.youtube.com/results?search_query=${encodeURIComponent(request.query)}`
+                        : "https://www.youtube.com";
+                return {
+                        reply: request.query
+                                ? `I can open a YouTube search for "${request.query}": ${url}`
+                                : `I can open YouTube here: ${url}`,
+                        webAction: { type: "youtube", query: request.query, url },
+                };
+        }
+
+        const abstract = stripHtml(searchData?.AbstractText || searchData?.Answer || "");
+        const heading = stripHtml(searchData?.Heading || query);
+        const related = Array.isArray(searchData?.RelatedTopics)
+                ? searchData.RelatedTopics
+                        .flatMap((item) => Array.isArray(item.Topics) ? item.Topics : [item])
+                        .filter((item) => item?.Text && item?.FirstURL)
+                        .slice(0, 3)
+                : [];
+        const searchUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+        const lines = [];
+        if (abstract) {
+                lines.push(`${heading}: ${abstract}`);
+        } else {
+                lines.push(`I searched for "${query}" and did not get a clean instant answer. Here is a web search link: ${searchUrl}`);
+        }
+        if (related.length) {
+                lines.push("Related links:");
+                for (const item of related) {
+                        lines.push(`- ${stripHtml(item.Text)}: ${item.FirstURL}`);
+                }
+        }
+        lines.push(`Search more: ${searchUrl}`);
+        return {
+                reply: lines.join("\n"),
+                webAction: { type: "web", query, url: searchUrl, answered: Boolean(abstract), relatedCount: related.length },
+        };
 }
 
 const FREE_SETTING_KEYS = new Set([
@@ -1685,6 +1775,12 @@ async function saveLearnedWorkflow(db, userId, workflow) {
 
 const DEX_SYSTEM_PROMPT = `You are Dex, a friendly and empathetic AI assistant for Konvict Artz. You help users with scheduling, questions, general support, and teaching. Be warm, concise, and helpful.
 
+Device and web access:
+- Do not claim unlimited access. Be honest about permissions, device security, app store rules, browser limits, and third-party service limits.
+- If a task needs a permission or external app, explain the exact permission or app connection needed.
+- When the user asks for current information, web results, YouTube, or search, use the available search/open-link flow and give useful links when direct control is not possible.
+- If you cannot directly control something on the user's device, offer the next best action and clear setup steps.
+
 When a user wants to learn something:
 - teach step by step instead of dumping everything at once
 - explain clearly, using simple language first and then a deeper explanation if needed
@@ -1863,6 +1959,34 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                                 followUpTitle: "Dex check-in",
                                                 followUpMessage: "Dex is checking in after a hard moment. If you want support, open Dex and tell me what you need right now.",
                                         });
+                                }
+                        }
+
+                        const webRequest = extractWebRequest(message);
+                        if (webRequest) {
+                                try {
+                                        const searchData = webRequest.type === "web"
+                                                ? await fetchDuckDuckGoInstantAnswer(webRequest.query)
+                                                : null;
+                                        const webReply = buildSearchReply(webRequest, searchData);
+                                        await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'user', ?)", [userId, message]);
+                                        await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, webReply.reply]);
+                                        return res.json(webReply);
+                                } catch (error) {
+                                        const fallback = webRequest.type === "youtube"
+                                                ? buildSearchReply(webRequest)
+                                                : {
+                                                        reply: `I could not reach live web search right now, but I can still help from what I know. Web search link: https://duckduckgo.com/?q=${encodeURIComponent(webRequest.query)}`,
+                                                        webAction: {
+                                                                type: "web",
+                                                                query: webRequest.query,
+                                                                url: `https://duckduckgo.com/?q=${encodeURIComponent(webRequest.query)}`,
+                                                                error: error?.message || "search_failed",
+                                                        },
+                                                };
+                                        await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'user', ?)", [userId, message]);
+                                        await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, fallback.reply]);
+                                        return res.json(fallback);
                                 }
                         }
 
