@@ -35,6 +35,8 @@ function getStatusLabel(accessType) {
       return "Expired";
     case "unlimited":
       return "Unlimited";
+    case "none":
+      return "Needs Access";
     default:
       return "Inactive";
   }
@@ -199,6 +201,7 @@ export default function BillingPanel() {
             {status?.access_type === "paid" && "Your Dex subscription is active. You can manage payment method or cancel in the billing portal."}
             {status?.access_type === "trial" && "Your 3-day trial is active. Start Stripe checkout now to roll straight into paid access without interruption."}
             {status?.access_type === "expired" && "Your Dex access has expired. Restart it with a Stripe subscription."}
+            {status?.access_type === "none" && "This account does not have active Dex access yet. Start a subscription to unlock Dex now."}
             {!status?.access_type && "Billing status is available after your account is loaded."}
           </div>
 

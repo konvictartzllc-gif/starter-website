@@ -62,6 +62,14 @@ function getShopReturnUrl(req, status) {
   return `${siteUrl.replace(/\/+$/, "")}/shop?checkout=${encodeURIComponent(status)}`;
 }
 
+function appendQueryParams(url, params) {
+  const parsed = new URL(url);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) parsed.searchParams.set(key, value);
+  });
+  return parsed.toString();
+}
+
 async function resolveBillingAccess(db, userId) {
   const user = await db.get(
     "SELECT access_type, trial_start, sub_expires, stripe_customer_id, stripe_subscription_id, role FROM users WHERE id = ?",
@@ -283,7 +291,10 @@ async function createCheckoutSession(req, res) {
     const priceId = (process.env.STRIPE_PRICE_ID || "").trim();
     const sessionPayload = {
       mode: "subscription",
-      success_url: `${getSuccessUrl(req)}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: appendQueryParams(getSuccessUrl(req), {
+        billing: "success",
+        session_id: "{CHECKOUT_SESSION_ID}",
+      }),
       cancel_url: getCancelUrl(req),
       customer: customerId,
       client_reference_id: String(user.id),
@@ -363,7 +374,11 @@ router.post("/coins-checkout", requireUser, async (req, res) => {
     const customerId = await ensureStripeCustomer(stripe, db, user);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      success_url: `${getSuccessUrl(req)}&coins=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: appendQueryParams(getSuccessUrl(req), {
+        billing: "success",
+        coins: "success",
+        session_id: "{CHECKOUT_SESSION_ID}",
+      }),
       cancel_url: getCancelUrl(req),
       customer: customerId,
       client_reference_id: String(user.id),

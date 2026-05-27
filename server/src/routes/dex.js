@@ -2022,27 +2022,43 @@ router.get("/access", requireUser, async (req, res) => {
     const user = await db.get("SELECT * FROM users WHERE id = ?", [req.user.id]);
     if (!user) return res.status(404).json({ error: "Not found" });
 
-             let access = user.role === "admin" ? "unlimited" : user.access_type;
+    let access = user.role === "admin" ? "unlimited" : user.access_type;
     let trialDaysLeft = null;
 
-             if (access === "trial" && user.trial_start) {
-                   const trialEnd = new Date(user.trial_start);
-                   trialEnd.setDate(trialEnd.getDate() + 3);
-                   const now = new Date();
-                   if (now > trialEnd) {
-                           access = "expired";
-                           await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [user.id]);
-                   } else {
-                           trialDaysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
-                   }
-             }
+    if (access === "trial" && user.trial_start) {
+        const trialEnd = new Date(user.trial_start);
+        trialEnd.setDate(trialEnd.getDate() + 3);
+        const now = new Date();
+        if (now > trialEnd) {
+            access = "expired";
+            await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [user.id]);
+        } else {
+            trialDaysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
+        }
+    }
 
-             if (access === "paid" && user.sub_expires && new Date() > new Date(user.sub_expires)) {
-                   access = "expired";
-                   await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [user.id]);
-             }
+    if (access === "paid" && user.sub_expires && new Date() > new Date(user.sub_expires)) {
+        access = "expired";
+        await db.run("UPDATE users SET access_type = 'expired' WHERE id = ?", [user.id]);
+    }
 
-             return res.json({ access, trialDaysLeft });
+    const hasAccess = ["trial", "paid", "unlimited"].includes(access);
+    const reason =
+        access === "expired"
+            ? "subscription_or_trial_expired"
+            : hasAccess
+                ? "ok"
+                : "no_access";
+
+    return res.json({
+        access,
+        access_type: access,
+        hasAccess,
+        trialDaysLeft,
+        reason,
+        checkoutRequired: !hasAccess,
+        recoveryUrl: hasAccess ? null : `/settings?billing=recovery&reason=${access === "expired" ? "subscription_expired" : "no_access"}`,
+    });
 });
 
 
