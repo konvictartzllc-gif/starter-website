@@ -279,6 +279,7 @@ export default function DexChat() {
   const messagesEndRef = useRef(null);
   const memoryTimerRef = useRef(null);
   const chatInputRef = useRef(null);
+  const launcherTapRef = useRef(0);
 
   const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking, startListening, sleep } = useDexVoice({
     enabled: wakeEnabled,
@@ -445,8 +446,23 @@ export default function DexChat() {
   function enableWakeMode() {
     setWakeEnabled(true);
     setOpen(true);
-    const message = "Wake mode is on. Say Hey Dex once, then keep talking naturally.";
+    window.setTimeout(() => startListening(), 25);
+    const message = isSupported
+      ? "Wake mode is on. Keep this page open and say Hey Dex."
+      : "Wake mode needs browser speech support. Tap Talk or use the Android app for always-ready wake word.";
     showToast(message);
+  }
+
+  function openDexQuickActions(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const now = Date.now();
+    if (now - launcherTapRef.current < 350) return;
+    launcherTapRef.current = now;
+    setOpen(true);
+    setGameOpen(false);
+    setShopOpen(false);
+    showToast("Dex is open. Tap Talk, Wake, Games, or Store.");
   }
 
   function openDexPanel() {
@@ -461,7 +477,9 @@ export default function DexChat() {
   }
 
   function openDexTextPanel() {
-    openDexPanel();
+    setOpen(true);
+    setGameOpen(false);
+    setShopOpen(false);
     window.setTimeout(() => chatInputRef.current?.focus(), 80);
   }
 
@@ -675,7 +693,9 @@ export default function DexChat() {
       <div className="dex-mascot fixed bottom-5 right-5 z-[9999]">
         <button
           type="button"
-          onClick={openDexPanel}
+          onClick={openDexQuickActions}
+          onPointerUp={openDexQuickActions}
+          onTouchEnd={openDexQuickActions}
           className="dex-mascot-bubble text-left"
           aria-live="polite"
         >
@@ -683,7 +703,9 @@ export default function DexChat() {
         </button>
         <button
           type="button"
-          onClick={openDexPanel}
+          onClick={openDexQuickActions}
+          onPointerUp={openDexQuickActions}
+          onTouchEnd={openDexQuickActions}
           className={`dex-companion dex-robot-button ${dexSizeClass} ${dexHeightClass} text-white shadow-lg transition-colors ${status === "listening" ? "dex-pulse" : ""}`}
           style={dexColorStyle}
           aria-label="Open Dex quick actions"
@@ -718,7 +740,7 @@ export default function DexChat() {
       )}
 
       {open && (
-        <section className="fixed bottom-24 right-5 z-[9999] flex h-[34rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-gray-800 bg-gray-950 shadow-2xl">
+        <section className="dex-chat-panel fixed bottom-24 right-5 z-[9999] flex h-[34rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-gray-800 bg-gray-950 shadow-2xl">
           <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
             <div>
               <div className="text-sm font-semibold text-white">Dex</div>

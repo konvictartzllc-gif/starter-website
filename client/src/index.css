@@ -37,6 +37,7 @@
   height: 6.4rem;
   pointer-events: auto;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .dex-mascot .dex-companion,
@@ -98,6 +99,13 @@
 
 .dex-robot-button:hover {
   filter: brightness(1.06);
+}
+
+.dex-robot-button,
+.dex-mascot-bubble {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .dex-size-small {
@@ -378,6 +386,14 @@
 }
 
 @media (max-width: 640px) {
+  .dex-chat-panel {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 7.5rem;
+    width: auto;
+    height: min(34rem, calc(100dvh - 9rem));
+  }
+
   .dex-mascot-bubble {
     right: 0;
     bottom: 6rem;
