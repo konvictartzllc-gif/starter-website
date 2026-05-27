@@ -11,16 +11,24 @@ let ringCentralStatus = {
 
 let smsSenderNumberCache = null;
 
+function envValue(name) {
+  return String(process.env[name] || "").trim();
+}
+
+function envJwt(name) {
+  return envValue(name).replace(/\s+/g, "");
+}
+
 function getConfig() {
   return {
-    clientId: process.env.RC_CLIENT_ID,
-    clientSecret: process.env.RC_CLIENT_SECRET,
-    jwt: process.env.RC_JWT,
-    username: process.env.RC_USERNAME,
-    password: process.env.RC_PASSWORD,
-    extension: process.env.RC_EXTENSION || process.env.RC_EXTENSION_NUMBER,
-    server: process.env.RC_SERVER || "https://platform.ringcentral.com",
-    fromNumber: process.env.RC_PHONE_NUMBER || process.env.SUPPORT_PHONE || process.env.OWNER_PHONE,
+    clientId: envValue("RC_CLIENT_ID"),
+    clientSecret: envValue("RC_CLIENT_SECRET"),
+    jwt: envJwt("RC_JWT"),
+    username: envValue("RC_USERNAME"),
+    password: envValue("RC_PASSWORD"),
+    extension: envValue("RC_EXTENSION") || envValue("RC_EXTENSION_NUMBER"),
+    server: envValue("RC_SERVER") || "https://platform.ringcentral.com",
+    fromNumber: envValue("RC_PHONE_NUMBER") || envValue("SUPPORT_PHONE") || envValue("OWNER_PHONE"),
   };
 }
 
