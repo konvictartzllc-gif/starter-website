@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { getJwtSecret, requireJwtSecret } from "./config.js";
 import { initDb } from "./db.js";
 import { getEmailStatus, initEmail } from "./services/email.js";
-import { getRingCentralStatus, initRingCentral } from "./services/ringcentral.js";
+import { exchangeRingCentralOAuthCode, getRingCentralStatus, initRingCentral } from "./services/ringcentral.js";
 import { getAIStatus, initAI } from "./services/ai.js";
 import authRoutes from "./routes/auth.js";
 import dexRoutes from "./routes/dex.js";
@@ -167,6 +167,32 @@ app.get("/oauth/callback", (req, res) => {
   const hasCode = typeof req.query.code === "string" && req.query.code.trim().length > 0;
   const error = typeof req.query.error === "string" ? req.query.error : null;
   const state = typeof req.query.state === "string" ? req.query.state : null;
+
+  if (!error && hasCode) {
+    exchangeRingCentralOAuthCode({ code: req.query.code, state })
+      .then((result) => {
+        res.json({
+          status: "ok",
+          provider: "ringcentral",
+          message: "RingCentral is connected to Dex.",
+          hasCode: true,
+          ready: result.ready,
+          authMode: result.authMode,
+          redirectUri: result.redirectUri,
+        });
+      })
+      .catch((err) => {
+        res.status(400).json({
+          status: "error",
+          provider: "ringcentral",
+          message: "Dex reached the RingCentral callback but could not finish OAuth.",
+          error: err?.message || "RingCentral OAuth failed.",
+          hasCode: true,
+          state,
+        });
+      });
+    return;
+  }
 
   res.status(error ? 400 : 200).json({
     status: error ? "error" : "ok",

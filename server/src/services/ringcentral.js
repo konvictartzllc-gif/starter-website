@@ -1,3 +1,6 @@
+import { getDb } from "../db.js";
+import { ensureDefaultIntegrationAccount, PROVIDER_RINGCENTRAL } from "./integrations.js";
+
 let accessToken = null;
 let tokenExpiresAt = 0;
 
@@ -38,7 +41,18 @@ function getConfig() {
     extension: firstEnvValue("RC_EXTENSION", "RC_EXTENSION_NUMBER", "RINGCENTRAL_EXTENSION"),
     server: firstEnvValue("RC_SERVER", "RINGCENTRAL_SERVER") || "https://platform.ringcentral.com",
     fromNumber: firstEnvValue("RC_PHONE_NUMBER", "RINGCENTRAL_PHONE_NUMBER", "SUPPORT_PHONE", "OWNER_PHONE"),
+    redirectUri: firstEnvValue("RC_REDIRECT_URI", "RINGCENTRAL_REDIRECT_URI"),
+    oauthState: firstEnvValue("RC_OAUTH_STATE", "RINGCENTRAL_OAUTH_STATE"),
   };
+}
+
+function publicApiUrl() {
+  return firstEnvValue("PUBLIC_API_URL", "RENDER_EXTERNAL_URL").replace(/\/+$/, "");
+}
+
+function ringCentralRedirectUri() {
+  const { redirectUri } = getConfig();
+  return redirectUri || `${publicApiUrl()}/oauth/callback`;
 }
 
 function ringCentralNextStep(reason, detail = "") {
@@ -56,7 +70,7 @@ function ringCentralNextStep(reason, detail = "") {
     return "Add RingCentral app permissions for SMS, RingOut, ReadAccounts, and ReadCallLog, then generate a new JWT.";
   }
   if (reason === "auth_failed" && (lower.includes("oau-251") || lower.includes("grant type"))) {
-    return "Your RingCentral app is not allowing JWT bearer login. Enable JWT/server-only auth or create a JWT-capable RingCentral app, then generate a fresh JWT.";
+    return "Your RingCentral app is not allowing JWT bearer login. Either connect it through the OAuth redirect URI or enable JWT/server-only auth and generate a fresh JWT.";
   }
   if (reason === "auth_failed") {
     return "Regenerate the RingCentral JWT from the same app/user as RC_CLIENT_ID and RC_CLIENT_SECRET, paste it into RC_JWT with no spaces, and redeploy.";
@@ -79,6 +93,81 @@ function hasRequiredConfig(config) {
   const hasJwtAuth = Boolean(config.jwt);
   const hasPasswordAuth = Boolean(config.username && config.password);
   return Boolean(config.clientId && config.clientSecret && (hasJwtAuth || hasPasswordAuth));
+}
+
+function hasRingCentralClientConfig(config) {
+  return Boolean(config.clientId && config.clientSecret);
+}
+
+function parseConfigJson(value) {
+  try {
+    return value ? JSON.parse(value) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function getSharedRingCentralAccount() {
+  const db = getDb();
+  return ensureDefaultIntegrationAccount(db, PROVIDER_RINGCENTRAL);
+}
+
+async function getStoredOAuthTokens() {
+  try {
+    const account = await getSharedRingCentralAccount();
+    const accountConfig = parseConfigJson(account?.config_json);
+    return accountConfig.oauth || null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveStoredOAuthTokens(token, extra = {}) {
+  const db = getDb();
+  const account = await getSharedRingCentralAccount();
+  const accountConfig = parseConfigJson(account?.config_json);
+  const expiresIn = Number(token.expires_in || 3600);
+  const nextOAuth = {
+    ...accountConfig.oauth,
+    ...extra,
+    accessToken: token.access_token || accountConfig.oauth?.accessToken || "",
+    refreshToken: token.refresh_token || accountConfig.oauth?.refreshToken || "",
+    tokenType: token.token_type || accountConfig.oauth?.tokenType || "bearer",
+    scope: token.scope || accountConfig.oauth?.scope || "",
+    expiresAt: Date.now() + expiresIn * 1000,
+    savedAt: new Date().toISOString(),
+  };
+  await db.run(
+    `UPDATE integration_accounts
+        SET config_json = ?, updated_at = datetime('now')
+      WHERE id = ?`,
+    [JSON.stringify({ ...accountConfig, managedBy: "dex", oauth: nextOAuth }), account.id]
+  );
+  return nextOAuth;
+}
+
+async function clearStoredOAuthTokens(error = null) {
+  try {
+    const db = getDb();
+    const account = await getSharedRingCentralAccount();
+    const accountConfig = parseConfigJson(account?.config_json);
+    const nextOAuth = {
+      ...(accountConfig.oauth || {}),
+      accessToken: "",
+      refreshToken: "",
+      expiresAt: 0,
+      lastError: error,
+      clearedAt: new Date().toISOString(),
+    };
+    await db.run(
+      `UPDATE integration_accounts
+          SET config_json = ?, updated_at = datetime('now')
+        WHERE id = ?`,
+      [JSON.stringify({ ...accountConfig, managedBy: "dex", oauth: nextOAuth }), account.id]
+    );
+  } catch {
+    // Diagnostics still report the auth failure if token clearing cannot be recorded.
+  }
 }
 
 async function fetchJson(url, options = {}) {
@@ -145,14 +234,29 @@ async function postSms(fromNumber, toNumber, body) {
 
 async function loginRingCentral(force = false) {
   const config = getConfig();
+  const storedOAuth = await getStoredOAuthTokens();
+  const hasStoredOAuth =
+    Boolean(storedOAuth?.refreshToken) ||
+    (Boolean(storedOAuth?.accessToken) && Number(storedOAuth.expiresAt || 0) > Date.now() + 60_000);
 
-  if (!hasRequiredConfig(config)) {
+  if (!hasRingCentralClientConfig(config)) {
     ringCentralStatus = {
       configured: false,
       ready: false,
       reason: "missing_credentials",
-      detail: "Missing RingCentral auth. Set RC_CLIENT_ID, RC_CLIENT_SECRET, and either RC_JWT or RC_USERNAME plus RC_PASSWORD.",
+      detail: "Missing RingCentral auth. Set RC_CLIENT_ID and RC_CLIENT_SECRET.",
       nextStep: ringCentralNextStep("missing_credentials"),
+    };
+    return null;
+  }
+
+  if (!hasRequiredConfig(config) && !hasStoredOAuth) {
+    ringCentralStatus = {
+      configured: true,
+      ready: false,
+      reason: "missing_credentials",
+      detail: "Missing RingCentral login. Set RC_JWT or connect RingCentral through /oauth/callback.",
+      nextStep: `Open RingCentral OAuth with redirect URI ${ringCentralRedirectUri()}, or add RC_JWT in Render.`,
     };
     return null;
   }
@@ -188,19 +292,36 @@ async function loginRingCentral(force = false) {
   };
 
   const credentials = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
-  const body = new URLSearchParams(
-    config.jwt
-      ? {
-          grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-          assertion: config.jwt,
-        }
-      : {
-          grant_type: "password",
-          username: config.username,
-          password: config.password,
-          ...(config.extension ? { extension: config.extension } : {}),
-        }
-  );
+  const useStoredAccessToken =
+    !force &&
+    storedOAuth?.accessToken &&
+    Number(storedOAuth.expiresAt || 0) > Date.now() + 60_000;
+  if (useStoredAccessToken) {
+    accessToken = storedOAuth.accessToken;
+    tokenExpiresAt = Number(storedOAuth.expiresAt || 0);
+    ringCentralStatus = {
+      configured: true,
+      ready: true,
+      reason: "ok",
+      detail: null,
+      nextStep: null,
+    };
+    return accessToken;
+  }
+
+  const body = new URLSearchParams();
+  if (config.jwt) {
+    body.set("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer");
+    body.set("assertion", config.jwt);
+  } else if (config.username && config.password) {
+    body.set("grant_type", "password");
+    body.set("username", config.username);
+    body.set("password", config.password);
+    if (config.extension) body.set("extension", config.extension);
+  } else if (storedOAuth?.refreshToken) {
+    body.set("grant_type", "refresh_token");
+    body.set("refresh_token", storedOAuth.refreshToken);
+  }
 
   try {
     const token = await fetchJson(`${config.server}/restapi/oauth/token`, {
@@ -214,6 +335,9 @@ async function loginRingCentral(force = false) {
 
     accessToken = token.access_token;
     tokenExpiresAt = Date.now() + ((token.expires_in || 3600) * 1000);
+    if (token.refresh_token || storedOAuth?.refreshToken) {
+      await saveStoredOAuthTokens(token, { authMode: config.jwt ? "jwt" : "oauth_refresh" });
+    }
     ringCentralStatus = {
       configured: true,
       ready: true,
@@ -224,6 +348,16 @@ async function loginRingCentral(force = false) {
     console.log("RingCentral initialized");
     return accessToken;
   } catch (err) {
+    if ((config.jwt || config.username) && storedOAuth?.refreshToken) {
+      try {
+        const refreshed = await refreshStoredOAuthToken(credentials, storedOAuth.refreshToken);
+        accessToken = refreshed.accessToken;
+        tokenExpiresAt = refreshed.expiresAt;
+        return accessToken;
+      } catch (refreshErr) {
+        await clearStoredOAuthTokens(refreshErr.message);
+      }
+    }
     accessToken = null;
     tokenExpiresAt = 0;
     const lower = String(err?.message || "").toLowerCase();
@@ -245,6 +379,79 @@ async function loginRingCentral(force = false) {
     console.error("RingCentral init error:", err.message);
     return null;
   }
+}
+
+async function refreshStoredOAuthToken(credentials, refreshToken) {
+  const config = getConfig();
+  const token = await fetchJson(`${config.server}/restapi/oauth/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }).toString(),
+  });
+  const saved = await saveStoredOAuthTokens(token, { authMode: "oauth_refresh" });
+  ringCentralStatus = {
+    configured: true,
+    ready: true,
+    reason: "ok",
+    detail: null,
+    nextStep: null,
+  };
+  return saved;
+}
+
+export async function exchangeRingCentralOAuthCode({ code, state } = {}) {
+  const config = getConfig();
+  const safeCode = String(code || "").trim();
+  const expectedState = config.oauthState;
+  if (!safeCode) {
+    throw new Error("Missing RingCentral OAuth code.");
+  }
+  if (!hasRingCentralClientConfig(config)) {
+    throw new Error("Missing RC_CLIENT_ID or RC_CLIENT_SECRET.");
+  }
+  if (expectedState && state !== expectedState) {
+    throw new Error("RingCentral OAuth state did not match.");
+  }
+
+  const credentials = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+  const token = await fetchJson(`${config.server}/restapi/oauth/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code: safeCode,
+      redirect_uri: ringCentralRedirectUri(),
+    }).toString(),
+  });
+
+  const saved = await saveStoredOAuthTokens(token, {
+    authMode: "oauth_authorization_code",
+    connectedAt: new Date().toISOString(),
+  });
+  accessToken = saved.accessToken;
+  tokenExpiresAt = saved.expiresAt;
+  ringCentralStatus = {
+    configured: true,
+    ready: true,
+    reason: "ok",
+    detail: null,
+    nextStep: null,
+  };
+  return {
+    ready: true,
+    authMode: saved.authMode,
+    expiresAt: saved.expiresAt,
+    redirectUri: ringCentralRedirectUri(),
+  };
 }
 
 async function callRingCentral(path, payload) {
