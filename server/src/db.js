@@ -200,6 +200,35 @@
       );
     `);
     await db.exec(`
+      CREATE TABLE IF NOT EXISTS integration_accounts (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider       TEXT NOT NULL,
+        label          TEXT NOT NULL,
+        shared         INTEGER NOT NULL DEFAULT 1,
+        active         INTEGER NOT NULL DEFAULT 1,
+        config_json    TEXT,
+        created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS user_integration_routes (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id          INTEGER NOT NULL REFERENCES users(id),
+        provider         TEXT NOT NULL,
+        account_id       INTEGER REFERENCES integration_accounts(id),
+        route_key        TEXT NOT NULL UNIQUE,
+        assigned_number  TEXT,
+        extension        TEXT,
+        permissions_json TEXT,
+        enabled          INTEGER NOT NULL DEFAULT 1,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(provider, assigned_number),
+        UNIQUE(provider, extension)
+      );
+    `);
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS call_events (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id    INTEGER NOT NULL REFERENCES users(id),

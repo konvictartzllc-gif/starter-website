@@ -109,6 +109,7 @@ app.use(cors({
 }));
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use("/api/twilio", express.urlencoded({ extended: false }));
+app.use("/api/ringcentral", express.urlencoded({ extended: false }));
 app.use(express.json());
 
 // Rate limiting
@@ -136,6 +137,7 @@ app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/affiliate", affiliateRoutes);
 app.use("/api/twilio/voice", twilioVoiceRoutes);
+app.use("/api/ringcentral/voice", twilioVoiceRoutes);
 
 // Health check
 app.get("/", (req, res) => {

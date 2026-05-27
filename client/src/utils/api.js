@@ -104,6 +104,8 @@ export const api = {
   // Permissions
   getPermissions: () => request("/dex/permissions"),
   setPermissions: (permissions) => request("/dex/permissions", { method: "POST", body: JSON.stringify({ permissions }) }),
+  getIntegrations: () => request("/dex/integrations"),
+  saveRingCentralRoute: (body) => request("/dex/integrations/ringcentral", { method: "POST", body: JSON.stringify(body) }),
 
   // User Memory
   getMemory: () => request("/dex/memory"),
@@ -137,6 +139,8 @@ export const api = {
   sendPromo: (body) => request("/admin/send-promo", { method: "POST", body: JSON.stringify(body) }),
   sendTestEmail: (body) => request("/admin/email/test", { method: "POST", body: JSON.stringify(body) }),
   getUsers: () => request("/admin/users"),
+  getIntegrationRoutes: () => request("/admin/integrations/routes"),
+  assignRingCentralRoute: (body) => request("/admin/integrations/ringcentral/assign", { method: "POST", body: JSON.stringify(body) }),
   getFeatureFlags: () => request("/admin/feature-flags"),
   updateFeatureFlag: (key, body) => request(`/admin/feature-flags/${key}`, { method: "PATCH", body: JSON.stringify(body) }),
 };

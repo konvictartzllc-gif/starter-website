@@ -4,6 +4,12 @@ import { requireUser, optionalUser } from "../middleware/auth.js";
 import { getDb } from "../db.js";
 import { getAIClient, getAIStatus } from "../services/ai.js";
 import { triggerEmergencyAlert, sendLowInventoryAlert, sendSms, makeCall } from "../services/ringcentral.js";
+import {
+        PROVIDER_RINGCENTRAL,
+        getUserIntegrationRoutes,
+        upsertUserIntegrationRoute,
+        normalizePhoneNumber,
+} from "../services/integrations.js";
 import { createEvent, listEvents } from "../services/calendar.js";
 import { verifyOta, spamFilter } from "../middleware/security.js";
 import { sendCustomEmail } from "../services/email.js";
@@ -1116,6 +1122,65 @@ router.post("/permissions", requireUser, async (req, res) => {
                 [userId, JSON.stringify(permissions)]
         );
         res.json({ success: true });
+});
+
+router.get("/integrations", requireUser, async (req, res) => {
+        const db = getDb();
+        const routes = await getUserIntegrationRoutes(db, req.user.id);
+        res.json({
+                integrations: routes.map((route) => ({
+                        id: route.id,
+                        provider: route.provider,
+                        accountLabel: route.account_label || "Shared account",
+                        sharedAccount: Boolean(route.account_shared),
+                        routeKey: route.route_key,
+                        assignedNumber: route.assigned_number,
+                        extension: route.extension,
+                        permissions: route.permissions_json ? JSON.parse(route.permissions_json) : {},
+                        enabled: Boolean(route.enabled),
+                        webhookUrl: `${process.env.PUBLIC_API_URL || process.env.RENDER_EXTERNAL_URL || ""}/api/twilio/voice?token=YOUR_WEBHOOK_TOKEN&route=${route.route_key}`,
+                })),
+        });
+});
+
+router.post("/integrations/ringcentral", requireUser, async (req, res) => {
+        const db = getDb();
+        const userId = req.user.id;
+        const row = await db.get("SELECT permissions FROM user_permissions WHERE user_id = ?", [userId]);
+        let permissions = {};
+        if (row?.permissions) {
+                try { permissions = JSON.parse(row.permissions); } catch {}
+        }
+        if (!permissions.phone) {
+                return res.status(403).json({ error: "phone_permission_required", message: "Enable phone permission before connecting a call route." });
+        }
+
+        const assignedNumber = normalizePhoneNumber(req.body.assignedNumber);
+        const extension = String(req.body.extension || "").trim();
+        const route = await upsertUserIntegrationRoute(db, {
+                userId,
+                provider: PROVIDER_RINGCENTRAL,
+                assignedNumber,
+                extension,
+                permissions: {
+                        answerCalls: true,
+                        takeMessages: true,
+                        sendSms: Boolean(permissions.notifications),
+                },
+                enabled: req.body.enabled !== false,
+        });
+        res.json({
+                success: true,
+                integration: {
+                        id: route.id,
+                        provider: route.provider,
+                        routeKey: route.route_key,
+                        assignedNumber: route.assigned_number,
+                        extension: route.extension,
+                        enabled: Boolean(route.enabled),
+                        webhookUrl: `${process.env.PUBLIC_API_URL || process.env.RENDER_EXTERNAL_URL || ""}/api/twilio/voice?token=YOUR_WEBHOOK_TOKEN&route=${route.route_key}`,
+                },
+        });
 });
 // â”€â”€ USER MEMORY ENDPOINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Dex can store and retrieve per-user memory (preferences, facts, routines)

@@ -6,6 +6,13 @@ import { getDb } from "../db.js";
 import { getEmailStatus, sendAffiliateInvite, sendCustomEmail, sendPromoCode } from "../services/email.js";
 import { sendLowInventoryAlert } from "../services/ringcentral.js";
 import { ensureAffiliateRecord } from "../services/affiliates.js";
+import {
+  PROVIDER_RINGCENTRAL,
+  ensureIntegrationTables,
+  getUserIntegrationRoutes,
+  normalizePhoneNumber,
+  upsertUserIntegrationRoute,
+} from "../services/integrations.js";
 
 const router = Router();
 
@@ -386,6 +393,86 @@ router.get("/users", requireAdmin, async (req, res) => {
       ORDER BY created_at DESC`
   );
   return res.json(users);
+});
+
+router.get("/integrations/routes", requireAdmin, async (req, res) => {
+  const db = getDb();
+  await ensureIntegrationTables(db);
+  const routes = await db.all(
+    `SELECT uir.*,
+            users.email,
+            users.name,
+            ia.label AS account_label
+       FROM user_integration_routes uir
+       JOIN users ON users.id = uir.user_id
+       LEFT JOIN integration_accounts ia ON ia.id = uir.account_id
+      ORDER BY uir.updated_at DESC`
+  );
+  return res.json({
+    routes: routes.map((route) => ({
+      id: route.id,
+      userId: route.user_id,
+      email: route.email,
+      name: route.name,
+      provider: route.provider,
+      accountLabel: route.account_label || "Shared account",
+      routeKey: route.route_key,
+      assignedNumber: route.assigned_number,
+      extension: route.extension,
+      enabled: Boolean(route.enabled),
+      permissions: route.permissions_json ? JSON.parse(route.permissions_json) : {},
+      updatedAt: route.updated_at,
+    })),
+  });
+});
+
+router.post("/integrations/ringcentral/assign", requireAdmin, [
+  body("userId").isInt({ min: 1 }),
+  body("assignedNumber").optional({ values: "falsy" }).trim(),
+  body("extension").optional({ values: "falsy" }).trim(),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const db = getDb();
+  const userId = parseInt(req.body.userId, 10);
+  const user = await db.get("SELECT id, email, name FROM users WHERE id = ?", [userId]);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const route = await upsertUserIntegrationRoute(db, {
+    userId,
+    provider: PROVIDER_RINGCENTRAL,
+    assignedNumber: normalizePhoneNumber(req.body.assignedNumber),
+    extension: req.body.extension,
+    permissions: req.body.permissions || { answerCalls: true, takeMessages: true },
+    enabled: req.body.enabled !== false,
+  });
+
+  const currentPermissionsRow = await db.get("SELECT permissions FROM user_permissions WHERE user_id = ?", [userId]);
+  let currentPermissions = {};
+  if (currentPermissionsRow?.permissions) {
+    try { currentPermissions = JSON.parse(currentPermissionsRow.permissions); } catch {}
+  }
+
+  await db.run(
+    `INSERT INTO user_permissions (user_id, permissions)
+     VALUES (?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET permissions = excluded.permissions`,
+    [
+      userId,
+      JSON.stringify({
+        ...currentPermissions,
+        phone: true,
+        autoAnswerKnownContacts: true,
+        autoAnswerAnyNonSpam: true,
+        autoDeclineSpam: true,
+        ...(req.body.userPermissions || {}),
+      }),
+    ]
+  );
+
+  const routes = await getUserIntegrationRoutes(db, userId);
+  return res.json({ success: true, route, routes });
 });
 
 router.patch("/users/:id/access", requireAdmin, async (req, res) => {

@@ -16,16 +16,54 @@ DEX_TWILIO_OWNER_EMAIL=your-admin-email@example.com
 
 ## Twilio Webhook
 
-In Twilio, set the phone number voice webhook to:
+In Twilio, set the phone number voice webhook to one of these:
 
 ```text
 https://konvict-artz.onrender.com/api/twilio/voice?token=YOUR_TOKEN_HERE
+```
+
+or, for a user-specific route:
+
+```text
+https://konvict-artz.onrender.com/api/twilio/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
 ```
 
 Use:
 
 ```text
 HTTP POST
+```
+
+## Centralized Routing
+
+Dex now supports shared provider accounts without mixing calls. Assign every user a route from the admin API:
+
+```text
+POST /api/admin/integrations/ringcentral/assign
+```
+
+Body:
+
+```json
+{
+  "userId": 123,
+  "assignedNumber": "+12055550123",
+  "extension": "101",
+  "permissions": {
+    "answerCalls": true,
+    "takeMessages": true,
+    "sendSms": false,
+    "callBack": false
+  }
+}
+```
+
+Each route receives a unique `routeKey`. Use that `routeKey` in the webhook URL for that user. Dex also tries to resolve calls by the dialed `To`/`Called` phone number or extension if the provider sends those fields.
+
+RingCentral-compatible alias:
+
+```text
+https://konvict-artz.onrender.com/api/ringcentral/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
 ```
 
 ## Phone Forwarding

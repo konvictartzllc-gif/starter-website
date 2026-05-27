@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getDb } from "../db.js";
+import { PROVIDER_RINGCENTRAL, resolveVoiceRoute } from "../services/integrations.js";
 
 const router = Router();
 
@@ -65,6 +66,21 @@ async function ensureVoiceTables(db) {
 
 async function resolveUser(req) {
   const db = getDb();
+  const route = await resolveVoiceRoute(db, {
+    routeKey: String(req.query.route || req.body.route || "").trim(),
+    provider: String(req.query.provider || req.body.provider || PROVIDER_RINGCENTRAL).trim(),
+    calledNumber: req.body.To || req.body.Called || req.query.To || req.query.Called,
+    extension: req.query.extension || req.body.Extension,
+  });
+  if (route) {
+    return {
+      id: route.user_id,
+      email: route.email,
+      name: route.name,
+      integrationRoute: route,
+    };
+  }
+
   const userId = String(req.query.userId || req.body.userId || "").trim();
   const email = String(req.query.email || req.body.email || process.env.DEX_TWILIO_OWNER_EMAIL || process.env.ADMIN_EMAIL || "")
     .trim()
@@ -91,7 +107,9 @@ function callerNumber(req) {
 
 function actionUrl(req, path, userId) {
   const token = encodeURIComponent(process.env.TWILIO_VOICE_WEBHOOK_TOKEN || "");
-  return `${publicBaseUrl(req)}/api/twilio/voice/${path}?token=${token}&userId=${encodeURIComponent(userId)}`;
+  const route = encodeURIComponent(String(req.query.route || req.body.route || "").trim());
+  const routePart = route ? `&route=${route}` : "";
+  return `${publicBaseUrl(req)}/api/twilio/voice/${path}?token=${token}&userId=${encodeURIComponent(userId)}${routePart}`;
 }
 
 async function saveCallMessage({ userId, caller, phoneNumber, message, event = "twilio_message" }) {
