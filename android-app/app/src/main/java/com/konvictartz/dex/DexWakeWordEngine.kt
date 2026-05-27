@@ -1,6 +1,7 @@
 package com.konvictartz.dex
 
 import android.content.Context
+import android.os.SystemClock
 import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
@@ -22,6 +23,23 @@ class DexWakeWordEngine(
     private var recognizer: Recognizer? = null
     private var running = false
     private var loading = false
+    private var lastWakeTriggeredAt = 0L
+    private var lastPartialCandidate = ""
+    private var repeatedPartialMatches = 0
+    private var backgroundNoiseScore = 0
+    private var lastNoiseDecayAt = 0L
+
+    private enum class WakeMatchStrength {
+        NONE,
+        BARE,
+        VARIANT,
+        EXACT
+    }
+
+    private data class WakeMatch(
+        val normalizedText: String,
+        val strength: WakeMatchStrength
+    )
 
     private fun modelAssetName(): String =
         prefs.getString(MainActivity.KEY_VOSK_MODEL_ASSET, "model-en-us").orEmpty().trim()
@@ -81,6 +99,7 @@ class DexWakeWordEngine(
         speechService = null
         recognizer = null
         running = false
+        resetPassiveState()
     }
 
     fun isRunning(): Boolean = running
@@ -95,6 +114,7 @@ class DexWakeWordEngine(
             val activeSpeechService = SpeechService(activeRecognizer, 16000.0f)
             recognizer = activeRecognizer
             speechService = activeSpeechService
+            resetPassiveState()
             activeSpeechService.startListening(this)
             running = true
             true
@@ -110,7 +130,8 @@ class DexWakeWordEngine(
         val phrase = normalizedWakePhrase()
         if (phrase.isBlank()) return emptySet()
         val variants = wakeVariants()
-        val bareDexVariants = setOf("dex", "decks", "deks", "decs", "dix")
+        val singleWordWake = phrase.split(" ").size == 1
+        val bareDexVariants = if (singleWordWake) bareWakeVariants() else emptySet()
         return (setOf(phrase) + variants + bareDexVariants).filter { it.isNotBlank() }.toSet()
     }
 
@@ -133,46 +154,124 @@ class DexWakeWordEngine(
         return variants.map { "$prefix $it".trim() }.toSet()
     }
 
-    private fun matchesNormalizedText(candidate: String): Boolean {
+    private fun bareWakeVariants(): Set<String> = setOf("dex", "decks", "deks", "decs", "dix")
+
+    private fun evaluateWakeMatch(candidate: String): WakeMatch {
         val normalizedCandidate = normalizeSpeechFragment(candidate)
-        if (normalizedCandidate.isBlank()) return false
+        if (normalizedCandidate.isBlank()) return WakeMatch(normalizedCandidate, WakeMatchStrength.NONE)
         val phrase = normalizedWakePhrase()
-        if (phrase.isBlank()) return false
-        if (normalizedCandidate == phrase) return true
-        if (normalizedCandidate.contains(phrase)) return true
-        if (normalizedCandidate in setOf("dex", "decks", "deks", "decs", "dix")) return true
-        return wakeVariants().any { variant ->
-            normalizedCandidate == variant || normalizedCandidate.contains(variant)
+        if (phrase.isBlank()) return WakeMatch(normalizedCandidate, WakeMatchStrength.NONE)
+        if (normalizedCandidate == phrase || normalizedCandidate.contains(phrase)) {
+            return WakeMatch(normalizedCandidate, WakeMatchStrength.EXACT)
+        }
+        if (wakeVariants().any { variant -> normalizedCandidate == variant || normalizedCandidate.contains(variant) }) {
+            return WakeMatch(normalizedCandidate, WakeMatchStrength.VARIANT)
+        }
+        if (normalizedCandidate in bareWakeVariants()) {
+            return WakeMatch(normalizedCandidate, WakeMatchStrength.BARE)
+        }
+        return WakeMatch(normalizedCandidate, WakeMatchStrength.NONE)
+    }
+
+    private fun extractSpeechFragment(payload: String?, finalResult: Boolean): String {
+        if (payload.isNullOrBlank()) return ""
+        return runCatching {
+            val json = JSONObject(payload)
+            val preferred = if (finalResult) json.optString("text") else json.optString("partial")
+            preferred.ifBlank { json.optString("text").ifBlank { json.optString("partial") } }
+        }.getOrDefault(payload)
+    }
+
+    private fun resetPassiveState() {
+        lastPartialCandidate = ""
+        repeatedPartialMatches = 0
+        backgroundNoiseScore = 0
+        lastNoiseDecayAt = SystemClock.elapsedRealtime()
+    }
+
+    private fun decayNoiseScore(now: Long = SystemClock.elapsedRealtime()) {
+        if (lastNoiseDecayAt == 0L) {
+            lastNoiseDecayAt = now
+            return
+        }
+        val decaySteps = ((now - lastNoiseDecayAt) / NOISE_DECAY_INTERVAL_MS).toInt()
+        if (decaySteps <= 0) return
+        backgroundNoiseScore = (backgroundNoiseScore - decaySteps).coerceAtLeast(0)
+        lastNoiseDecayAt += decaySteps * NOISE_DECAY_INTERVAL_MS
+    }
+
+    private fun markBackgroundNoise() {
+        decayNoiseScore()
+        backgroundNoiseScore = (backgroundNoiseScore + 1).coerceAtMost(MAX_NOISE_SCORE)
+        lastPartialCandidate = ""
+        repeatedPartialMatches = 0
+    }
+
+    private fun canTriggerWake(now: Long = SystemClock.elapsedRealtime()): Boolean {
+        return now - lastWakeTriggeredAt >= WAKE_TRIGGER_COOLDOWN_MS
+    }
+
+    private fun handleWakeCandidate(payload: String?, finalResult: Boolean) {
+        val fragment = extractSpeechFragment(payload, finalResult)
+        val match = evaluateWakeMatch(fragment)
+        if (match.normalizedText.isBlank()) {
+            return
+        }
+        if (match.strength == WakeMatchStrength.NONE) {
+            markBackgroundNoise()
+            return
+        }
+
+        decayNoiseScore()
+        val now = SystemClock.elapsedRealtime()
+        if (!canTriggerWake(now)) return
+
+        if (finalResult) {
+            val allowFinalTrigger =
+                match.strength == WakeMatchStrength.EXACT ||
+                    match.strength == WakeMatchStrength.VARIANT ||
+                    (match.strength == WakeMatchStrength.BARE && backgroundNoiseScore <= QUIET_ROOM_NOISE_SCORE)
+            if (allowFinalTrigger) {
+                triggerWake(now)
+            }
+            return
+        }
+
+        if (lastPartialCandidate == match.normalizedText) {
+            repeatedPartialMatches += 1
+        } else {
+            lastPartialCandidate = match.normalizedText
+            repeatedPartialMatches = 1
+        }
+
+        val requiredRepeats = when {
+            backgroundNoiseScore >= NOISY_ROOM_SCORE -> 3
+            match.strength == WakeMatchStrength.BARE -> 3
+            else -> 2
+        }
+        if (repeatedPartialMatches >= requiredRepeats && match.strength != WakeMatchStrength.BARE) {
+            triggerWake(now)
         }
     }
 
-    private fun matchesWakePhrase(payload: String?): Boolean {
-        if (payload.isNullOrBlank()) return false
-        if (matchesNormalizedText(payload)) return true
-        return runCatching {
-            val json = JSONObject(payload)
-            val partial = json.optString("partial")
-            val text = json.optString("text")
-            matchesNormalizedText(partial) || matchesNormalizedText(text)
-        }.getOrDefault(false)
+    private fun triggerWake(now: Long = SystemClock.elapsedRealtime()) {
+        lastWakeTriggeredAt = now
+        lastPartialCandidate = ""
+        repeatedPartialMatches = 0
+        backgroundNoiseScore = 0
+        onWakeWordDetected()
     }
 
     override fun onPartialResult(hypothesis: String?) {
-        if (matchesWakePhrase(hypothesis)) {
-            onWakeWordDetected()
-        }
+        handleWakeCandidate(hypothesis, finalResult = false)
     }
 
     override fun onResult(hypothesis: String?) {
-        if (matchesWakePhrase(hypothesis)) {
-            onWakeWordDetected()
-        }
+        handleWakeCandidate(hypothesis, finalResult = true)
     }
 
     override fun onFinalResult(hypothesis: String?) {
-        if (matchesWakePhrase(hypothesis)) {
-            onWakeWordDetected()
-        }
+        handleWakeCandidate(hypothesis, finalResult = true)
     }
 
     override fun onError(e: Exception?) {
@@ -181,4 +280,12 @@ class DexWakeWordEngine(
     }
 
     override fun onTimeout() = Unit
+
+    private companion object {
+        const val WAKE_TRIGGER_COOLDOWN_MS = 2200L
+        const val NOISE_DECAY_INTERVAL_MS = 4500L
+        const val MAX_NOISE_SCORE = 6
+        const val QUIET_ROOM_NOISE_SCORE = 1
+        const val NOISY_ROOM_SCORE = 3
+    }
 }
