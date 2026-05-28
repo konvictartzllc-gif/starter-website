@@ -7,7 +7,7 @@ import LearningHub from "../components/LearningHub.jsx";
 import Permissions from "../components/Permissions.jsx";
 import Preferences from "../components/Preferences.jsx";
 
-const ADMIN_TABS = ["stats", "dex tools", "flags", "inventory", "affiliates", "promo", "users"];
+const ADMIN_TABS = ["launch", "stats", "dex tools", "flags", "inventory", "affiliates", "promo", "users"];
 
 function normalizeAdminTab(value) {
   const tab = String(value || "")
@@ -15,6 +15,68 @@ function normalizeAdminTab(value) {
     .trim()
     .toLowerCase();
   return ADMIN_TABS.includes(tab) ? tab : "dex tools";
+}
+
+function isReadyStatus(item) {
+  if (!item) return false;
+  if (typeof item.ready === "boolean") return item.ready;
+  if (typeof item.configured === "boolean") return item.configured;
+  return false;
+}
+
+function statusReason(item) {
+  if (!item) return "not checked";
+  return item.reason || item.detail || item.nextStep || (isReadyStatus(item) ? "ok" : "needs setup");
+}
+
+function buildLaunchChecks(diagnostics) {
+  const providers = diagnostics?.providers || {};
+  const launch = diagnostics?.launch || {};
+  const summary = diagnostics?.summary || {};
+  return [
+    {
+      label: "AI replies",
+      ready: isReadyStatus(providers.ai),
+      detail: statusReason(providers.ai),
+      next: "Set OPENAI_API_KEY and confirm AI diagnostics are ok.",
+    },
+    {
+      label: "Email delivery",
+      ready: isReadyStatus(providers.email),
+      detail: statusReason(providers.email),
+      next: "Send a test email from Promo and verify inbox delivery.",
+    },
+    {
+      label: "Stripe billing",
+      ready: isReadyStatus(providers.stripe),
+      detail: statusReason(providers.stripe),
+      next: "Confirm live secret key, price ID, success/cancel URLs, and webhook secret.",
+    },
+    {
+      label: "RingCentral calls/SMS",
+      ready: Boolean(providers.ringcentral?.ready),
+      detail: providers.ringcentral?.detail || providers.ringcentral?.reason || "not checked",
+      next: providers.ringcentral?.nextStep || "Connect RingCentral OAuth/JWT and run one live call/SMS test.",
+    },
+    {
+      label: "Public site URL",
+      ready: Boolean(summary.publicSiteUrlSet || launch.site?.publicSiteUrlStatus?.configured),
+      detail: launch.site?.publicSiteUrl || "missing",
+      next: "Set PUBLIC_SITE_URL to https://www.konvict-artz.com.",
+    },
+    {
+      label: "Client origin",
+      ready: Boolean(summary.clientOriginSet || launch.site?.clientOriginStatus?.configured),
+      detail: launch.site?.clientOrigin || "missing",
+      next: "Set CLIENT_ORIGIN to the production website origin.",
+    },
+    {
+      label: "Auth secrets",
+      ready: Boolean(launch.auth?.jwtSecret?.configured && launch.auth?.adminEmail?.configured && launch.auth?.adminPassword?.configured),
+      detail: launch.auth?.jwtSecret?.configured ? "configured" : "missing jwt/admin config",
+      next: "Confirm JWT_SECRET, ADMIN_EMAIL, and ADMIN_PASSWORD are set in Render.",
+    },
+  ];
 }
 
 export default function AdminPortal() {
@@ -30,6 +92,8 @@ export default function AdminPortal() {
   const [affiliateInvites, setAffiliateInvites] = useState([]);
   const [users, setUsers] = useState([]);
   const [featureFlags, setFeatureFlags] = useState([]);
+  const [diagnostics, setDiagnostics] = useState(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -57,6 +121,9 @@ export default function AdminPortal() {
   const [testEmail, setTestEmail] = useState("");
 
   const isAdmin = user?.role === "admin";
+  const launchChecks = buildLaunchChecks(diagnostics);
+  const readyLaunchChecks = launchChecks.filter((check) => check.ready).length;
+  const launchReady = launchChecks.length > 0 && readyLaunchChecks === launchChecks.length;
 
   function updateAdminTab(nextTab, options = {}) {
     const normalized = normalizeAdminTab(nextTab);
@@ -115,6 +182,17 @@ export default function AdminPortal() {
     try { setFeatureFlags(await api.getFeatureFlags()); } catch {}
   }
 
+  async function loadDiagnostics() {
+    setDiagnosticsLoading(true);
+    try {
+      setDiagnostics(await api.getDiagnostics());
+    } catch (err) {
+      setMsg("Error: " + (err.error || err.message || "Failed to load launch diagnostics"));
+    } finally {
+      setDiagnosticsLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!isAdmin) return;
     loadStats();
@@ -123,6 +201,7 @@ export default function AdminPortal() {
     loadAffiliateInvites();
     loadUsers();
     loadFeatureFlags();
+    loadDiagnostics();
   }, [isAdmin]);
 
   useEffect(() => {
@@ -419,6 +498,81 @@ export default function AdminPortal() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {tab === "launch" && (
+          <div>
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Launch Readiness</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  One place to see what is ready, what is blocked, and what needs your next move.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadDiagnostics}
+                disabled={diagnosticsLoading}
+                className="bg-brand hover:bg-brand-light disabled:opacity-60 text-white rounded-lg px-4 py-2 text-sm font-semibold transition-all"
+              >
+                {diagnosticsLoading ? "Checking..." : "Refresh Checks"}
+              </button>
+            </div>
+
+            <div className={`mb-5 rounded-xl border px-4 py-4 ${
+              launchReady ? "border-green-700 bg-green-900/20" : "border-yellow-700 bg-yellow-900/20"
+            }`}>
+              <p className={`text-sm font-bold ${launchReady ? "text-green-300" : "text-yellow-300"}`}>
+                {launchReady ? "Launch ready" : `${readyLaunchChecks}/${launchChecks.length} launch checks ready`}
+              </p>
+              <p className="mt-1 text-sm text-gray-300">
+                {launchReady
+                  ? "Core provider diagnostics are green. Run one final live payment, affiliate invite, emergency alert, and phone-answering test."
+                  : "Finish the blocked checks below before calling Dex launch-ready."}
+              </p>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              {launchChecks.map((check) => (
+                <div key={check.label} className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-white">{check.label}</h3>
+                      <p className="mt-1 break-words text-sm text-gray-400">{check.detail}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${
+                      check.ready ? "bg-green-900/50 text-green-300" : "bg-red-900/50 text-red-300"
+                    }`}>
+                      {check.ready ? "Ready" : "Fix"}
+                    </span>
+                  </div>
+                  {!check.ready && (
+                    <p className="mt-3 rounded-md border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-300">
+                      Next: {check.next}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 rounded-xl border border-gray-800 bg-gray-900 p-4">
+              <h3 className="font-semibold text-white">Final Manual Tests</h3>
+              <div className="mt-3 grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
+                {[
+                  "Create a user account and confirm trial access.",
+                  "Run live Stripe subscription and confirm user becomes paid.",
+                  "Buy a Dex coin pack and confirm coins update.",
+                  "Generate affiliate invite and confirm the email/link works.",
+                  "Install latest APK and test Hey Dex on Android.",
+                  "Run one RingCentral call-routing test end to end.",
+                  "Trigger emergency contact alert with a safe test phrase.",
+                  "Ask Dex to search web and YouTube from web and app.",
+                ].map((item) => (
+                  <div key={item} className="rounded-md bg-gray-950 px-3 py-2">{item}</div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

@@ -125,6 +125,7 @@ export const api = {
   downloadAffiliateAndroid: () => download("/affiliate/android/download", "Dex-Assistant.apk"),
 
   // Admin
+  getDiagnostics: () => request("/diagnostics/providers"),
   getAdminStats: () => request("/admin/stats"),
   getInventory: () => request("/admin/inventory"),
   addInventory: (body) => request("/admin/inventory", { method: "POST", body: JSON.stringify(body) }),
