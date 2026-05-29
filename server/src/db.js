@@ -177,6 +177,23 @@
         created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS service_bookings (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        service         TEXT    NOT NULL,
+        name            TEXT    NOT NULL,
+        email           TEXT,
+        phone           TEXT,
+        zip_code        TEXT    NOT NULL,
+        address         TEXT,
+        preferred_date  TEXT,
+        preferred_time  TEXT,
+        notes           TEXT,
+        status          TEXT    NOT NULL DEFAULT 'new',
+        created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+        updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
     await ensureColumn("payments", "stripe_payment_intent_id", "TEXT");
     await ensureColumn("payments", "stripe_checkout_session_id", "TEXT");
     await ensureColumn("payments", "stripe_subscription_id", "TEXT");

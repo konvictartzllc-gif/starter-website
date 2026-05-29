@@ -12,6 +12,7 @@ import BannerAds from "./components/BannerAds.jsx";
 import PrivacyBanner from "./components/PrivacyBanner.jsx";
 import Privacy from "./pages/Privacy.jsx";
 import Terms from "./pages/Terms.jsx";
+import Booking from "./pages/Booking.jsx";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/admin" element={<AdminPortal />} />
         <Route path="/affiliate" element={<AffiliateDashboard />} />
         <Route path="/shop" element={<Shop />} />
+        <Route path="/book" element={<Booking />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/settings" element={<Settings />} />

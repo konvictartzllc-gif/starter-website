@@ -7,7 +7,7 @@ import LearningHub from "../components/LearningHub.jsx";
 import Permissions from "../components/Permissions.jsx";
 import Preferences from "../components/Preferences.jsx";
 
-const ADMIN_TABS = ["launch", "stats", "dex tools", "flags", "inventory", "affiliates", "promo", "users"];
+const ADMIN_TABS = ["launch", "stats", "bookings", "dex tools", "flags", "inventory", "affiliates", "promo", "users"];
 
 function normalizeAdminTab(value) {
   const tab = String(value || "")
@@ -92,6 +92,8 @@ export default function AdminPortal() {
   const [affiliateInvites, setAffiliateInvites] = useState([]);
   const [users, setUsers] = useState([]);
   const [featureFlags, setFeatureFlags] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [serviceArea, setServiceArea] = useState([]);
   const [diagnostics, setDiagnostics] = useState(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -182,6 +184,14 @@ export default function AdminPortal() {
     try { setFeatureFlags(await api.getFeatureFlags()); } catch {}
   }
 
+  async function loadBookings() {
+    try {
+      const data = await api.getBookings();
+      setBookings(data.bookings || []);
+      setServiceArea(data.serviceArea || []);
+    } catch {}
+  }
+
   async function loadDiagnostics() {
     setDiagnosticsLoading(true);
     try {
@@ -201,6 +211,7 @@ export default function AdminPortal() {
     loadAffiliateInvites();
     loadUsers();
     loadFeatureFlags();
+    loadBookings();
     loadDiagnostics();
   }, [isAdmin]);
 
@@ -367,6 +378,16 @@ export default function AdminPortal() {
       loadStats();
     } catch (err) {
       setMsg("Error: " + (err.error || "Failed"));
+    }
+  }
+
+  async function handleUpdateBooking(id, status) {
+    try {
+      await api.updateBooking(id, { status });
+      setMsg(`Booking marked ${status}.`);
+      loadBookings();
+    } catch (err) {
+      setMsg("Error: " + (err.error || "Failed to update booking"));
     }
   }
 
@@ -602,6 +623,77 @@ export default function AdminPortal() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {tab === "bookings" && (
+          <div>
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Service Bookings</h2>
+                <p className="mt-1 text-sm text-gray-400">
+                  Customers can book all services inside ZIP codes {(serviceArea.length ? serviceArea : ["35580", "35501", "35579", "35148", "35549"]).join(", ")}.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadBookings}
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-light"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {bookings.length === 0 ? (
+              <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 text-sm text-gray-400">
+                No booking requests yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {bookings.map((booking) => (
+                  <div key={booking.id} className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-white">{booking.service}</h3>
+                          <span className={`rounded px-2 py-1 text-xs font-bold ${
+                            booking.status === "new" ? "bg-blue-900/50 text-blue-300" :
+                            booking.status === "confirmed" ? "bg-green-900/50 text-green-300" :
+                            booking.status === "completed" ? "bg-purple-900/50 text-purple-300" :
+                            booking.status === "cancelled" ? "bg-red-900/50 text-red-300" :
+                            "bg-gray-800 text-gray-300"
+                          }`}>
+                            {booking.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-300">{booking.name} - ZIP {booking.zip_code}</p>
+                        <p className="mt-1 text-sm text-gray-400">
+                          {[booking.phone, booking.email].filter(Boolean).join(" - ") || "No contact details saved"}
+                        </p>
+                        {booking.address && <p className="mt-1 text-sm text-gray-400">{booking.address}</p>}
+                        <p className="mt-1 text-sm text-gray-400">
+                          Preferred: {booking.preferred_date || "date not set"} {booking.preferred_time || ""}
+                        </p>
+                        {booking.notes && <p className="mt-3 whitespace-pre-wrap rounded-md bg-gray-950 px-3 py-2 text-sm text-gray-300">{booking.notes}</p>}
+                        <p className="mt-2 text-xs text-gray-500">Requested {new Date(booking.created_at).toLocaleString()}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        {["confirmed", "rescheduled", "completed", "cancelled"].map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => handleUpdateBooking(booking.id, status)}
+                            className="rounded-md bg-gray-800 px-3 py-2 text-xs font-bold capitalize text-gray-100 hover:bg-gray-700"
+                          >
+                            {status}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

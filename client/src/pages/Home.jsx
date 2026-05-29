@@ -264,8 +264,15 @@ function Home() {
                 </div>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Link
-                    to="/shop"
+                    to={`/book?service=${encodeURIComponent(selectedService.title)}`}
                     className="rounded-md bg-brand px-5 py-3 text-sm font-bold text-white hover:bg-brand-light"
+                    onClick={() => setSelectedService(null)}
+                  >
+                    Book Appointment
+                  </Link>
+                  <Link
+                    to="/shop"
+                    className="rounded-md border border-gray-700 px-5 py-3 text-sm font-bold text-gray-200 hover:border-brand"
                     onClick={() => setSelectedService(null)}
                   >
                     View Shop

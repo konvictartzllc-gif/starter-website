@@ -120,6 +120,10 @@ export const api = {
   openBillingPortal: () => request("/payments/portal", { method: "POST", body: JSON.stringify({}) }),
   getPaymentStatus: () => request("/payments/status"),
 
+  // Bookings
+  getServiceArea: (zip) => request(`/bookings/service-area${zip ? `?zip=${encodeURIComponent(zip)}` : ""}`),
+  createBooking: (body) => request("/bookings", { method: "POST", body: JSON.stringify(body) }),
+
   // Affiliate
   getAffiliateDashboard: () => request("/affiliate/dashboard"),
   downloadAffiliateAndroid: () => download("/affiliate/android/download", "Dex-Assistant.apk"),
@@ -140,6 +144,8 @@ export const api = {
   sendPromo: (body) => request("/admin/send-promo", { method: "POST", body: JSON.stringify(body) }),
   sendTestEmail: (body) => request("/admin/email/test", { method: "POST", body: JSON.stringify(body) }),
   getUsers: () => request("/admin/users"),
+  getBookings: () => request("/bookings/admin"),
+  updateBooking: (id, body) => request(`/bookings/admin/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   getIntegrationRoutes: () => request("/admin/integrations/routes"),
   assignRingCentralRoute: (body) => request("/admin/integrations/ringcentral/assign", { method: "POST", body: JSON.stringify(body) }),
   getFeatureFlags: () => request("/admin/feature-flags"),

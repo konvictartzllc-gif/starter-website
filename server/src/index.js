@@ -15,6 +15,7 @@ import paymentsRoutes from "./routes/payments.js";
 import adminRoutes from "./routes/admin.js";
 import affiliateRoutes from "./routes/affiliate.js";
 import twilioVoiceRoutes from "./routes/twilioVoice.js";
+import bookingRoutes from "./routes/bookings.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -136,6 +137,7 @@ app.use("/api/dex", dexRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/affiliate", affiliateRoutes);
+app.use("/api/bookings", bookingRoutes);
 app.use("/api/twilio/voice", twilioVoiceRoutes);
 app.use("/api/ringcentral/voice", twilioVoiceRoutes);
 
