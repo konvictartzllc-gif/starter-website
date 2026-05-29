@@ -3,10 +3,50 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth.jsx";
 
 const services = [
-  { marker: "LC", title: "Lawn Care", desc: "Mowing, trimming, edging, and full yard maintenance." },
-  { marker: "CL", title: "Cleaning", desc: "Residential and commercial cleaning for regular or one-time jobs." },
-  { marker: "HD", title: "Handyman", desc: "Repairs, installs, and practical home improvements." },
-  { marker: "EL", title: "Electronics", desc: "Refurbished and new electronics with straightforward checkout." },
+  {
+    marker: "LC",
+    title: "Lawn Care",
+    desc: "Mowing, trimming, edging, and full yard maintenance.",
+    details: "Keep the outside of the property sharp with routine cuts, clean edges, trimming around fences and walkways, leaf cleanup, and full yard maintenance plans.",
+    includes: ["Mowing and edging", "Trimming and cleanup", "Seasonal yard refresh", "One-time or recurring service"],
+    photos: [
+      { label: "Clean cuts", src: "https://images.unsplash.com/photo-1589923188900-85dae523342b?auto=format&fit=crop&w=900&q=80" },
+      { label: "Fresh edges", src: "https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&w=900&q=80" },
+    ],
+  },
+  {
+    marker: "CL",
+    title: "Cleaning",
+    desc: "Residential and commercial cleaning for regular or one-time jobs.",
+    details: "Book dependable cleaning for homes, offices, move-outs, deep cleans, and recurring upkeep so the space looks ready when people walk in.",
+    includes: ["Deep cleaning", "Regular home cleaning", "Office and commercial spaces", "Move-in and move-out cleanup"],
+    photos: [
+      { label: "Residential", src: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=900&q=80" },
+      { label: "Detail work", src: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=900&q=80" },
+    ],
+  },
+  {
+    marker: "HD",
+    title: "Handyman",
+    desc: "Repairs, installs, and practical home improvements.",
+    details: "Get help with small repairs, installs, furniture assembly, fixture swaps, punch-list items, and practical improvements around the home or business.",
+    includes: ["Small repairs", "Installations", "Assembly work", "Home improvement punch lists"],
+    photos: [
+      { label: "Repairs", src: "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=900&q=80" },
+      { label: "Install work", src: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=900&q=80" },
+    ],
+  },
+  {
+    marker: "EL",
+    title: "Electronics",
+    desc: "Refurbished and new electronics with straightforward checkout.",
+    details: "Shop available electronics, accessories, refurbished devices, and tech items added through the Konvict Artz inventory system.",
+    includes: ["New and refurbished items", "Accessories and add-ons", "Inventory shown in real time", "Secure checkout when available"],
+    photos: [
+      { label: "Devices", src: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80" },
+      { label: "Accessories", src: "https://images.unsplash.com/photo-1468495244123-6c6c332eeece?auto=format&fit=crop&w=900&q=80" },
+    ],
+  },
 ];
 
 const dexFeatures = [
@@ -22,6 +62,7 @@ function Home() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstall, setShowInstall] = useState(false);
   const [installStatus, setInstallStatus] = useState("");
+  const [selectedService, setSelectedService] = useState(null);
 
   useEffect(() => {
     const handler = (event) => {
@@ -164,16 +205,93 @@ function Home() {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {services.map((service) => (
-            <article key={service.title} className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+            <button
+              key={service.title}
+              type="button"
+              onClick={() => setSelectedService(service)}
+              className="group rounded-lg border border-gray-800 bg-gray-900 p-5 text-left transition hover:-translate-y-1 hover:border-brand/70 hover:bg-gray-900/80 focus:outline-none focus:ring-2 focus:ring-brand"
+            >
               <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gray-800 text-xs font-black text-brand">
                 {service.marker}
               </span>
               <h3 className="mt-4 text-lg font-bold">{service.title}</h3>
               <p className="mt-2 text-sm leading-6 text-gray-400">{service.desc}</p>
-            </article>
+              <span className="mt-4 inline-flex text-sm font-bold text-brand group-hover:text-brand-light">View details</span>
+            </button>
           ))}
         </div>
       </section>
+
+      {selectedService && (
+        <div
+          className="fixed inset-0 z-40 flex items-end bg-black/70 px-4 py-4 sm:items-center sm:justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="service-details-title"
+          onClick={() => setSelectedService(null)}
+        >
+          <div
+            className="max-h-[88vh] w-full max-w-4xl overflow-y-auto rounded-lg border border-gray-800 bg-gray-950 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-gray-800 p-5">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.22em] text-brand">{selectedService.marker}</p>
+                <h2 id="service-details-title" className="mt-1 text-2xl font-black">{selectedService.title}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedService(null)}
+                className="rounded-md border border-gray-700 px-3 py-2 text-sm font-bold text-gray-200 hover:border-brand"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid gap-6 p-5 lg:grid-cols-[1fr_0.9fr]">
+              <div>
+                <p className="text-base leading-7 text-gray-300">{selectedService.details}</p>
+                <div className="mt-5 rounded-lg border border-gray-800 bg-gray-900 p-4">
+                  <h3 className="font-bold">What we offer</h3>
+                  <ul className="mt-3 grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
+                    {selectedService.includes.map((item) => (
+                      <li key={item} className="flex gap-2">
+                        <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-green-400" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Link
+                    to="/shop"
+                    className="rounded-md bg-brand px-5 py-3 text-sm font-bold text-white hover:bg-brand-light"
+                    onClick={() => setSelectedService(null)}
+                  >
+                    View Shop
+                  </Link>
+                  <Link
+                    to={user ? "/settings" : "/register"}
+                    className="rounded-md border border-gray-700 px-5 py-3 text-sm font-bold text-gray-200 hover:border-brand"
+                    onClick={() => setSelectedService(null)}
+                  >
+                    {user ? "Ask Dex About This" : "Create Account"}
+                  </Link>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                {selectedService.photos.map((photo) => (
+                  <figure key={photo.src} className="overflow-hidden rounded-lg border border-gray-800 bg-gray-900">
+                    <img src={photo.src} alt={`${selectedService.title} ${photo.label}`} className="aspect-[4/3] w-full object-cover" />
+                    <figcaption className="px-3 py-2 text-sm font-semibold text-gray-200">{photo.label}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="border-y border-gray-800 bg-gray-900 px-6 py-12">
         <div className="mx-auto max-w-3xl text-center">
