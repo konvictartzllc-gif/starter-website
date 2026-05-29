@@ -14,7 +14,7 @@ import { createEvent, listEvents } from "../services/calendar.js";
 import { verifyOta, spamFilter } from "../middleware/security.js";
 import { sendCustomEmail } from "../services/email.js";
 import { detectTone } from "../services/toneDetection.js";
-import { styleResponse } from "../services/responseStyler.js";
+import { getToneInstruction, styleResponse } from "../services/responseStyler.js";
 import { buildSupportReply, detectSafetySignal } from "../services/safetySignals.js";
 const router = Router();
 
@@ -1801,7 +1801,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-              const { message } = req.body;
+              const { message, voiceSignals } = req.body;
     const db = getDb();
     const userId = req.user.id;
     const historyThreshold = await purgeExpiredChatHistory(db, userId);
@@ -1943,7 +1943,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                         if (safetySignal.level === "support" || safetySignal.level === "urgent_support") {
                                 const supportReply = buildSupportReply(safetySignal, learningPreferences);
                                 if (supportReply) {
-                                        const detectedTone = detectTone(message);
+                                        const detectedTone = detectTone(message, voiceSignals);
                                         const styled = styleResponse(supportReply, detectedTone);
                                         await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, styled.text]);
                                         const followUpEnabled = learningPreferences.safety_follow_up_opt_in === "1";
@@ -2016,6 +2016,17 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
     if (workflowContext) {
       messages.unshift({ role: "system", content: workflowContext });
     }
+    const detectedTone = detectTone(message, voiceSignals);
+    const toneInstruction = getToneInstruction(detectedTone);
+    if (toneInstruction) {
+      messages.unshift({
+        role: "system",
+        content:
+          `Tone-aware response mode: ${toneInstruction} ` +
+          `Detected tone: ${detectedTone || "neutral"}. If the user seems sad, cheer them up gently. ` +
+          `If angry, help calm them down. If happy, keep the happiness going. If anxious, steady the conversation.`,
+      });
+    }
     messages.push({ role: "user", content: message });
 
               await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'user', ?)", [userId, message]);
@@ -2043,6 +2054,8 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                     console.error("Workflow learning error:", error?.message || error);
                             }
                     }
+                    const styledReply = styleResponse(reply, detectedTone);
+                    reply = styledReply.text;
                     await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, reply]);
 
                         // Auto-learn frequent chat intents.
@@ -2131,7 +2144,13 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 automationPerformed = true;
                         }
 
-                        return res.json({ reply, appointmentIntent, automationPerformed });
+                        return res.json({
+                                reply,
+                                appointmentIntent,
+                                automationPerformed,
+                                tone: styledReply.meta?.detectedTone || detectedTone || "neutral",
+                                toneStyle: styledReply.meta?.appliedStyle || "neutral",
+                        });
               } catch (err) {
                     console.error("OpenAI error:", err.message);
                     const fallback = "Dex chat is temporarily unavailable. Please try again in a moment.";
