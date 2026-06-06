@@ -1,6 +1,40 @@
 # Dex Launch Handoff Status
 
-Last updated: 2026-05-15
+Last updated: 2026-06-06
+
+## 2026-06-06 Launch Readiness Snapshot
+
+- Web production build passes with `npm --prefix client run build`.
+- Server syntax checks pass for:
+  - `node --check server\src\index.js`
+  - `node --check server\src\routes\dex.js`
+- Android debug build passes with `.\gradlew.bat :app:assembleDebug`.
+- Android release App Bundle build passes with `.\gradlew.bat :app:bundleRelease`.
+- Live Render diagnostics are green at `https://konvict-artz.onrender.com/api/diagnostics/providers`:
+  - AI ready
+  - email ready
+  - RingCentral ready
+  - Stripe ready
+  - JWT secret configured
+  - admin email/password configured
+  - public site URL and client origin configured
+  - Google OAuth configured
+- Public website returns `200` at `https://www.konvict-artz.com`.
+- Public web API rewrite reaches the backend at `https://www.konvict-artz.com/api/health`.
+
+## 2026-06-06 Immediate Launch Order
+
+1. Commit and push the current web/server polish and Dex voice/media fixes.
+2. Redeploy Render backend and Vercel frontend so production matches this workspace.
+3. Repeat live diagnostics after deploy.
+4. Run production proof tests with real accounts:
+   - fresh signup/login
+   - Dex chat
+   - YouTube/open action
+   - Stripe checkout and webhook
+   - admin affiliate invite/code flow
+5. Install the fresh Android release build on the Samsung device and test core flows.
+6. Rotate any exposed secrets before public launch.
 
 ## Completed From This Workspace
 

@@ -110,6 +110,7 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
   const submitCommand = useCallback((command) => {
     const cleaned = normalizeTranscript(command);
     if (cleaned.length <= 2 || shouldIgnoreCommand(cleaned)) return;
+    setError("");
     clearWakeTimeout();
     clearCommandTimeout();
     clearConversationTimers();
@@ -143,7 +144,10 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
       const results = Array.from(event.results);
       const lastResult = results[results.length - 1];
       const transcript = normalizeTranscript(lastResult[0].transcript);
-      if (transcript) setLastHeard(transcript);
+      if (transcript) {
+        setError("");
+        setLastHeard(transcript);
+      }
 
       if (!listeningForCommandRef.current && !conversationActiveRef.current) {
         // Listening for wake word
@@ -274,6 +278,7 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
       setStatus("speaking");
       const resumeListening = () => {
         isSpeakingRef.current = false;
+        setError("");
         setStatus("listening");
         try { recognitionRef.current?.start(); } catch {}
         if (conversationActiveRef.current && !idlePromptActiveRef.current) {
@@ -283,6 +288,7 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
       utterance.onend = resumeListening;
       utterance.onerror = resumeListening;
       synth.speak(utterance);
+      setError("");
     };
 
     if (synth.getVoices().length === 0 && "onvoiceschanged" in synth) {

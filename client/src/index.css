@@ -3,8 +3,28 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-gray-950 text-white font-sans;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  img {
+    max-width: 100%;
+  }
+
+  a,
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid #a78bfa;
+    outline-offset: 3px;
   }
 }
 
@@ -413,6 +433,21 @@
   to { opacity: 1; transform: translateY(0); }
 }
 .fade-in { animation: fadeIn 0.25s ease forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 .preferences-form {
   color: #e5e7eb;

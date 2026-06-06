@@ -254,6 +254,53 @@ function isAccessBlocked(errorCode) {
   return errorCode === "trial_expired" || errorCode === "subscription_expired" || errorCode === "no_access";
 }
 
+function cleanMediaQuery(value = "") {
+  return String(value || "")
+    .replace(/^.*?\b(?:and\s+)?(?:play|run|start)\b/i, "")
+    .replace(/\b(?:on\s+)?(?:youtube|yt|music|song|track|video)\b/gi, " ")
+    .replace(/\b(?:please|for me|right now|now)\b/gi, " ")
+    .replace(/^(?:the\s+)?app\s+and\s+/i, "")
+    .replace(/^(?:and\s+)?(?:open|play|run|start)\s+/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isPlayConfirmation(message = "") {
+  return /\b(?:yes|yeah|yep|ok|okay|sure)?\s*(?:play|open|run|start)\s+(?:it|that|this)\b/i.test(String(message || "").trim());
+}
+
+function getLocalOpenAction(message = "") {
+  const text = String(message || "").trim();
+  if (!text) return null;
+
+  if (/\b(open|pull up|launch)\s+(?:the\s+)?(?:youtube|yt)\b/i.test(text) && !/\b(play|run|start)\b/i.test(text)) {
+    return {
+      reply: "Opening YouTube.",
+      webAction: { type: "youtube", query: "", url: "https://www.youtube.com", autoOpen: true, intent: "open" },
+    };
+  }
+
+  const mediaMatch =
+    text.match(/\b(?:play|run|start)\s+(?:the\s+)?(?:song|track|music|video)?\s*(.+)/i) ||
+    text.match(/\b(?:open|pull up|launch)\s+(.+?)\s+(?:on\s+)?(?:youtube|yt)\b/i);
+  const query = cleanMediaQuery(mediaMatch?.[1]);
+  if (!query || /^(?:a\s+)?(?:game|games|riddle|trivia|quiz)$/i.test(query)) return null;
+
+  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  return {
+    reply: `Opening YouTube for "${query}".`,
+    webAction: { type: "youtube", query, url, autoOpen: true, intent: "play" },
+  };
+}
+
+function openReturnedAction(action) {
+  if (!action?.url || !action.autoOpen) return false;
+  const opened = window.open(action.url, "_blank", "noopener,noreferrer");
+  if (opened) return true;
+  window.location.assign(action.url);
+  return true;
+}
+
 export default function DexChat() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -280,6 +327,7 @@ export default function DexChat() {
   const memoryTimerRef = useRef(null);
   const chatInputRef = useRef(null);
   const launcherTapRef = useRef(0);
+  const lastPlayableActionRef = useRef(null);
 
   const { status, isSupported, lastHeard, error: voiceError, speak, stopSpeaking, startListening, sleep } = useDexVoice({
     enabled: wakeEnabled,
@@ -598,10 +646,10 @@ export default function DexChat() {
     recognition.onerror = (event) => {
       setVoiceBusy(false);
       if (event.error === "network" || event.error === "aborted" || event.error === "no-speech") {
-        showToast("Voice had a quick hiccup. Try again.");
+        showToast("Listening had a quick hiccup. Try again.");
         return;
       }
-      showToast(`Voice error: ${event.error}`);
+      showToast(`Listening issue: ${event.error}`);
     };
     recognition.onend = () => {
       setVoiceBusy(false);
@@ -643,6 +691,36 @@ export default function DexChat() {
     setInput("");
     setAccessError(null);
 
+    if (isPlayConfirmation(trimmed) && lastPlayableActionRef.current?.url) {
+      const webAction = { ...lastPlayableActionRef.current, autoOpen: true, intent: "play" };
+      const reply = webAction.query ? `Opening YouTube for "${webAction.query}".` : "Opening YouTube.";
+      setOpen(true);
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: trimmed },
+        { role: "assistant", content: reply, webAction },
+      ]);
+      openReturnedAction(webAction);
+      showToast("Opening YouTube...");
+      speak(reply);
+      return;
+    }
+
+    const localAction = getLocalOpenAction(trimmed);
+    if (localAction) {
+      lastPlayableActionRef.current = localAction.webAction;
+      setOpen(true);
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: trimmed },
+        { role: "assistant", content: localAction.reply, webAction: localAction.webAction },
+      ]);
+      openReturnedAction(localAction.webAction);
+      showToast(localAction.webAction.type === "youtube" ? "Opening YouTube..." : "Opening link...");
+      speak(localAction.reply);
+      return;
+    }
+
     if (!user) {
       const guestReply = "Hey! You'll need to sign up or log in first to chat with me. It's free for 3 days with no card needed.";
       setOpen(true);
@@ -661,6 +739,13 @@ export default function DexChat() {
     try {
       const data = await api.chat(trimmed);
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply, webAction: data.webAction || null }]);
+      if (data.webAction?.type === "youtube" && data.webAction?.url) {
+        lastPlayableActionRef.current = data.webAction;
+      }
+      const actionOpened = openReturnedAction(data.webAction);
+      if (actionOpened) {
+        showToast(data.webAction?.type === "youtube" ? "Opening YouTube..." : "Opening link...");
+      }
       speak(data.reply);
 
       if (data.appointmentIntent) {
@@ -748,7 +833,7 @@ export default function DexChat() {
                 {isSupported ? `Voice ${status}` : "Voice not supported here"}
               </div>
               {voiceError && (
-                <div className="text-xs text-red-300">Voice error: {voiceError}</div>
+                <div className="text-xs text-amber-300">Listening issue: {voiceError}</div>
               )}
               {lastHeard && (
                 <div className="max-w-[16rem] truncate text-xs text-gray-500">
@@ -967,7 +1052,9 @@ export default function DexChat() {
                       rel="noreferrer"
                       className="mt-2 block rounded-md border border-brand/60 px-3 py-2 text-center text-xs font-semibold text-brand hover:bg-brand/10"
                     >
-                      {message.webAction.type === "youtube" ? "Open YouTube" : "Open Search"}
+                      {message.webAction.type === "youtube"
+                        ? message.webAction.intent === "play" ? "Play on YouTube" : "Open YouTube"
+                        : "Open Search"}
                     </a>
                   )}
               </div>

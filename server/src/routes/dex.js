@@ -68,12 +68,27 @@ function isEmergencyContactAlertRequest(message = "") {
 
 function extractWebRequest(message = "") {
         const text = String(message || "").trim();
+        const cleanedMediaQuery = (value = "") => String(value || "")
+                .replace(/^.*?\b(?:and\s+)?(?:play|run|start)\b/i, "")
+                .replace(/\b(?:on\s+)?(?:youtube|yt|music|song|video)\b/ig, " ")
+                .replace(/\b(?:please|for me|right now|now)\b/ig, " ")
+                .replace(/^(?:the\s+)?app\s+and\s+/i, "")
+                .replace(/^(?:and\s+)?(?:open|play|run|start)\s+/i, "")
+                .replace(/\s+/g, " ")
+                .trim();
+        const mediaMatch =
+                text.match(/\b(?:play|run|start)\s+(?:the\s+)?(?:song|track|music|video)?\s*(.+)/i) ||
+                text.match(/\b(?:open|pull up)\s+(.+?)\s+(?:on\s+)?(?:youtube|yt)\b/i);
+        const mediaQuery = cleanedMediaQuery(mediaMatch?.[1]);
+        if (mediaQuery && !/^(?:a\s+)?(?:game|games|riddle|trivia|quiz)$/i.test(mediaQuery)) {
+                return { type: "youtube", query: mediaQuery, autoOpen: true, intent: "play" };
+        }
         const youtubeMatch = text.match(/\b(?:search|look up|find|pull up|open)\s+(?:on\s+)?youtube\s+(?:for\s+)?(.+)/i);
         if (youtubeMatch?.[1]) {
-                return { type: "youtube", query: youtubeMatch[1].trim() };
+                return { type: "youtube", query: youtubeMatch[1].trim(), autoOpen: /\b(open|pull up)\b/i.test(text) };
         }
         if (/\b(open|pull up)\s+youtube\b/i.test(text)) {
-                return { type: "youtube", query: "" };
+                return { type: "youtube", query: "", autoOpen: true };
         }
         const webMatch =
                 text.match(/\b(?:search|look up|google|find)\s+(?:the\s+web\s+)?(?:for\s+)?(.+)/i) ||
@@ -121,9 +136,15 @@ function buildSearchReply(request, searchData = null) {
                         : "https://www.youtube.com";
                 return {
                         reply: request.query
-                                ? `I can open a YouTube search for "${request.query}": ${url}`
-                                : `I can open YouTube here: ${url}`,
-                        webAction: { type: "youtube", query: request.query, url },
+                                ? `${request.intent === "play" ? "Opening" : "I can open"} YouTube for "${request.query}": ${url}`
+                                : "Opening YouTube.",
+                        webAction: {
+                                type: "youtube",
+                                query: request.query,
+                                url,
+                                autoOpen: Boolean(request.autoOpen),
+                                intent: request.intent || "open",
+                        },
                 };
         }
 
@@ -1778,7 +1799,7 @@ const DEX_SYSTEM_PROMPT = `You are Dex, a friendly and empathetic AI assistant f
 Device and web access:
 - Do not claim unlimited access. Be honest about permissions, device security, app store rules, browser limits, and third-party service limits.
 - If a task needs a permission or external app, explain the exact permission or app connection needed.
-- When the user asks for current information, web results, YouTube, or search, use the available search/open-link flow and give useful links when direct control is not possible.
+- When the user asks to open, play, run, search, or pull up YouTube/web content, use the available open-link flow. Do not say you cannot open it unless the app lacks the needed permission or the browser blocks it.
 - If you cannot directly control something on the user's device, offer the next best action and clear setup steps.
 
 When a user wants to learn something:
