@@ -97,7 +97,12 @@ export async function readJson(request) {
 }
 
 export function validateEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+  const email = String(value || "").trim();
+  if (!email || email.includes(" ")) return false;
+  const parts = email.split("@");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return false;
+  const domainParts = parts[1].split(".");
+  return domainParts.length >= 2 && domainParts.every(Boolean);
 }
 
 export function randomToken(size = 16) {

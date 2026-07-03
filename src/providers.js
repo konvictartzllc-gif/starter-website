@@ -5,6 +5,12 @@ function boolSummary(value, reason) {
   return value ? { configured: true, reason: "ok" } : { configured: false, reason };
 }
 
+function trimTrailingSlashes(value) {
+  let next = String(value || "");
+  while (next.endsWith("/")) next = next.slice(0, -1);
+  return next;
+}
+
 export function getDiagnostics(env) {
   const aiConfigured = Boolean(env.OPENAI_API_KEY);
   const stripeConfigured = Boolean(
@@ -147,7 +153,7 @@ export function getProductCatalog(env) {
 
 export async function createStripeCheckoutSession(env, options) {
   if (!env.STRIPE_SECRET_KEY) throw new Error("Stripe is not configured.");
-  const siteUrl = (env.PUBLIC_SITE_URL || options.siteUrl || "https://worker-autumn-cherry-0533.workers.dev").replace(/\/+$/, "");
+  const siteUrl = trimTrailingSlashes(env.PUBLIC_SITE_URL || options.siteUrl || "https://worker-autumn-cherry-0533.workers.dev");
   return stripeRequest(env, "/v1/checkout/sessions", {
     mode: options.mode,
     "line_items[0][price]": options.priceId,
@@ -162,7 +168,7 @@ export async function createStripeCheckoutSession(env, options) {
 
 export async function createStripePortalSession(env, customerId) {
   if (!env.STRIPE_SECRET_KEY) throw new Error("Stripe is not configured.");
-  const siteUrl = (env.STRIPE_PORTAL_RETURN_URL || env.PUBLIC_SITE_URL || "https://worker-autumn-cherry-0533.workers.dev").replace(/\/+$/, "");
+  const siteUrl = trimTrailingSlashes(env.STRIPE_PORTAL_RETURN_URL || env.PUBLIC_SITE_URL || "https://worker-autumn-cherry-0533.workers.dev");
   return stripeRequest(env, "/v1/billing_portal/sessions", {
     customer: customerId,
     return_url: siteUrl,

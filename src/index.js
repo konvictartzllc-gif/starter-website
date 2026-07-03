@@ -166,7 +166,9 @@ async function rateLimit(env, request, scope, { windowMs, max }) {
 }
 
 function getSiteUrl(request, env) {
-  return (env.PUBLIC_SITE_URL || `${new URL(request.url).origin}`).replace(/\/+$/, "");
+  let siteUrl = String(env.PUBLIC_SITE_URL || new URL(request.url).origin);
+  while (siteUrl.endsWith("/")) siteUrl = siteUrl.slice(0, -1);
+  return siteUrl;
 }
 
 function getDexProducts(env) {
@@ -1110,7 +1112,7 @@ export default {
         jsonResponse(
           {
             error: status === 500 ? "Internal server error" : error.message,
-            detail: env.NODE_ENV === "production" ? undefined : error.stack || String(error),
+            detail: env.NODE_ENV === "production" || status === 500 ? undefined : error.message,
           },
           status
         ),

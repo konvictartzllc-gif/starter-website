@@ -6,6 +6,8 @@ on:
 jobs:
   retired:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Explain migration
         run: |
