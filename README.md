@@ -24,13 +24,14 @@ This repo has gone through a few product phases, so the safest source of truth i
 
 ## Current Stack
 
-- Backend: Node.js + Express + SQLite
-- Web: Vite-based frontend
+- Backend: Cloudflare Worker fetch handler
+- Database: Cloudflare D1
+- Web: Vite-based frontend served from the same Worker
 - Mobile: native Android app
 - Billing: Stripe
 - AI: OpenAI
-- Email: SMTP
-- Telephony: RingCentral integration path
+- Email: SMTP configuration surfaced through Worker diagnostics
+- Telephony: RingCentral/Twilio callback routes exposed by the Worker
 
 ## Local Setup
 
@@ -42,22 +43,21 @@ npm --prefix .\server install
 npm --prefix .\client install
 ```
 
-### 2. Configure backend env
+### 2. Configure Worker env
 
-Copy the template and fill in real values:
+For local Worker development:
 
 ```powershell
-Copy-Item .\server\.env.example .\server\.env
-code .\server\.env
+Copy-Item .\.dev.vars.example .\.dev.vars
+code .\.dev.vars
 ```
 
-Important current env keys include:
+Important Cloudflare secrets and vars include:
 
 ```env
-PORT=4000
-PUBLIC_SITE_URL=https://www.konvict-artz.com
-CLIENT_ORIGIN=https://www.konvict-artz.com
-ALLOWED_ORIGINS=https://www.konvict-artz.com,https://konvict-artz.com
+PUBLIC_SITE_URL=https://worker-autumn-cherry-0533.workers.dev
+CLIENT_ORIGIN=https://worker-autumn-cherry-0533.workers.dev
+ALLOWED_ORIGINS=https://worker-autumn-cherry-0533.workers.dev,https://www.konvict-artz.com,https://konvict-artz.com
 
 JWT_SECRET=...
 ADMIN_EMAIL=...
@@ -84,52 +84,101 @@ SENDER_NAME=Konvict Artz
 
 RC_CLIENT_ID=...
 RC_CLIENT_SECRET=...
-RC_JWT=...
 RC_PHONE_NUMBER=...
 RC_SERVER=https://platform.ringcentral.com
 ```
 
-### 3. Run locally
-
-Backend:
+### 3. Create the D1 database
 
 ```powershell
-npm --prefix .\server run start
+wrangler d1 create dex-production
 ```
 
-Web client:
+Copy the returned `database_id` into [wrangler.toml](./wrangler.toml).
+
+### 4. Apply the schema
 
 ```powershell
-npm --prefix .\client run dev
+wrangler d1 migrations apply dex-production --local
+wrangler d1 migrations apply dex-production --remote
 ```
 
-Useful backend URLs:
+### 5. Build and run locally
 
-- `http://localhost:4000/`
-- `http://localhost:4000/health`
-- `http://localhost:4000/api/health`
-- `http://localhost:4000/api/diagnostics/providers`
+Build the frontend that the Worker serves as static assets:
 
-## Current Deployment Path
+```powershell
+npm --prefix .\client install
+npm --prefix .\client run build
+```
 
-### Backend
+Run the Worker locally:
 
-Use Render with:
+```powershell
+wrangler dev
+```
 
-- repo root config: [render.yaml](./render.yaml)
-- or service config: [server/render.yaml](./server/render.yaml)
+Useful Worker URLs:
 
-Important:
+- `http://localhost:8787/health`
+- `http://localhost:8787/api/health`
+- `http://localhost:8787/api/diagnostics/providers`
 
-- Root Directory: `server`
-- Build Command: `npm install`
-- Start Command: `node src/index.js`
+## Cloudflare Deployment Path
+
+### Worker
+
+This repository now ships a Worker entry point at [src/index.js](./src/index.js) and D1 schema helpers at [src/db.js](./src/db.js).
+
+Deploy target:
+
+- `worker-autumn-cherry-0533`
+
+Required secrets:
+
+- `JWT_SECRET`
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `OPENAI_API_KEY`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_PUBLISHABLE_KEY`
+- `STRIPE_PRICE_ID`
+- `STRIPE_WEBHOOK_SECRET`
+- `SMTP_HOST`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `RC_CLIENT_ID`
+- `RC_CLIENT_SECRET`
+
+Set them with:
+
+```powershell
+wrangler secret put JWT_SECRET
+wrangler secret put ADMIN_EMAIL
+wrangler secret put ADMIN_PASSWORD
+...
+```
 
 ### Frontend
 
-Frontend is intended to live at:
+`client/dist` is built with:
 
-- `https://www.konvict-artz.com`
+```powershell
+npm --prefix .\client run build
+```
+
+The Worker serves those built assets directly through the `[assets]` section in [wrangler.toml](./wrangler.toml), so `/api/*` and the SPA live on the same domain.
+
+### GitHub Actions
+
+The active deployment workflow is [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml). It:
+
+- installs dependencies
+- builds `client/dist`
+- applies D1 migrations
+- deploys `worker-autumn-cherry-0533`
+
+The two Azure workflows were intentionally retired to stop the disabled-subscription deployment failure that was showing up in Actions.
 
 ### Android
 
@@ -137,7 +186,7 @@ Open [android-app/](./android-app/) in Android Studio and build from there.
 
 ## Launch Diagnostics
 
-The backend now exposes:
+The Worker now exposes:
 
 - `GET /api/diagnostics/providers`
 
@@ -154,10 +203,10 @@ This gives a quick launch-readiness snapshot for:
 
 - Older docs in this repo used Square naming and older auth fields. The current product uses Stripe and `ADMIN_EMAIL`.
 - If a doc conflicts with current code, trust:
-  - [server/.env.example](./server/.env.example)
-  - [render.yaml](./render.yaml)
-  - [server/render.yaml](./server/render.yaml)
-  - [server/src/index.js](./server/src/index.js)
+  - [wrangler.toml](./wrangler.toml)
+  - [.dev.vars.example](./.dev.vars.example)
+  - [migrations/0001_initial.sql](./migrations/0001_initial.sql)
+  - [src/index.js](./src/index.js)
 
 ## Related Docs
 
