@@ -7,7 +7,7 @@ function normalizeApiBase(value) {
   return raw;
 }
 
-const BASE = normalizeApiBase(import.meta.env.VITE_API_URL);
+const BASE = normalizeApiBase(import.meta.env.VITE_API_URL || "https://konvict-artz-api.konvictartzllc.workers.dev");
 
 function getToken() {
   return localStorage.getItem("dex_token");
