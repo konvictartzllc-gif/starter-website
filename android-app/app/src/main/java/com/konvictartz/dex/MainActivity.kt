@@ -6010,18 +6010,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val port = parsedUri?.port ?: -1
         val normalized = when {
             lower.startsWith("http://localhost") || lower.startsWith("http://127.0.0.1") -> DEFAULT_SERVER_URL
-            lower.startsWith("http://konvict-artz.onrender.com") -> trimmed.replaceFirst("http://", "https://")
+            lower.startsWith("http://konvict-artz.up.railway.app") -> trimmed.replaceFirst("http://", "https://")
             lower.startsWith("http://www.konvict-artz.com") -> trimmed.replaceFirst("http://", "https://")
             lower.startsWith("http://konvict-artz.com") -> trimmed.replaceFirst("http://", "https://")
             isPrivateLanHost(host) && port == 4000 -> trimmed.replace(":4000", ":3001")
             else -> trimmed
         }
         return when {
-            normalized.equals("https://konvict-artz.onrender.com", ignoreCase = true) -> DEFAULT_SERVER_URL
-            normalized.equals("http://konvict-artz.onrender.com", ignoreCase = true) -> DEFAULT_SERVER_URL
+            normalized.equals("https://konvict-artz.up.railway.app", ignoreCase = true) -> DEFAULT_SERVER_URL
+            normalized.equals("http://konvict-artz.up.railway.app", ignoreCase = true) -> DEFAULT_SERVER_URL
             normalized.equals("https://www.konvict-artz.com", ignoreCase = true) -> "https://www.konvict-artz.com/api"
             normalized.equals("https://konvict-artz.com", ignoreCase = true) -> "https://konvict-artz.com/api"
-            normalized.startsWith("https://konvict-artz.onrender.com/", ignoreCase = true) &&
+            normalized.startsWith("https://konvict-artz.up.railway.app/", ignoreCase = true) &&
                 !normalized.contains("/api", ignoreCase = true) -> DEFAULT_SERVER_URL
             normalized.startsWith("https://www.konvict-artz.com/", ignoreCase = true) &&
                 !normalized.contains("/api", ignoreCase = true) -> "https://www.konvict-artz.com/api"
@@ -11687,7 +11687,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val EXTRA_SMS_TOKEN = "sms_token"
         const val EXTRA_ASSISTANT_SURFACE = "assistant_surface"
         const val EXTRA_ASSISTANT_CALLER = "assistant_caller"
-        const val DEFAULT_SERVER_URL = "https://konvict-artz.onrender.com/api"
+        const val DEFAULT_SERVER_URL = "https://YOUR_RAILWAY_URL/api"
         const val DEFAULT_VOSK_MODEL_ASSET = "model-en-us"
         const val DEFAULT_VOSK_WAKE_PHRASE = "hey dex"
         const val ASSISTANT_SURFACE_WAKE = "wake"

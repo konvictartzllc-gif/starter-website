@@ -5,7 +5,7 @@ This is the short list of items that still block a confident launch. If an item 
 ## 1. Freeze And Deploy The Current Build
 
 - [ ] Commit and push the current Android, backend, and web changes
-- [ ] Redeploy Render backend
+- [ ] Redeploy Railway backend
 - [ ] Redeploy Vercel frontend
 - [ ] Confirm the live backend and web are running the same feature set
 
@@ -16,7 +16,7 @@ Why this is first:
 
 ## 2. Re-Check Live Diagnostics
 
-- [ ] Open `https://konvict-artz.onrender.com/api/diagnostics/providers`
+- [ ] Open `https://YOUR_RAILWAY_URL/api/diagnostics/providers`
 - [ ] Confirm:
   - `ai.ready = true`
   - `email.ready = true`
@@ -79,7 +79,7 @@ Launch rule:
 ## 6. Prove Android Core Experience On A Clean Install
 
 - [ ] Install the current Android build fresh
-- [ ] Point it to `https://konvict-artz.onrender.com/api`
+- [ ] Point it to `https://YOUR_RAILWAY_URL/api`
 - [ ] Log in successfully
 - [ ] Test Dex voice
 - [ ] Test wake mode

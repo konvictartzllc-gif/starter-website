@@ -6,7 +6,7 @@ This is the longer deployment guide for the current Dex backend.
 
 You should have:
 
-- a Render account
+- a Railway account (https://railway.app)
 - access to your GitHub repo
 - Stripe keys and webhook secret
 - OpenAI key
@@ -15,18 +15,19 @@ You should have:
 
 ## Backend service settings
 
-Create a Render web service with:
+Create a Railway service connected to this GitHub repo with:
 
-- **Name:** `konvict-artz-backend`
-- **Environment:** `Node`
 - **Root Directory:** `server`
 - **Build Command:** `npm install`
 - **Start Command:** `node src/index.js`
 
-The Render config files in this repo are:
+The Railway config file for this service is:
 
-- [render.yaml](./render.yaml)
-- [server/render.yaml](./server/render.yaml)
+- [server/railway.toml](./server/railway.toml)
+
+Railway injects `PORT` automatically — do not set it manually.
+
+For SQLite persistence, add a Railway Volume and mount it at `/data`. Then set `DB_PATH=/data/konvict.db` in the service environment variables.
 
 ## Required environment variables
 
@@ -36,10 +37,11 @@ At minimum, set:
 
 ```env
 NODE_ENV=production
-PORT=3001
 PUBLIC_SITE_URL=https://www.konvict-artz.com
 CLIENT_ORIGIN=https://www.konvict-artz.com
 ALLOWED_ORIGINS=https://www.konvict-artz.com,https://konvict-artz.com
+
+DB_PATH=/data/konvict.db
 
 JWT_SECRET=...
 ADMIN_EMAIL=...
@@ -80,10 +82,10 @@ RC_SERVER=https://platform.ringcentral.com
 
 After deployment, test these routes:
 
-- `https://YOUR_RENDER_URL/`
-- `https://YOUR_RENDER_URL/health`
-- `https://YOUR_RENDER_URL/api/health`
-- `https://YOUR_RENDER_URL/api/diagnostics/providers`
+- `https://YOUR_RAILWAY_URL/`
+- `https://YOUR_RAILWAY_URL/health`
+- `https://YOUR_RAILWAY_URL/api/health`
+- `https://YOUR_RAILWAY_URL/api/diagnostics/providers`
 
 Expected baseline:
 
@@ -100,12 +102,12 @@ Important:
 
 Your frontend should send `/api/*` to the deployed backend.
 
-If you use a Vercel rewrite, the destination should look like:
+If you use a Vercel rewrite, update `client/vercel.json` so the destination looks like:
 
 ```json
 {
   "source": "/api/:path*",
-  "destination": "https://YOUR_RENDER_URL/api/:path*"
+  "destination": "https://YOUR_RAILWAY_URL/api/:path*"
 }
 ```
 
@@ -148,26 +150,26 @@ This helps you confirm:
 For the Android companion:
 
 1. build/install from [android-app/](./android-app/)
-2. point the app to the live backend URL
+2. point the app to the live Railway backend URL
 3. test login, permissions, caller announce, voice, and billing-related access
 
 ## Common pitfalls
 
-- wrong Render service URL
-- Render service deployed from the repo root instead of `server`
+- wrong Railway service URL
+- Railway service deployed from the repo root instead of `server` (set Root Directory to `server` in the dashboard)
 - old env names like `ADMIN_USERNAME`
 - old Square-era env names instead of Stripe keys
-- Vercel still pointing `/api/*` at an old backend
-- environment variables added to the wrong Render service
+- Vercel still pointing `/api/*` at the old Render backend URL
+- environment variables added to the wrong Railway service
 - environment variables not saved before redeploy
 - assuming `/health` means auth and Stripe are ready
+- forgetting to add a Railway Volume for SQLite persistence
 
 ## Current source of truth
 
 If any document disagrees with code, trust these first:
 
 - [server/.env.example](./server/.env.example)
-- [render.yaml](./render.yaml)
-- [server/render.yaml](./server/render.yaml)
+- [server/railway.toml](./server/railway.toml)
 - [server/src/index.js](./server/src/index.js)
 - [server/src/routes/payments.js](./server/src/routes/payments.js)

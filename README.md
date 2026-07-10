@@ -114,16 +114,17 @@ Useful backend URLs:
 
 ### Backend
 
-Use Render with:
+Use Railway with:
 
-- repo root config: [render.yaml](./render.yaml)
-- or service config: [server/render.yaml](./server/render.yaml)
+- service config: [server/railway.toml](./server/railway.toml)
 
 Important:
 
 - Root Directory: `server`
 - Build Command: `npm install`
 - Start Command: `node src/index.js`
+- Railway injects `PORT` automatically
+- Add a Railway Volume at `/data` for SQLite persistence
 
 ### Frontend
 
@@ -155,8 +156,7 @@ This gives a quick launch-readiness snapshot for:
 - Older docs in this repo used Square naming and older auth fields. The current product uses Stripe and `ADMIN_EMAIL`.
 - If a doc conflicts with current code, trust:
   - [server/.env.example](./server/.env.example)
-  - [render.yaml](./render.yaml)
-  - [server/render.yaml](./server/render.yaml)
+  - [server/railway.toml](./server/railway.toml)
   - [server/src/index.js](./server/src/index.js)
 
 ## Related Docs
