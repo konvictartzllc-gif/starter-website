@@ -1,0 +1,15 @@
+name = "worker-autumn-cherry-0533"
+main = "src/index.js"
+compatibility_date = "2026-07-03"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dex-production"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[assets]
+directory = "./client/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/health", "/oauth/callback"]
