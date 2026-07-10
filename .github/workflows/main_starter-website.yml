@@ -39,6 +39,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
+    # Set repository variable ENABLE_AZURE_DEPLOY=true in GitHub Settings → Secrets and variables → Actions → Variables to enable this job
     if: ${{ vars.ENABLE_AZURE_DEPLOY == 'true' }}
     permissions:
       id-token: write #This is required for requesting the JWT
