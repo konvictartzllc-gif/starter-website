@@ -2,28 +2,33 @@
 
 This is the shortest reliable deployment path for the current Dex stack.
 
-## 1. Backend on Render
+## 1. Backend on Railway
 
-Create or update a Render web service with:
+Create a Railway service connected to this GitHub repo with:
 
-- **Name:** `konvict-artz-backend`
 - **Root Directory:** `server`
 - **Build Command:** `npm install`
 - **Start Command:** `node src/index.js`
 
-Use the current Render config files as reference:
+The Railway config file is:
 
-- [render.yaml](./render.yaml)
-- [server/render.yaml](./server/render.yaml)
+- [server/railway.toml](./server/railway.toml)
 
-## 2. Required Render environment variables
+Railway injects `PORT` automatically — do not set it manually.
+
+For SQLite persistence, add a Railway Volume mounted at `/data` and set `DB_PATH=/data/konvict.db`.
+
+## 2. Required Railway environment variables
 
 Set these before testing:
 
 ```env
+NODE_ENV=production
 PUBLIC_SITE_URL=https://www.konvict-artz.com
 CLIENT_ORIGIN=https://www.konvict-artz.com
 ALLOWED_ORIGINS=https://www.konvict-artz.com,https://konvict-artz.com
+
+DB_PATH=/data/konvict.db
 
 JWT_SECRET=...
 ADMIN_EMAIL=...
@@ -61,10 +66,10 @@ EMERGENCY_PHONE=...
 
 Once deployed, test:
 
-- `https://YOUR_RENDER_URL/`
-- `https://YOUR_RENDER_URL/health`
-- `https://YOUR_RENDER_URL/api/health`
-- `https://YOUR_RENDER_URL/api/diagnostics/providers`
+- `https://YOUR_RAILWAY_URL/`
+- `https://YOUR_RAILWAY_URL/health`
+- `https://YOUR_RAILWAY_URL/api/health`
+- `https://YOUR_RAILWAY_URL/api/diagnostics/providers`
 
 What you want to see:
 
@@ -83,14 +88,12 @@ If `/health` works but `/api/diagnostics/providers` shows missing config, the ap
 
 ## 4. Frontend wiring
 
-Make sure the frontend points `/api/*` to the deployed backend URL.
-
-If you are using Vercel rewrites, the destination should be:
+Update `client/vercel.json` to point `/api/*` to the deployed Railway backend URL:
 
 ```json
 {
   "source": "/api/:path*",
-  "destination": "https://YOUR_RENDER_URL/api/:path*"
+  "destination": "https://YOUR_RAILWAY_URL/api/:path*"
 }
 ```
 
@@ -107,7 +110,7 @@ Once backend health is good and diagnostics no longer show missing core config:
 7. open billing portal
 
 If signup or login fails on live, check `/api/diagnostics/providers` before anything else.
-That route is the fastest way to spot missing Render environment variables.
+That route is the fastest way to spot missing Railway environment variables.
 
 ## 6. Android
 
@@ -115,7 +118,7 @@ For Android testing:
 
 1. open [android-app/](./android-app/) in Android Studio
 2. build/install on your phone
-3. point it to the live backend URL
+3. point it to the live Railway backend URL
 4. test login, permissions, voice, and call flows
 
 ## 7. Reality check
@@ -123,10 +126,7 @@ For Android testing:
 If something disagrees with older docs, trust the current files:
 
 - [server/.env.example](./server/.env.example)
-- [render.yaml](./render.yaml)
-- [server/render.yaml](./server/render.yaml)
+- [server/railway.toml](./server/railway.toml)
 - [server/src/index.js](./server/src/index.js)
 
-Current known live backend URL:
-
-- `https://konvict-artz.onrender.com`
+Current deployment platform: **Railway**

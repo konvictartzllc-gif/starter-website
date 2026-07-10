@@ -1,0 +1,12 @@
+# Root-level Railway config.
+# Use this when the Railway service Root Directory is set to the repository root (not "server").
+# If the Root Directory is set to "server" in the Railway dashboard, use server/railway.toml instead.
+
+[build]
+builder = "nixpacks"
+buildCommand = "cd server && npm install"
+
+[deploy]
+startCommand = "cd server && node src/index.js"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10

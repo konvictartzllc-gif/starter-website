@@ -10,7 +10,7 @@ Last updated: 2026-06-06
   - `node --check server\src\routes\dex.js`
 - Android debug build passes with `.\gradlew.bat :app:assembleDebug`.
 - Android release App Bundle build passes with `.\gradlew.bat :app:bundleRelease`.
-- Live Render diagnostics are green at `https://konvict-artz.onrender.com/api/diagnostics/providers`:
+- Live Railway diagnostics are green at `https://YOUR_RAILWAY_URL/api/diagnostics/providers`:
   - AI ready
   - email ready
   - RingCentral ready
@@ -25,7 +25,7 @@ Last updated: 2026-06-06
 ## 2026-06-06 Immediate Launch Order
 
 1. Commit and push the current web/server polish and Dex voice/media fixes.
-2. Redeploy Render backend and Vercel frontend so production matches this workspace.
+2. Redeploy Railway backend and Vercel frontend so production matches this workspace.
 3. Repeat live diagnostics after deploy.
 4. Run production proof tests with real accounts:
    - fresh signup/login
@@ -46,8 +46,8 @@ Last updated: 2026-06-06
   - `/health` returns `ok`.
   - `/api/diagnostics/providers` returns core providers ready with the local environment.
   - RingCentral remains not ready in the local smoke result.
-- Frontend production API wiring points to `https://konvict-artz.onrender.com/api`.
-- Android default backend points to `https://konvict-artz.onrender.com/api`.
+- Frontend production API wiring points to `https://YOUR_RAILWAY_URL/api`.
+- Android default backend points to `https://YOUR_RAILWAY_URL/api`.
 - Removed the hardcoded fallback admin email/password from `server/src/index.js`.
 
 ## Build Artifacts Created
@@ -61,15 +61,16 @@ Last updated: 2026-06-06
 
 These require accounts, production credentials, a real phone, or app-store access.
 
-1. Render backend
-   - Add/confirm all production environment variables in the correct Render service.
+1. Railway backend
+   - Add/confirm all production environment variables in the correct Railway service.
    - Redeploy the backend.
-   - Open `https://konvict-artz.onrender.com/api/diagnostics/providers`.
+   - Open `https://YOUR_RAILWAY_URL/api/diagnostics/providers`.
    - Confirm core systems are green: AI, JWT secret, admin email/password, site URL/origin, Stripe.
 
 2. Vercel frontend
+   - Update `client/vercel.json` to point `/api/*` at the Railway backend URL.
    - Redeploy the frontend.
-   - Confirm `https://www.konvict-artz.com/api/health` reaches the Render backend.
+   - Confirm `https://www.konvict-artz.com/api/health` reaches the Railway backend.
 
 3. Production account proof
    - Create a brand-new user.
@@ -106,4 +107,4 @@ These require accounts, production credentials, a real phone, or app-store acces
 
 ## Current Code-Level Launch Note
 
-`server/src/index.js` now refuses to start unless `ADMIN_EMAIL` and `ADMIN_PASSWORD` are configured. This is intentional for launch safety. If Render fails after this change, add those variables to the live service and redeploy.
+`server/src/index.js` now refuses to start unless `ADMIN_EMAIL` and `ADMIN_PASSWORD` are configured. This is intentional for launch safety. If Railway fails after this change, add those variables to the live service and redeploy.
