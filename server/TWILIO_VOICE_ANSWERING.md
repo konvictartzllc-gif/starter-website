@@ -4,10 +4,10 @@ This is the phone-free answering-machine path. Calls must be forwarded to a Twil
 
 ## Environment Variables
 
-Set these on Render:
+Set these on Railway:
 
 ```text
-PUBLIC_API_URL=https://konvict-artz.onrender.com
+PUBLIC_API_URL=https://konvict-artz-backend-production.up.railway.app
 TWILIO_VOICE_WEBHOOK_TOKEN=make-a-long-random-secret
 DEX_TWILIO_OWNER_EMAIL=your-admin-email@example.com
 ```
@@ -19,13 +19,13 @@ DEX_TWILIO_OWNER_EMAIL=your-admin-email@example.com
 In Twilio, set the phone number voice webhook to one of these:
 
 ```text
-https://konvict-artz.onrender.com/api/twilio/voice?token=YOUR_TOKEN_HERE
+https://konvict-artz-backend-production.up.railway.app/api/twilio/voice?token=YOUR_TOKEN_HERE
 ```
 
 or, for a user-specific route:
 
 ```text
-https://konvict-artz.onrender.com/api/twilio/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
+https://konvict-artz-backend-production.up.railway.app/api/twilio/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
 ```
 
 Use:
@@ -63,7 +63,7 @@ Each route receives a unique `routeKey`. Use that `routeKey` in the webhook URL 
 RingCentral-compatible alias:
 
 ```text
-https://konvict-artz.onrender.com/api/ringcentral/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
+https://konvict-artz-backend-production.up.railway.app/api/ringcentral/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
 ```
 
 ## Phone Forwarding

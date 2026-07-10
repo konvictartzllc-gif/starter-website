@@ -114,16 +114,10 @@ Useful backend URLs:
 
 ### Backend
 
-Use Render with:
+Use the live Railway backend:
 
-- repo root config: [render.yaml](./render.yaml)
-- or service config: [server/render.yaml](./server/render.yaml)
-
-Important:
-
-- Root Directory: `server`
-- Build Command: `npm install`
-- Start Command: `node src/index.js`
+- Live backend URL: `https://konvict-artz-backend-production.up.railway.app`
+- API base URL: `https://konvict-artz-backend-production.up.railway.app/api`
 
 ### Frontend
 
@@ -155,8 +149,6 @@ This gives a quick launch-readiness snapshot for:
 - Older docs in this repo used Square naming and older auth fields. The current product uses Stripe and `ADMIN_EMAIL`.
 - If a doc conflicts with current code, trust:
   - [server/.env.example](./server/.env.example)
-  - [render.yaml](./render.yaml)
-  - [server/render.yaml](./server/render.yaml)
   - [server/src/index.js](./server/src/index.js)
 
 ## Related Docs
