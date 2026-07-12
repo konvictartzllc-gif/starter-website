@@ -30,3 +30,10 @@ android-app/.gradle-user-home/
 android-app/.idea/
 android-app/build/
 android-app/local.properties
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
