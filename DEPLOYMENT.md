@@ -6,27 +6,25 @@ This is the longer deployment guide for the current Dex backend.
 
 You should have:
 
-- a Render account
+- a Railway account
 - access to your GitHub repo
 - Stripe keys and webhook secret
 - OpenAI key
 - SMTP credentials if you want email features live
-- RingCentral credentials if you want live telephony features
+- Twilio/new communications provider credentials if you want live telephony features
 
 ## Backend service settings
 
-Create a Render web service with:
+Create a Railway service with:
 
 - **Name:** `konvict-artz-backend`
-- **Environment:** `Node`
 - **Root Directory:** `server`
 - **Build Command:** `npm install`
 - **Start Command:** `node src/index.js`
 
-The Render config files in this repo are:
+The deployment config file in this repo is:
 
-- [render.yaml](./render.yaml)
-- [server/render.yaml](./server/render.yaml)
+- [server/railway.json](./server/railway.json)
 
 ## Required environment variables
 
@@ -68,22 +66,20 @@ SMTP_PASS=...
 SENDER_EMAIL=...
 SENDER_NAME=Konvict Artz
 
-RC_CLIENT_ID=...
-RC_CLIENT_SECRET=...
-RC_USERNAME=...
-RC_PASSWORD=...
-RC_PHONE_NUMBER=...
-RC_SERVER=https://platform.ringcentral.com
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_FROM_NUMBER=...
+TWILIO_VOICE_WEBHOOK_TOKEN=...
 ```
 
 ## Verify the deployed backend
 
 After deployment, test these routes:
 
-- `https://YOUR_RENDER_URL/`
-- `https://YOUR_RENDER_URL/health`
-- `https://YOUR_RENDER_URL/api/health`
-- `https://YOUR_RENDER_URL/api/diagnostics/providers`
+- `https://YOUR_RAILWAY_URL/`
+- `https://YOUR_RAILWAY_URL/health`
+- `https://YOUR_RAILWAY_URL/api/health`
+- `https://YOUR_RAILWAY_URL/api/diagnostics/providers`
 
 Expected baseline:
 
@@ -105,7 +101,7 @@ If you use a Vercel rewrite, the destination should look like:
 ```json
 {
   "source": "/api/:path*",
-  "destination": "https://YOUR_RENDER_URL/api/:path*"
+  "destination": "https://YOUR_RAILWAY_URL/api/:path*"
 }
 ```
 
@@ -138,7 +134,7 @@ This helps you confirm:
 
 - AI status
 - email status
-- RingCentral status
+- Communications provider status
 - Stripe config status
 - site/origin config
 - auth config
@@ -153,12 +149,12 @@ For the Android companion:
 
 ## Common pitfalls
 
-- wrong Render service URL
-- Render service deployed from the repo root instead of `server`
+- wrong Railway service URL
+- Railway service deployed from the repo root instead of `server`
 - old env names like `ADMIN_USERNAME`
 - old Square-era env names instead of Stripe keys
 - Vercel still pointing `/api/*` at an old backend
-- environment variables added to the wrong Render service
+- environment variables added to the wrong Railway service
 - environment variables not saved before redeploy
 - assuming `/health` means auth and Stripe are ready
 
@@ -167,7 +163,6 @@ For the Android companion:
 If any document disagrees with code, trust these first:
 
 - [server/.env.example](./server/.env.example)
-- [render.yaml](./render.yaml)
-- [server/render.yaml](./server/render.yaml)
+- [server/railway.json](./server/railway.json)
 - [server/src/index.js](./server/src/index.js)
 - [server/src/routes/payments.js](./server/src/routes/payments.js)

@@ -3,9 +3,9 @@ import { body, validationResult } from "express-validator";
 import { requireUser, optionalUser } from "../middleware/auth.js";
 import { getDb } from "../db.js";
 import { getAIClient, getAIStatus } from "../services/ai.js";
-import { triggerEmergencyAlert, sendLowInventoryAlert, sendSms, makeCall } from "../services/ringcentral.js";
+import { triggerEmergencyAlert, sendSms } from "../services/communications.js";
 import {
-        PROVIDER_RINGCENTRAL,
+        PROVIDER_TWILIO_VOICE,
         getUserIntegrationRoutes,
         upsertUserIntegrationRoute,
         normalizePhoneNumber,
@@ -16,6 +16,8 @@ import { sendCustomEmail } from "../services/email.js";
 import { detectTone } from "../services/toneDetection.js";
 import { getToneInstruction, styleResponse } from "../services/responseStyler.js";
 import { buildSupportReply, detectSafetySignal } from "../services/safetySignals.js";
+import { dexIntentEngine } from "../services/dexIntentEngine.js";
+import { getPublicApiBaseUrl } from "../deploy.js";
 const router = Router();
 
 const CHAT_MEMORY_RETENTION_DAYS = 3;
@@ -1238,6 +1240,7 @@ router.post("/permissions", requireUser, async (req, res) => {
 router.get("/integrations", requireUser, async (req, res) => {
         const db = getDb();
         const routes = await getUserIntegrationRoutes(db, req.user.id);
+        const publicApiBaseUrl = getPublicApiBaseUrl();
         res.json({
                 integrations: routes.map((route) => ({
                         id: route.id,
@@ -1249,14 +1252,15 @@ router.get("/integrations", requireUser, async (req, res) => {
                         extension: route.extension,
                         permissions: route.permissions_json ? JSON.parse(route.permissions_json) : {},
                         enabled: Boolean(route.enabled),
-                        webhookUrl: `${process.env.PUBLIC_API_URL || process.env.RENDER_EXTERNAL_URL || ""}/api/twilio/voice?token=YOUR_WEBHOOK_TOKEN&route=${route.route_key}`,
+                        webhookUrl: `${publicApiBaseUrl}/api/twilio/voice?token=YOUR_WEBHOOK_TOKEN&route=${route.route_key}`,
                 })),
         });
 });
 
-router.post("/integrations/ringcentral", requireUser, async (req, res) => {
+router.post("/integrations/voice", requireUser, async (req, res) => {
         const db = getDb();
         const userId = req.user.id;
+        const publicApiBaseUrl = getPublicApiBaseUrl();
         const row = await db.get("SELECT permissions FROM user_permissions WHERE user_id = ?", [userId]);
         let permissions = {};
         if (row?.permissions) {
@@ -1270,7 +1274,7 @@ router.post("/integrations/ringcentral", requireUser, async (req, res) => {
         const extension = String(req.body.extension || "").trim();
         const route = await upsertUserIntegrationRoute(db, {
                 userId,
-                provider: PROVIDER_RINGCENTRAL,
+                provider: PROVIDER_TWILIO_VOICE,
                 assignedNumber,
                 extension,
                 permissions: {
@@ -1289,7 +1293,7 @@ router.post("/integrations/ringcentral", requireUser, async (req, res) => {
                         assignedNumber: route.assigned_number,
                         extension: route.extension,
                         enabled: Boolean(route.enabled),
-                        webhookUrl: `${process.env.PUBLIC_API_URL || process.env.RENDER_EXTERNAL_URL || ""}/api/twilio/voice?token=YOUR_WEBHOOK_TOKEN&route=${route.route_key}`,
+                        webhookUrl: `${publicApiBaseUrl}/api/twilio/voice?token=YOUR_WEBHOOK_TOKEN&route=${route.route_key}`,
                 },
         });
 });
@@ -1867,10 +1871,66 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                     return res.status(403).json({ error: "no_access", message: "Start your free 3-day trial or subscribe for $9.99/month." });
               }
 
+              const dexIntent = dexIntentEngine.classify_intent(message, {
+                    detectSensitiveInfo,
+                    detectSafetySignal,
+                    extractWebRequest,
+                    isEmergencyContactAlertRequest,
+              });
+              const dexParameters = dexIntentEngine.extract_parameters(message, dexIntent, {
+                    detectSafetySignal,
+                    extractWebRequest,
+                    userId,
+                    voiceSignals,
+              });
+              const dexRoute = dexIntentEngine.route_to_action(dexIntent, dexParameters);
+              const dexBrain = {
+                    intent: dexIntent.key,
+                    confidence: dexIntent.confidence,
+                    route: dexRoute.name,
+                    actionIntent: dexRoute.actionIntent,
+              };
+              const dexActionResult = await dexIntentEngine.execute_action(dexRoute, dexParameters, {
+                    warn_sensitive_info: async () => ({
+                            reply: SENSITIVE_INFO_WARNING,
+                            warning: "sensitive_info_blocked",
+                    }),
+                    handle_web_request: async ({ webRequest }) => {
+                            try {
+                                    const searchData = webRequest.type === "web"
+                                            ? await fetchDuckDuckGoInstantAnswer(webRequest.query)
+                                            : null;
+                                    const webReply = buildSearchReply(webRequest, searchData);
+                                    await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'user', ?)", [userId, message]);
+                                    await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, webReply.reply]);
+                                    return webReply;
+                            } catch (error) {
+                                    const fallback = webRequest.type === "youtube"
+                                            ? buildSearchReply(webRequest)
+                                            : {
+                                                    reply: `I could not reach live web search right now, but I can still help from what I know. Web search link: https://duckduckgo.com/?q=${encodeURIComponent(webRequest.query)}`,
+                                                    webAction: {
+                                                            type: "web",
+                                                            query: webRequest.query,
+                                                            url: `https://duckduckgo.com/?q=${encodeURIComponent(webRequest.query)}`,
+                                                            error: error?.message || "search_failed",
+                                                    },
+                                            };
+                                    await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'user', ?)", [userId, message]);
+                                    await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, fallback.reply]);
+                                    return fallback;
+                            }
+                    },
+              });
+              if (dexActionResult) {
+                    return res.json({ ...dexActionResult, dexBrain });
+              }
+
                         if (detectSensitiveInfo(message)) {
                                 return res.json({
                                         reply: SENSITIVE_INFO_WARNING,
                                         warning: "sensitive_info_blocked",
+                                        dexBrain,
                                 });
                         }
 
@@ -2079,20 +2139,8 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                     reply = styledReply.text;
                     await db.run("INSERT INTO chat_history (user_id, role, content) VALUES (?, 'assistant', ?)", [userId, reply]);
 
-                        // Auto-learn frequent chat intents.
-                        // Track frequent intents (e.g., schedule, call, remind)
-                        const intentPatterns = [
-                                { key: "schedule", regex: /\b(schedule|book|appointment|set up|add to (my )?calendar)\b/i },
-                                { key: "call", regex: /\b(call|ring|phone|dial)\b/i },
-                                { key: "remind", regex: /\b(remind|reminder|remember to)\b/i },
-                        ];
-                        let matchedIntent = null;
-                        for (const intent of intentPatterns) {
-                                if (intent.regex.test(message)) {
-                                        matchedIntent = intent.key;
-                                        break;
-                                }
-                        }
+                        // Auto-learn frequent chat intents from DexIntentEngine.
+                        const matchedIntent = dexRoute.actionIntent;
                         if (matchedIntent && isPaidSubscriber(user)) {
                                 await ensureMemoryTable(db);
                                 const key = `pref:automation_count:${matchedIntent}`;
@@ -2139,7 +2187,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                         } catch {}
 
                         // Schedule automation
-                        const appointmentIntent = intentPatterns[0].regex.test(message);
+                        const appointmentIntent = matchedIntent === "schedule";
                         if (appointmentIntent && enabledAutomations["schedule"]) {
                                 try {
                                         const startTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -2171,11 +2219,12 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 automationPerformed,
                                 tone: styledReply.meta?.detectedTone || detectedTone || "neutral",
                                 toneStyle: styledReply.meta?.appliedStyle || "neutral",
+                                dexBrain,
                         });
               } catch (err) {
                     console.error("OpenAI error:", err.message);
                     const fallback = "Dex chat is temporarily unavailable. Please try again in a moment.";
-                    return res.json({ reply: fallback });
+                    return res.json({ reply: fallback, dexBrain });
               }
 });
 

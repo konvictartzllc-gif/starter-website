@@ -4,10 +4,10 @@ This is the phone-free answering-machine path. Calls must be forwarded to a Twil
 
 ## Environment Variables
 
-Set these on Render:
+Set these on Railway:
 
 ```text
-PUBLIC_API_URL=https://konvict-artz.onrender.com
+PUBLIC_API_URL=https://your-backend.up.railway.app
 TWILIO_VOICE_WEBHOOK_TOKEN=make-a-long-random-secret
 DEX_TWILIO_OWNER_EMAIL=your-admin-email@example.com
 ```
@@ -19,13 +19,13 @@ DEX_TWILIO_OWNER_EMAIL=your-admin-email@example.com
 In Twilio, set the phone number voice webhook to one of these:
 
 ```text
-https://konvict-artz.onrender.com/api/twilio/voice?token=YOUR_TOKEN_HERE
+https://your-backend.up.railway.app/api/twilio/voice?token=YOUR_TOKEN_HERE
 ```
 
 or, for a user-specific route:
 
 ```text
-https://konvict-artz.onrender.com/api/twilio/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
+https://your-backend.up.railway.app/api/twilio/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
 ```
 
 Use:
@@ -39,7 +39,7 @@ HTTP POST
 Dex now supports shared provider accounts without mixing calls. Assign every user a route from the admin API:
 
 ```text
-POST /api/admin/integrations/ringcentral/assign
+POST /api/admin/integrations/voice/assign
 ```
 
 Body:
@@ -60,10 +60,16 @@ Body:
 
 Each route receives a unique `routeKey`. Use that `routeKey` in the webhook URL for that user. Dex also tries to resolve calls by the dialed `To`/`Called` phone number or extension if the provider sends those fields.
 
-RingCentral-compatible alias:
+Voice route URL:
 
 ```text
-https://konvict-artz.onrender.com/api/ringcentral/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
+https://your-backend.up.railway.app/api/twilio/voice?token=YOUR_TOKEN_HERE&route=USER_ROUTE_KEY
+```
+
+If you attach a Railway volume for SQLite, point `DB_PATH` at that mount, for example:
+
+```text
+/app/data/konvict.db
 ```
 
 ## Phone Forwarding

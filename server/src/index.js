@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { getJwtSecret, requireJwtSecret } from "./config.js";
 import { initDb } from "./db.js";
 import { getEmailStatus, initEmail } from "./services/email.js";
-import { exchangeRingCentralOAuthCode, getRingCentralStatus, initRingCentral } from "./services/ringcentral.js";
+import { getCommunicationsStatus, initCommunications } from "./services/communications.js";
 import { getAIStatus, initAI } from "./services/ai.js";
 import authRoutes from "./routes/auth.js";
 import dexRoutes from "./routes/dex.js";
@@ -16,6 +16,7 @@ import adminRoutes from "./routes/admin.js";
 import affiliateRoutes from "./routes/affiliate.js";
 import twilioVoiceRoutes from "./routes/twilioVoice.js";
 import bookingRoutes from "./routes/bookings.js";
+import { getDefaultDbPath } from "./deploy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -28,7 +29,9 @@ const defaultOrigins = [
   "https://starter-website-git-dex-v2-patches-konvict-artz.vercel.app",
   "https://www.konvict-artz.com",
   "https://konvict-artz.com",
-  "https://konvictartz.com"
+  "https://konvictartz.com",
+  "http://localhost:3000",
+  "http://localhost:5173"
 ];
 const configuredOrigins = [
   process.env.CLIENT_ORIGIN,
@@ -106,11 +109,12 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error("Not allowed by CORS"), false);
   },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
 }));
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use("/api/twilio", express.urlencoded({ extended: false }));
-app.use("/api/ringcentral", express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 // Rate limiting
@@ -139,7 +143,6 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/affiliate", affiliateRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/twilio/voice", twilioVoiceRoutes);
-app.use("/api/ringcentral/voice", twilioVoiceRoutes);
 
 // Health check
 app.get("/", (req, res) => {
@@ -165,55 +168,11 @@ app.get("/api", (req, res) => {
 });
 app.get("/health", (req, res) => res.json({ status: "ok", service: "Konvict Artz - Dex AI Backend" }));
 app.get("/api/health", (req, res) => res.json({ status: "ok", service: "Konvict Artz - Dex AI Backend" }));
-app.get("/oauth/callback", (req, res) => {
-  const hasCode = typeof req.query.code === "string" && req.query.code.trim().length > 0;
-  const error = typeof req.query.error === "string" ? req.query.error : null;
-  const state = typeof req.query.state === "string" ? req.query.state : null;
-
-  if (!error && hasCode) {
-    exchangeRingCentralOAuthCode({ code: req.query.code, state })
-      .then((result) => {
-        res.json({
-          status: "ok",
-          provider: "ringcentral",
-          message: "RingCentral is connected to Dex.",
-          hasCode: true,
-          ready: result.ready,
-          authMode: result.authMode,
-          redirectUri: result.redirectUri,
-        });
-      })
-      .catch((err) => {
-        res.status(400).json({
-          status: "error",
-          provider: "ringcentral",
-          message: "Dex reached the RingCentral callback but could not finish OAuth.",
-          error: err?.message || "RingCentral OAuth failed.",
-          hasCode: true,
-          state,
-        });
-      });
-    return;
-  }
-
-  res.status(error ? 400 : 200).json({
-    status: error ? "error" : "ok",
-    provider: "ringcentral",
-    message: error
-      ? "RingCentral returned an OAuth error."
-      : hasCode
-        ? "RingCentral OAuth callback reached Dex. JWT auth is still used for server-side RingCentral actions."
-        : "RingCentral OAuth callback is reachable.",
-    hasCode,
-    error,
-    state,
-  });
-});
 app.get("/api/diagnostics/providers", (req, res) => {
   const providers = {
     ai: getAIStatus(),
     email: getEmailStatus(),
-    ringcentral: getRingCentralStatus(),
+    communications: getCommunicationsStatus(),
     stripe: getStripeStatus(),
   };
   const launch = getLaunchConfigStatus();
@@ -225,7 +184,7 @@ app.get("/api/diagnostics/providers", (req, res) => {
     summary: {
       providersConfigured: providerReadiness,
       coreProvidersReady: providerOperational,
-      ringcentralReady: providers.ringcentral.ready,
+      communicationsReady: providers.communications.ready,
       publicSiteUrlSet: launch.site.publicSiteUrlStatus.configured,
       clientOriginSet: launch.site.clientOriginStatus.configured,
     },
@@ -234,7 +193,7 @@ app.get("/api/diagnostics/providers", (req, res) => {
     environment: {
       nodeEnv: process.env.NODE_ENV || "development",
       port: PORT,
-      dbPath: process.env.DB_PATH || path.join(__dirname, "../../data/konvict.db"),
+      dbPath: getDefaultDbPath(path.join(__dirname, "..")),
     },
   });
 });
@@ -243,7 +202,7 @@ app.get("/api/diagnostics/providers", (req, res) => {
 async function checkInventoryAlerts() {
   try {
     const { getDb } = await import("./db.js");
-    const { sendLowInventoryAlert } = await import("./services/ringcentral.js");
+    const { sendLowInventoryAlert } = await import("./services/communications.js");
     const db = getDb();
     const lowItems = await db.all(
       "SELECT * FROM inventory WHERE quantity <= low_threshold AND alerted = 0"
@@ -263,7 +222,7 @@ async function checkInventoryAlerts() {
 // ── Start server ──────────────────────────────────────────────────────────────
 async function start() {
   requireJwtSecret();
-  const dbPath = process.env.DB_PATH || path.join(__dirname, "../../data/konvict.db");
+  const dbPath = getDefaultDbPath(path.join(__dirname, ".."));
   const adminUsername = process.env.ADMIN_EMAIL?.trim();
   const adminPassword = process.env.ADMIN_PASSWORD?.trim();
 
@@ -273,7 +232,7 @@ async function start() {
 
   await initDb({ dbPath, adminUsername, adminPassword });
   initEmail();
-  await initRingCentral();
+  initCommunications();
   await initAI();
 
   // Check inventory every hour
@@ -283,7 +242,7 @@ async function start() {
     console.log(`\n🚀 Konvict Artz - Dex AI Backend running on port ${PORT}`);
     console.log(`   Admin login: ${adminUsername}`);
     console.log(`   Health: http://localhost:${PORT}/health`);
-    console.log(`   Provider status: AI=${getAIStatus().reason}, Email=${getEmailStatus().reason}, RingCentral=${getRingCentralStatus().reason}\n`);
+    console.log(`   Provider status: AI=${getAIStatus().reason}, Email=${getEmailStatus().reason}, Communications=${getCommunicationsStatus().reason}\n`);
   });
 }
 

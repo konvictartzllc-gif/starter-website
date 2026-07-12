@@ -15,13 +15,12 @@ This file is now a current-state summary, not the older Square-era launch note.
 
 ### Live backend
 
-Verified on Render:
+Verified on Railway:
 
-- `https://konvict-artz.onrender.com/health` works
-- the current live backend URL is `https://konvict-artz.onrender.com`
-- the deployed service is the Dex backend, not the wrong app
+- `https://YOUR_RAILWAY_URL/health` should return `ok`
+- the deployed service should be the Dex backend, not the wrong app
 
-Not yet verified on Render:
+Not yet verified on Railway:
 
 - signup
 - login
@@ -35,19 +34,19 @@ Latest local diagnostics showed:
 - AI: `ok`
 - Email: `ok`
 - Stripe: `ok`
-- RingCentral: `network_error`
+- Communications provider: `not_configured`
 
 That means:
 
 - core config is in much better shape
 - Stripe keys are present
 - email config is present
-- RingCentral is still the provider that needs follow-up in a real deployed environment
+- Communications provider credentials still need follow-up in a real deployed environment
 
 Latest live diagnostics showed:
 
 - health is green
-- Render environment variables are still missing from the running service
+- Railway environment variables are still missing from the running service
 - JWT/admin/site/Stripe/OpenAI values are not yet visible to the live process
 
 That means the live backend can boot but still fail on signup, login, and billing.
@@ -86,9 +85,9 @@ Still best treated as final-device validation items:
 
 ## Current launch blockers
 
-1. Render environment variables must be present in the live `konvict-artz.onrender.com` service
+1. Railway environment variables must be present in the live service
 2. live Stripe payment proof still needs to be completed
-3. RingCentral live connectivity still needs follow-up
+3. Communications provider live connectivity still needs follow-up
 
 ## Current source of truth
 
@@ -96,6 +95,5 @@ When in doubt, trust:
 
 - [README.md](./README.md)
 - [DEPLOY_NOW.md](./DEPLOY_NOW.md)
-- [render.yaml](./render.yaml)
-- [server/render.yaml](./server/render.yaml)
+- [server/railway.json](./server/railway.json)
 - [server/.env.example](./server/.env.example)

@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # Dex AI Platform - Production Deployment Script (PowerShell)
-# This script guides you through deploying to Render + Vercel
+# This script guides you through deploying to Railway + Vercel
 
 Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║     DEX AI PLATFORM - PRODUCTION DEPLOYMENT HELPER             ║" -ForegroundColor Cyan
@@ -13,33 +13,34 @@ $JWT_SECRET = node -e "console.log(require('crypto').randomBytes(32).toString('h
 Write-Host "✓ Generated JWT_SECRET: $($JWT_SECRET.Substring(0, 20))..." -ForegroundColor Green
 Write-Host ""
 
-# Show Render deployment instructions
-Write-Host "📋 Step 2: Deploy to Render (Manual)" -ForegroundColor Blue
+# Show Railway deployment instructions
+Write-Host "📋 Step 2: Deploy to Railway (Manual)" -ForegroundColor Blue
 Write-Host ""
 Write-Host "Follow these steps:"
-Write-Host "  1. Go to https://render.com/dashboard"
-Write-Host "  2. Click 'New +' → 'Web Service'"
+Write-Host "  1. Go to https://railway.app/dashboard"
+Write-Host "  2. Create/select your project and service"
 Write-Host "  3. Connect: $(git config --get remote.origin.url)"
 Write-Host "  4. Settings:"
 Write-Host "     - Name: konvict-artz-dex-api"
 Write-Host "     - Runtime: Node"
+Write-Host "     - Root Directory: server"
 Write-Host "     - Build: npm install"
 Write-Host "     - Start: node src/index.js"
-Write-Host "     - Plan: Free"
-Write-Host "  5. Click 'Create Web Service'"
+Write-Host "  5. Deploy the service"
 Write-Host ""
 Write-Host "⏳ Wait for deployment to complete (2-3 minutes)..." -ForegroundColor Yellow
 Write-Host ""
 
 # Show environment variables
-Write-Host "📋 Step 3: Add Environment Variables in Render" -ForegroundColor Blue
+Write-Host "📋 Step 3: Add Environment Variables in Railway" -ForegroundColor Blue
 Write-Host ""
-Write-Host "In Render Dashboard → Settings → Environment, add:" -ForegroundColor Green
+Write-Host "In Railway service variables, add:" -ForegroundColor Green
 Write-Host ""
 Write-Host "JWT_SECRET=$JWT_SECRET"
+Write-Host "PUBLIC_API_URL=https://YOUR_RAILWAY_URL"
 Write-Host "CLIENT_ORIGIN=https://www.konvict-artz.com"
-Write-Host "ADMIN_USERNAME=KonvictArtz"
-Write-Host "ADMIN_PASSWORD=K0nv1ctArtz2026Launch"
+Write-Host "ADMIN_EMAIL=owner@example.com"
+Write-Host "ADMIN_PASSWORD=replace_with_real_password"
 Write-Host "DEX_PRICE_CENTS=999"
 Write-Host "DEX_CURRENCY=USD"
 Write-Host ""
@@ -48,34 +49,33 @@ Write-Host "OPENAI_API_KEY=sk-your-key-here"
 Write-Host "SMTP_HOST=smtp.gmail.com"
 Write-Host ""
 
-# Get Render URL from user
-Write-Host "📋 Step 4: Get Your Render Backend URL" -ForegroundColor Blue
+# Get Railway URL from user
+Write-Host "📋 Step 4: Get Your Railway Backend URL" -ForegroundColor Blue
 Write-Host ""
-Write-Host "After Render deployment completes:"
-Write-Host "  1. Go to https://render.com/dashboard"
-Write-Host "  2. Click 'konvict-artz-dex-api' service"
-Write-Host "  3. Copy the URL (e.g., https://xxxx-xxxx-xxxx.onrender.com)"
+Write-Host "After Railway deployment completes:"
+Write-Host "  1. Open your Railway service"
+Write-Host "  2. Copy the public URL (e.g., https://xxxx.up.railway.app)"
 Write-Host ""
-$RENDER_URL = Read-Host "Paste your Render URL here"
+$RAILWAY_URL = Read-Host "Paste your Railway URL here"
 
-if ([string]::IsNullOrEmpty($RENDER_URL)) {
-    Write-Host "❌ Error: Render URL is empty" -ForegroundColor Red
+if ([string]::IsNullOrEmpty($RAILWAY_URL)) {
+    Write-Host "❌ Error: Railway URL is empty" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "✓ Render URL: $RENDER_URL" -ForegroundColor Green
+Write-Host "✓ Railway URL: $RAILWAY_URL" -ForegroundColor Green
 Write-Host ""
 
 # Update vercel.json
 Write-Host "📋 Step 5: Wire Backend to Vercel" -ForegroundColor Blue
 Write-Host ""
-Write-Host "Updating vercel.json with Render backend URL..."
+Write-Host "Updating vercel.json with Railway backend URL..."
 
 $vercelJson = @{
     rewrites = @(
         @{
             source = "/api/:path*"
-            destination = "$RENDER_URL/api/:path*"
+            destination = "$RAILWAY_URL/api/:path*"
         }
     )
     routes = @(
@@ -86,14 +86,14 @@ $vercelJson = @{
     )
 } | ConvertTo-Json -Depth 10
 
-Set-Content -Path "vercel.json" -Value $vercelJson
+Set-Content -Path "client/vercel.json" -Value $vercelJson
 Write-Host "✓ vercel.json updated" -ForegroundColor Green
 Write-Host ""
 
 # Push to GitHub
 Write-Host "📋 Step 6: Push to GitHub" -ForegroundColor Blue
 git add -A
-git commit -m "deploy: Wire Render backend to Vercel frontend"
+git commit -m "deploy: Wire Railway backend to Vercel frontend"
 git push origin main
 Write-Host "✓ Pushed to GitHub" -ForegroundColor Green
 Write-Host ""
@@ -110,7 +110,7 @@ Write-Host ""
 Write-Host "📋 Step 8: Test Live Endpoints" -ForegroundColor Blue
 Write-Host ""
 Write-Host "Test backend health:" -ForegroundColor Green
-Write-Host "  curl $RENDER_URL/api/health" -ForegroundColor Yellow
+Write-Host "  curl $RAILWAY_URL/api/health" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Expected response: {""ok"": true}" -ForegroundColor Cyan
 Write-Host ""
@@ -123,15 +123,15 @@ Write-Host ""
 
 Write-Host "📊 Final Status:" -ForegroundColor Cyan
 Write-Host "  ✅ Frontend: https://www.konvict-artz.com" -ForegroundColor Green
-Write-Host "  ✅ Backend: $RENDER_URL" -ForegroundColor Green
+Write-Host "  ✅ Backend: $RAILWAY_URL" -ForegroundColor Green
 Write-Host "  ✅ Voice Chat: Ready (Chrome/Edge)" -ForegroundColor Green
 Write-Host "  ✅ Trial System: Active" -ForegroundColor Green
 Write-Host "  ✅ Payments: Ready" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "🚀 Next Actions:" -ForegroundColor Yellow
-Write-Host "  • Wait 2-3 minutes for Render to deploy"
+Write-Host "  • Wait 2-3 minutes for Railway to deploy"
 Write-Host "  • Visit https://www.konvict-artz.com and register"
 Write-Host "  • Try voice chat: Say 'Hey Dex'"
-Write-Host "  • Monitor logs at https://render.com/dashboard"
+Write-Host "  • Monitor logs at https://railway.app/dashboard"
 Write-Host ""

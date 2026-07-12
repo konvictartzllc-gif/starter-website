@@ -7,7 +7,15 @@ function normalizeApiBase(value) {
   return raw;
 }
 
-const BASE = normalizeApiBase(import.meta.env.VITE_API_URL || "https://konvict-artz-api.konvictartzllc.workers.dev");
+function shouldUseSameOriginApi() {
+  if (typeof window === "undefined") return false;
+  const host = String(window.location.hostname || "").toLowerCase();
+  return host === "www.konvict-artz.com" || host === "konvict-artz.com";
+}
+
+const BASE = shouldUseSameOriginApi()
+  ? "/api"
+  : normalizeApiBase(import.meta.env.VITE_API_URL || "https://konvict-artz-api.konvictartzllc.workers.dev");
 
 function getToken() {
   return localStorage.getItem("dex_token");
@@ -105,7 +113,7 @@ export const api = {
   getPermissions: () => request("/dex/permissions"),
   setPermissions: (permissions) => request("/dex/permissions", { method: "POST", body: JSON.stringify({ permissions }) }),
   getIntegrations: () => request("/dex/integrations"),
-  saveRingCentralRoute: (body) => request("/dex/integrations/ringcentral", { method: "POST", body: JSON.stringify(body) }),
+  saveVoiceRoute: (body) => request("/dex/integrations/voice", { method: "POST", body: JSON.stringify(body) }),
 
   // User Memory
   getMemory: () => request("/dex/memory"),
@@ -126,6 +134,7 @@ export const api = {
 
   // Affiliate
   getAffiliateDashboard: () => request("/affiliate/dashboard"),
+  requestAffiliateCashout: (body) => request("/affiliate/cashout", { method: "POST", body: JSON.stringify(body) }),
   downloadAffiliateAndroid: () => download("/affiliate/android/download", "Dex-Assistant.apk"),
 
   // Admin
@@ -147,7 +156,7 @@ export const api = {
   getBookings: () => request("/bookings/admin"),
   updateBooking: (id, body) => request(`/bookings/admin/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   getIntegrationRoutes: () => request("/admin/integrations/routes"),
-  assignRingCentralRoute: (body) => request("/admin/integrations/ringcentral/assign", { method: "POST", body: JSON.stringify(body) }),
+  assignVoiceRoute: (body) => request("/admin/integrations/voice/assign", { method: "POST", body: JSON.stringify(body) }),
   getFeatureFlags: () => request("/admin/feature-flags"),
   updateFeatureFlag: (key, body) => request(`/admin/feature-flags/${key}`, { method: "PATCH", body: JSON.stringify(body) }),
 };

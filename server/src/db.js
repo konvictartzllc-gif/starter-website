@@ -7,6 +7,7 @@
   import path from "path";
   import sqlite3 from "sqlite3";
   import { open } from "sqlite";
+  import { getDefaultDbPath } from "./deploy.js";
 
   let db = null;
 
@@ -24,13 +25,13 @@
       try {
         fs.mkdirSync(dbDir, { recursive: true });
       } catch (err) {
-        if (process.env.NODE_ENV === "production" && resolvedDbPath.startsWith("/data/")) {
-          resolvedDbPath = path.join(process.cwd(), "data", "konvict.db");
+        if (process.env.NODE_ENV === "production") {
+          resolvedDbPath = getDefaultDbPath(process.cwd());
           dbDir = path.dirname(resolvedDbPath);
           fs.mkdirSync(dbDir, { recursive: true });
           console.warn(
             `Persistent DB path ${dbPath} is not writable yet (${err.code || err.message}). ` +
-            `Using temporary DB path ${resolvedDbPath}. Upgrade Render and mount /data before launch.`
+            `Using fallback DB path ${resolvedDbPath}. Configure Railway volume storage and DB_PATH before launch.`
           );
         } else {
           throw err;
@@ -108,6 +109,20 @@
         used_at      TEXT,
         expires_at   TEXT,
         created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS affiliate_payout_requests (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        affiliate_id   INTEGER NOT NULL REFERENCES affiliates(id),
+        user_id        INTEGER NOT NULL REFERENCES users(id),
+        amount         REAL    NOT NULL,
+        payout_method  TEXT    NOT NULL,
+        payout_details TEXT    NOT NULL,
+        status         TEXT    NOT NULL DEFAULT 'pending',
+        notes          TEXT,
+        requested_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+        updated_at     TEXT    NOT NULL DEFAULT (datetime('now'))
       );
     `);
     // ── Inventory ─────────────────────────────────────────────────────────────

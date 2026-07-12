@@ -66,6 +66,15 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputLayout
+import com.konvictartz.dex.core.models.DexIntent
+import com.konvictartz.dex.core.models.DexResponse
+import com.konvictartz.dex.domain.intent.ActionMapper
+import com.konvictartz.dex.domain.usecases.ExecuteDexCommand
+import com.konvictartz.dex.domain.usecases.ProcessVoiceCommand
+import com.konvictartz.dex.features.apps.AppLauncher
+import com.konvictartz.dex.features.apps.MediaController
+import com.konvictartz.dex.features.calls.TwilioCallService
+import com.konvictartz.dex.features.sms.TextBeltService
 import com.konvictartz.dex.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -248,6 +257,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val client = OkHttpClient()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val processVoiceCommand = ProcessVoiceCommand()
+    private val executeDexCommand by lazy {
+        ExecuteDexCommand(
+            appLauncher = AppLauncher(this),
+            mediaController = MediaController(this),
+            callService = TwilioCallService(this),
+            smsService = TextBeltService(this),
+        )
+    }
 
     private var isRegisterMode = false
     private var authToken: String? = null
@@ -6010,19 +6028,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val port = parsedUri?.port ?: -1
         val normalized = when {
             lower.startsWith("http://localhost") || lower.startsWith("http://127.0.0.1") -> DEFAULT_SERVER_URL
-            lower.startsWith("http://konvict-artz.onrender.com") -> trimmed.replaceFirst("http://", "https://")
             lower.startsWith("http://www.konvict-artz.com") -> trimmed.replaceFirst("http://", "https://")
             lower.startsWith("http://konvict-artz.com") -> trimmed.replaceFirst("http://", "https://")
             isPrivateLanHost(host) && port == 4000 -> trimmed.replace(":4000", ":3001")
             else -> trimmed
         }
         return when {
-            normalized.equals("https://konvict-artz.onrender.com", ignoreCase = true) -> DEFAULT_SERVER_URL
-            normalized.equals("http://konvict-artz.onrender.com", ignoreCase = true) -> DEFAULT_SERVER_URL
             normalized.equals("https://www.konvict-artz.com", ignoreCase = true) -> "https://www.konvict-artz.com/api"
             normalized.equals("https://konvict-artz.com", ignoreCase = true) -> "https://konvict-artz.com/api"
-            normalized.startsWith("https://konvict-artz.onrender.com/", ignoreCase = true) &&
-                !normalized.contains("/api", ignoreCase = true) -> DEFAULT_SERVER_URL
             normalized.startsWith("https://www.konvict-artz.com/", ignoreCase = true) &&
                 !normalized.contains("/api", ignoreCase = true) -> "https://www.konvict-artz.com/api"
             normalized.startsWith("https://konvict-artz.com/", ignoreCase = true) &&
@@ -8104,6 +8117,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             clearStalePromptState()
         }
         if (handleImmediateEmergencyCommand(message)) return true
+        val dexCommand = processVoiceCommand(message)
+        when (dexCommand.intent) {
+            DexIntent.OPEN_APP,
+            DexIntent.OPEN_MEDIA -> {
+                val dexResponse = executeDexCommand.execute(dexCommand)
+                if (dexResponse.handled) {
+                    applyDexCommandResponse(dexResponse)
+                    return true
+                }
+            }
+            else -> Unit
+        }
         if (handleTaskIntent(message)) return true
         detectContactOnlyIntent(message)?.let { contact ->
             pendingDetectedContactPhrase = message.trim()
@@ -8115,6 +8140,28 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return true
         }
         return false
+    }
+
+    private fun applyDexCommandResponse(response: DexResponse) {
+        val reply = response.spokenText.ifBlank { return }
+        binding.conversationStatus.text = reply
+        binding.lastReplyValue.text = reply
+        speakDex(reply, R.string.voice_speaking, resumeWakeModeAfterSpeech = true)
+    }
+
+    private fun handleDexOpenAppCommand(target: String): Boolean {
+        val canonicalTarget = ActionMapper.canonicalAppName(target)
+        return when (canonicalTarget.lowercase(Locale.US)) {
+            "youtube" -> {
+                openYoutube(null)
+                true
+            }
+            "youtube music" -> {
+                openYoutubeMusic(target)
+                true
+            }
+            else -> handleAppLaunchIntent("open $canonicalTarget")
+        }
     }
 
     private fun handleDexMiniGameIntent(message: String): Boolean {
@@ -11687,7 +11734,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val EXTRA_SMS_TOKEN = "sms_token"
         const val EXTRA_ASSISTANT_SURFACE = "assistant_surface"
         const val EXTRA_ASSISTANT_CALLER = "assistant_caller"
-        const val DEFAULT_SERVER_URL = "https://konvict-artz.onrender.com/api"
+        const val DEFAULT_SERVER_URL = "https://www.konvict-artz.com/api"
         const val DEFAULT_VOSK_MODEL_ASSET = "model-en-us"
         const val DEFAULT_VOSK_WAKE_PHRASE = "hey dex"
         const val ASSISTANT_SURFACE_WAKE = "wake"

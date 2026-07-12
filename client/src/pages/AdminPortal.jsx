@@ -53,12 +53,6 @@ function buildLaunchChecks(diagnostics) {
       next: "Confirm live secret key, price ID, success/cancel URLs, and webhook secret.",
     },
     {
-      label: "RingCentral calls/SMS",
-      ready: Boolean(providers.ringcentral?.ready),
-      detail: providers.ringcentral?.detail || providers.ringcentral?.reason || "not checked",
-      next: providers.ringcentral?.nextStep || "Connect RingCentral OAuth/JWT and run one live call/SMS test.",
-    },
-    {
       label: "Public site URL",
       ready: Boolean(summary.publicSiteUrlSet || launch.site?.publicSiteUrlStatus?.configured),
       detail: launch.site?.publicSiteUrl || "missing",
@@ -74,7 +68,7 @@ function buildLaunchChecks(diagnostics) {
       label: "Auth secrets",
       ready: Boolean(launch.auth?.jwtSecret?.configured && launch.auth?.adminEmail?.configured && launch.auth?.adminPassword?.configured),
       detail: launch.auth?.jwtSecret?.configured ? "configured" : "missing jwt/admin config",
-      next: "Confirm JWT_SECRET, ADMIN_EMAIL, and ADMIN_PASSWORD are set in Render.",
+      next: "Confirm JWT_SECRET, ADMIN_EMAIL, and ADMIN_PASSWORD are set in Railway.",
     },
   ];
 }
@@ -586,7 +580,7 @@ export default function AdminPortal() {
                   "Buy a Dex coin pack and confirm coins update.",
                   "Generate affiliate invite and confirm the email/link works.",
                   "Install latest APK and test Hey Dex on Android.",
-                  "Run one RingCentral call-routing test end to end.",
+                  "Run one communications call-routing test end to end.",
                   "Trigger emergency contact alert with a safe test phrase.",
                   "Ask Dex to search web and YouTube from web and app.",
                 ].map((item) => (
@@ -897,7 +891,19 @@ export default function AdminPortal() {
                     <span>Signups: <strong className="text-white">{a.signups}</strong></span>
                     <span>Paid Subs: <strong className="text-white">{a.paid_subs}</strong></span>
                     <span>Earnings: <strong className="text-green-400">${Number(a.earnings || 0).toFixed(2)}</strong></span>
+                    <span>Pending Cash Out: <strong className="text-amber-300">${Number(a.pending_payouts || 0).toFixed(2)}</strong></span>
                   </div>
+                  {a.latest_payout_status && (
+                    <div className="mt-3 rounded-lg bg-gray-900/70 p-3 text-xs text-gray-300">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="font-semibold text-white">Latest cash-out request</span>
+                        <span className="rounded bg-brand/20 px-2 py-1 font-bold text-brand">{a.latest_payout_status}</span>
+                        <span>${Number(a.latest_payout_amount || 0).toFixed(2)}</span>
+                        <span>{String(a.latest_payout_method || "").replace("_", " ")}</span>
+                      </div>
+                      <p className="mt-2 break-all text-gray-400">{a.latest_payout_details}</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

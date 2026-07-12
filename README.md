@@ -30,7 +30,7 @@ This repo has gone through a few product phases, so the safest source of truth i
 - Billing: Stripe
 - AI: OpenAI
 - Email: SMTP
-- Telephony: RingCentral integration path
+- Telephony: Twilio/new communications provider integration path
 
 ## Local Setup
 
@@ -82,11 +82,10 @@ SMTP_PASS=...
 SENDER_EMAIL=...
 SENDER_NAME=Konvict Artz
 
-RC_CLIENT_ID=...
-RC_CLIENT_SECRET=...
-RC_JWT=...
-RC_PHONE_NUMBER=...
-RC_SERVER=https://platform.ringcentral.com
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_FROM_NUMBER=...
+TWILIO_VOICE_WEBHOOK_TOKEN=...
 ```
 
 ### 3. Run locally
@@ -114,10 +113,9 @@ Useful backend URLs:
 
 ### Backend
 
-Use Render with:
+Use Railway with:
 
-- repo root config: [render.yaml](./render.yaml)
-- or service config: [server/render.yaml](./server/render.yaml)
+- service config: [server/railway.json](./server/railway.json)
 
 Important:
 
@@ -145,7 +143,7 @@ This gives a quick launch-readiness snapshot for:
 
 - AI
 - email
-- RingCentral
+- Twilio/new communications provider
 - Stripe
 - site/origin config
 - auth config
@@ -155,8 +153,7 @@ This gives a quick launch-readiness snapshot for:
 - Older docs in this repo used Square naming and older auth fields. The current product uses Stripe and `ADMIN_EMAIL`.
 - If a doc conflicts with current code, trust:
   - [server/.env.example](./server/.env.example)
-  - [render.yaml](./render.yaml)
-  - [server/render.yaml](./server/render.yaml)
+  - [server/railway.json](./server/railway.json)
   - [server/src/index.js](./server/src/index.js)
 
 ## Related Docs
