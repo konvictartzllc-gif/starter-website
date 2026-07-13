@@ -25,30 +25,43 @@ app.use(
   })
 );
 
-// Load API routes BEFORE static files
+// ----------------------
+// API ROUTES
+// ----------------------
+
+// AUTH ROUTES
 import authRoutes from "./routes/auth.js";
-import forgotRoutes from "./routes/forgot.js";
-app.use("/api/forgot", forgotRoutes);
 app.use("/api/auth", authRoutes);
 
-// OPTIONAL: Add other API routes here
+// FORGOT PASSWORD ROUTES
+import forgotRoutes from "./routes/forgot.js";
+app.use("/api/forgot", forgotRoutes);
+
+// Add other API routes here if needed:
 // import dexRoutes from "./routes/dex.js";
 // app.use("/api/dex", dexRoutes);
 
 // import adsRoutes from "./routes/ads.js";
 // app.use("/api/ads", adsRoutes);
 
-// Static file serving (must be LAST)
+// ----------------------
+// STATIC FILES (MUST BE LAST)
+// ----------------------
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Serve frontend build
 app.use(express.static(path.join(__dirname, "../../client/dist")));
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../../client/dist/index.html"));
 });
 
-// Start server
+// ----------------------
+// START SERVER
+// ----------------------
+
 app.listen(PORT, () => {
   console.log(`Konvict Artz backend running on port ${PORT}`);
 });
