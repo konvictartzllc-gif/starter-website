@@ -14,14 +14,34 @@ export default function AffiliateDashboard() {
   const [copied, setCopied] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [cashoutForm, setCashoutForm] = useState({
+    amount: "",
+    payoutMethod: "cash_app",
+    payoutDetails: "",
+  });
+  const [cashoutStatus, setCashoutStatus] = useState("");
+  const [cashoutSubmitting, setCashoutSubmitting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    api.getAffiliateDashboard()
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
+    loadDashboard();
   }, [user]);
+
+  async function loadDashboard() {
+    setLoading(true);
+    try {
+      const dashboard = await api.getAffiliateDashboard();
+      setData(dashboard);
+      setCashoutForm((current) => ({
+        ...current,
+        amount: current.amount || Number(dashboard.availableToCashOut || 0).toFixed(2),
+      }));
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function copyLink() {
     navigator.clipboard.writeText(data.referralLink);
@@ -41,6 +61,30 @@ export default function AffiliateDashboard() {
       setDownloading(false);
     }
   }
+
+  async function requestCashout(e) {
+    e.preventDefault();
+    setCashoutSubmitting(true);
+    setCashoutStatus("");
+    try {
+      await api.requestAffiliateCashout({
+        amount: Number(cashoutForm.amount),
+        payoutMethod: cashoutForm.payoutMethod,
+        payoutDetails: cashoutForm.payoutDetails,
+      });
+      setCashoutStatus("Cash-out request sent. Konvict Artz will review it and send your payout.");
+      setCashoutForm((current) => ({ ...current, payoutDetails: "" }));
+      await loadDashboard();
+    } catch (err) {
+      setCashoutStatus(err.error || "Could not submit that cash-out request.");
+    } finally {
+      setCashoutSubmitting(false);
+    }
+  }
+
+  const availableToCashOut = Number(data?.availableToCashOut || 0);
+  const pendingPayouts = Number(data?.pendingPayouts || 0);
+  const cashoutDisabled = cashoutSubmitting || availableToCashOut <= 0;
 
   if (!user) {
     return (
@@ -83,6 +127,92 @@ export default function AffiliateDashboard() {
             <p className="text-3xl font-bold text-green-400">${data.earnings.toFixed(2)}</p>
             <p className="text-xs text-gray-400 mt-1">Total Earned</p>
           </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl p-4 mb-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-xl">
+              <p className="text-xs uppercase tracking-wide text-brand mb-1">Cash Out</p>
+              <h2 className="text-xl font-bold">Request Affiliate Payout</h2>
+              <p className="text-sm text-gray-400 mt-1">
+                Available now: <strong className="text-green-400">${availableToCashOut.toFixed(2)}</strong>
+                {pendingPayouts > 0 && (
+                  <span className="text-gray-500"> (${pendingPayouts.toFixed(2)} already pending)</span>
+                )}
+              </p>
+            </div>
+
+            <form onSubmit={requestCashout} className="w-full lg:max-w-md space-y-3">
+              <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  max={availableToCashOut || undefined}
+                  required
+                  value={cashoutForm.amount}
+                  onChange={(e) => setCashoutForm((p) => ({ ...p, amount: e.target.value }))}
+                  disabled={cashoutDisabled}
+                  className="bg-gray-700 text-sm text-white rounded-lg px-3 py-2 outline-none disabled:opacity-60"
+                  aria-label="Cash-out amount"
+                />
+                <select
+                  value={cashoutForm.payoutMethod}
+                  onChange={(e) => setCashoutForm((p) => ({ ...p, payoutMethod: e.target.value }))}
+                  disabled={cashoutDisabled}
+                  className="bg-gray-700 text-sm text-white rounded-lg px-3 py-2 outline-none disabled:opacity-60"
+                  aria-label="Payout method"
+                >
+                  <option value="cash_app">Cash App</option>
+                  <option value="paypal">PayPal</option>
+                  <option value="venmo">Venmo</option>
+                  <option value="zelle">Zelle</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <input
+                value={cashoutForm.payoutDetails}
+                onChange={(e) => setCashoutForm((p) => ({ ...p, payoutDetails: e.target.value }))}
+                disabled={cashoutDisabled}
+                required
+                placeholder="Username, email, phone, or payment instructions"
+                className="w-full bg-gray-700 text-sm text-white rounded-lg px-3 py-2 outline-none disabled:opacity-60"
+              />
+              <button
+                type="submit"
+                disabled={cashoutDisabled}
+                className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 font-semibold text-sm transition-all"
+              >
+                {cashoutSubmitting ? "Sending Request..." : availableToCashOut > 0 ? "Request Cash Out" : "No Earnings Available"}
+              </button>
+              {cashoutStatus && (
+                <p className={`text-sm ${cashoutStatus.includes("sent") ? "text-green-300" : "text-amber-300"}`}>
+                  {cashoutStatus}
+                </p>
+              )}
+            </form>
+          </div>
+
+          {data.payoutRequests?.length > 0 && (
+            <div className="mt-5 border-t border-gray-700 pt-4">
+              <h3 className="font-semibold mb-3">Recent Cash-Out Requests</h3>
+              <div className="space-y-2">
+                {data.payoutRequests.map((request) => (
+                  <div key={request.id} className="flex flex-col gap-1 rounded-lg bg-gray-900/70 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <span className="font-semibold text-white">${Number(request.amount || 0).toFixed(2)}</span>
+                      <span className="ml-2 text-gray-400">{request.payout_method.replace("_", " ")}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="rounded bg-brand/20 px-2 py-1 font-bold text-brand">{request.status}</span>
+                      <span className="text-gray-500">{new Date(request.requested_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Promo Code */}

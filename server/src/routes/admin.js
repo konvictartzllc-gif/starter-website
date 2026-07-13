@@ -4,10 +4,10 @@ import { v4 as uuidv4 } from "uuid";
 import { requireAdmin } from "../middleware/auth.js";
 import { getDb } from "../db.js";
 import { getEmailStatus, sendAffiliateInvite, sendCustomEmail, sendPromoCode } from "../services/email.js";
-import { sendLowInventoryAlert } from "../services/ringcentral.js";
+import { sendLowInventoryAlert } from "../services/communications.js";
 import { ensureAffiliateRecord } from "../services/affiliates.js";
 import {
-  PROVIDER_RINGCENTRAL,
+  PROVIDER_TWILIO_VOICE,
   ensureIntegrationTables,
   getUserIntegrationRoutes,
   normalizePhoneNumber,
@@ -186,9 +186,29 @@ router.delete("/inventory/:id", requireAdmin, async (req, res) => {
 router.get("/affiliates", requireAdmin, async (req, res) => {
   const db = getDb();
   const affiliates = await db.all(
-    `SELECT a.*, u.email, u.name
+    `SELECT a.*, u.email, u.name,
+            COALESCE(pending.total_pending, 0) AS pending_payouts,
+            latest.amount AS latest_payout_amount,
+            latest.payout_method AS latest_payout_method,
+            latest.payout_details AS latest_payout_details,
+            latest.status AS latest_payout_status,
+            latest.requested_at AS latest_payout_requested_at
        FROM affiliates a
        JOIN users u ON u.id = a.user_id
+       LEFT JOIN (
+         SELECT affiliate_id, SUM(amount) AS total_pending
+           FROM affiliate_payout_requests
+          WHERE status IN ('pending', 'approved', 'processing')
+          GROUP BY affiliate_id
+       ) pending ON pending.affiliate_id = a.id
+       LEFT JOIN affiliate_payout_requests latest
+         ON latest.id = (
+           SELECT apr.id
+             FROM affiliate_payout_requests apr
+            WHERE apr.affiliate_id = a.id
+            ORDER BY apr.requested_at DESC
+            LIMIT 1
+         )
       ORDER BY a.paid_subs DESC, a.signups DESC`
   );
   return res.json(affiliates);
@@ -426,7 +446,7 @@ router.get("/integrations/routes", requireAdmin, async (req, res) => {
   });
 });
 
-router.post("/integrations/ringcentral/assign", requireAdmin, [
+router.post("/integrations/voice/assign", requireAdmin, [
   body("userId").isInt({ min: 1 }),
   body("assignedNumber").optional({ values: "falsy" }).trim(),
   body("extension").optional({ values: "falsy" }).trim(),
@@ -441,7 +461,7 @@ router.post("/integrations/ringcentral/assign", requireAdmin, [
 
   const route = await upsertUserIntegrationRoute(db, {
     userId,
-    provider: PROVIDER_RINGCENTRAL,
+    provider: PROVIDER_TWILIO_VOICE,
     assignedNumber: normalizePhoneNumber(req.body.assignedNumber),
     extension: req.body.extension,
     permissions: req.body.permissions || { answerCalls: true, takeMessages: true },

@@ -31,7 +31,7 @@ This is the Android Studio project for Dex.
 
 - connect Dex login to your existing backend
 - add phone permissions and call listener flow
-- add RingCentral actions
+- add communications provider actions
 - add Google Calendar OAuth
 - add contact lookup and spam handling
 

@@ -1292,6 +1292,7 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                 val personName = resolveEmergencyPersonName()
                 val trigger = normalized.replace(Regex("\\s+"), " ").trim()
                 val crisisReply = getString(R.string.local_emergency_reply, personName)
+                triggerServerEmergencyAlert(trigger)
                 val smsStatus = sendEscalationSafetySms(trigger)
                 scheduleNextSafetyFollowUp(10, "crisis", true)
                 persistSafetyCheckInMemory("crisis", "crisis")
@@ -1672,6 +1673,37 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
             onSuccess = { getString(R.string.local_emergency_sms_attempting) },
             onFailure = { getString(R.string.local_emergency_sms_failed) }
         )
+    }
+
+    private fun triggerServerEmergencyAlert(triggerMessage: String) {
+        val trimmed = triggerMessage.trim()
+        if (trimmed.isBlank()) return
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val token = prefs.getString(MainActivity.KEY_TOKEN, null)
+        val serverUrl = prefs.getString(MainActivity.KEY_SERVER_URL, MainActivity.DEFAULT_SERVER_URL)
+            ?.trimEnd('/')
+            .orEmpty()
+        if (token.isNullOrBlank() || serverUrl.isBlank()) return
+
+        Thread {
+            runCatching {
+                val payload = JSONObject().apply { put("message", trimmed) }
+                val request = Request.Builder()
+                    .url("$serverUrl/dex/chat")
+                    .post(payload.toString().toRequestBody(jsonType))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer $token")
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        val body = response.body?.string().orEmpty()
+                        throw IOException(body.ifBlank { "Server emergency alert failed with ${response.code}" })
+                    }
+                }
+            }.onFailure { error ->
+                logBackgroundRecognizerEvent("server emergency alert failed: ${error.message ?: "unknown error"}")
+            }
+        }.start()
     }
 
     private fun clearPendingReminderContext() {
@@ -2448,11 +2480,25 @@ class DexForegroundService : Service(), TextToSpeech.OnInitListener {
                         throw IOException(body.ifBlank { "Background Dex chat failed with ${response.code}" })
                     }
                     val json = JSONObject(response.body?.string().orEmpty())
-                    json.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
+                    val reply = json.optString("reply").ifBlank { getString(R.string.wake_mode_fallback_reply) }
+                    val localSmsStatus =
+                        if (json.optBoolean("emergency", false) && !json.optBoolean("trustedContactDelivered", false)) {
+                            sendEscalationSafetySms(trimmed)
+                        } else {
+                            null
+                        }
+                    listOfNotNull(reply, localSmsStatus).joinToString(" ")
                 }
             }.getOrElse { error ->
                 logBackgroundRecognizerEvent("background wake command failed: ${error.message ?: "unknown error"}")
-                getString(R.string.wake_mode_fallback_reply)
+                if (isHighRiskSafetyReply(trimmed.lowercase(Locale.US))) {
+                    listOfNotNull(
+                        getString(R.string.local_emergency_reply, resolveEmergencyPersonName()),
+                        sendEscalationSafetySms(trimmed)
+                    ).joinToString(" ")
+                } else {
+                    getString(R.string.wake_mode_fallback_reply)
+                }
             }
             mainHandler.post {
                 speakShortStatus(spokenReply)

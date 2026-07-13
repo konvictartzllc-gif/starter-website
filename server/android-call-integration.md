@@ -11,7 +11,7 @@ Dex should:
 - allow unknown callers through
 - ask the user by voice whether to answer or reject non-spam calls
 - draft outbound texts before sending and require approval every time
-- use RingCentral to place, reroute, and send SMS
+- use the configured communications provider to place, reroute, and send SMS
 - connect each user to their own private Google Calendar
 - keep chat memory for 3 days
 - refuse to store sensitive information such as bank details, passwords, or Social Security numbers
@@ -37,7 +37,7 @@ Still needed on the Android side:
 - spam detection source
 - voice prompt flow for answer/reject confirmation
 - contacts access and save-contact prompt
-- RingCentral action bridge
+- Communications provider action bridge
 - Google OAuth mobile flow
 
 ## Android Permissions
@@ -152,21 +152,21 @@ Flow:
 2. Dex drafts the message.
 3. Dex reads the draft aloud or shows it on screen.
 4. User approves.
-5. Dex sends through RingCentral.
+5. Dex sends through the configured communications provider.
 
 Rules:
 - approval is required every time
 - contact must exist in the user's contacts
 - no auto-send mode for now
 
-## RingCentral Responsibilities
+## Communications Provider Responsibilities
 
-RingCentral is the transport layer for:
+The configured communications provider is the transport layer for:
 - placing calls
 - rerouting calls
 - sending SMS
 
-Android should not directly invent a second outbound calling system if RingCentral is already connected for the user action.
+Android should not directly invent a second outbound calling system if the configured communications provider is already connected for the user action.
 
 ## Google Calendar
 
@@ -228,7 +228,7 @@ Backend note:
 5. Implement Dex voice confirmation for answer/reject.
 6. POST call events to Dex backend.
 7. Add contact lookup and save-contact prompt.
-8. Build draft-and-approve SMS flow with RingCentral.
+8. Build draft-and-approve SMS flow with the configured communications provider.
 9. Add private Google Calendar OAuth connection flow.
 10. Expose voice selection in Android settings.
 

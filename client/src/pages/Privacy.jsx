@@ -102,7 +102,7 @@ export default function Privacy() {
               actions, and payment events.
             </li>
             <li>
-              <strong>Communications:</strong> RingCentral may be used for supported call or SMS
+              <strong>Communications:</strong> Dex's configured communications provider may be used for supported call or SMS
               flows, and SMTP/email providers may be used for email delivery.
             </li>
             <li>

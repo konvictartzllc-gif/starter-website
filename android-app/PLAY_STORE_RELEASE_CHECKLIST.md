@@ -38,7 +38,7 @@
 - [ ] Android release build points to the production backend
 - [ ] Stripe live config is installed and tested
 - [ ] Email config is installed and tested
-- [ ] RingCentral config is installed and tested if those features will be live at launch
+- [ ] Communications provider config is installed and tested if those features will be live at launch
 
 ## Real-device release test
 

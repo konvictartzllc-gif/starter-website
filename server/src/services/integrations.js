@@ -1,6 +1,5 @@
 import crypto from "crypto";
 
-export const PROVIDER_RINGCENTRAL = "ringcentral";
 export const PROVIDER_TWILIO_VOICE = "twilio_voice";
 
 export function normalizePhoneNumber(value) {
@@ -49,14 +48,14 @@ export async function ensureIntegrationTables(db) {
   `);
 }
 
-export async function ensureDefaultIntegrationAccount(db, provider = PROVIDER_RINGCENTRAL) {
+export async function ensureDefaultIntegrationAccount(db, provider = PROVIDER_TWILIO_VOICE) {
   await ensureIntegrationTables(db);
   const existing = await db.get(
     "SELECT * FROM integration_accounts WHERE provider = ? AND shared = 1 ORDER BY id ASC LIMIT 1",
     [provider]
   );
   if (existing) return existing;
-  const label = provider === PROVIDER_RINGCENTRAL ? "Shared RingCentral account" : "Shared voice account";
+  const label = provider === PROVIDER_TWILIO_VOICE ? "Shared Twilio voice account" : "Shared voice account";
   const result = await db.run(
     `INSERT INTO integration_accounts (provider, label, shared, active, config_json)
      VALUES (?, ?, 1, 1, ?)`,
@@ -67,7 +66,7 @@ export async function ensureDefaultIntegrationAccount(db, provider = PROVIDER_RI
 
 export async function upsertUserIntegrationRoute(db, {
   userId,
-  provider = PROVIDER_RINGCENTRAL,
+  provider = PROVIDER_TWILIO_VOICE,
   accountId = null,
   assignedNumber = null,
   extension = null,
@@ -137,8 +136,8 @@ export async function resolveVoiceRoute(db, { routeKey, provider, calledNumber, 
     params.push(routeKey);
   }
   if (provider) {
-    clauses.push("uir.provider IN (?, ?)");
-    params.push(provider, PROVIDER_RINGCENTRAL);
+    clauses.push("uir.provider = ?");
+    params.push(provider);
   }
   if (normalizedCalled) {
     clauses.push("uir.assigned_number = ?");

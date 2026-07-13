@@ -3,7 +3,7 @@ import { body, validationResult } from "express-validator";
 import OpenAI from "openai";
 import { requireUser, optionalUser } from "../middleware/auth.js";
 import { getDb } from "../db.js";
-import { triggerEmergencyAlert, sendLowInventoryAlert, sendSms, makeCall } from "../services/ringcentral.js";
+import { triggerEmergencyAlert, sendLowInventoryAlert, sendSms, makeCall } from "../services/communications.js";
 import { createEvent, listEvents } from "../services/calendar.js";
 import { verifyOta, spamFilter } from "../middleware/security.js";
 const router = Router();
