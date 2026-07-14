@@ -375,6 +375,17 @@
         ('learning_reminders', 1, 'Enable Dex daily learning reminder scheduling.')
       ON CONFLICT(key) DO NOTHING;
     `);
+    // ── Password Reset Tokens ─────────────────────────────────────────────────
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        token      TEXT    NOT NULL UNIQUE,
+        expires_at TEXT    NOT NULL,
+        used       INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
     // ── Seed admin user ─────────────────────────────────────────────────------
     const existing = await db.get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
     if (!existing) {

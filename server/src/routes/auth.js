@@ -1,10 +1,11 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { body, validationResult } from "express-validator";
 import { getDb } from "../db.js";
 import { getJwtSecret } from "../config.js";
-import { sendWelcomeEmail } from "../services/email.js";
+import { sendWelcomeEmail, sendPasswordResetEmail } from "../services/email.js";
 import { ensureAffiliateRecord } from "../services/affiliates.js";
 import { requireUser } from "../middleware/auth.js";
 import { generateOta } from "../middleware/security.js";
@@ -318,5 +319,90 @@ router.post("/ota/request", requireUser, [body("actionType").notEmpty()], async 
     res.status(500).json({ error: "Failed to send authorization code" });
   }
 });
+
+// POST /api/auth/forgot-password
+router.post(
+  "/forgot-password",
+  [body("email").isEmail().normalizeEmail()],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const { email } = req.body;
+    const db = getDb();
+
+    // Always respond with success to prevent email enumeration
+    const user = await db.get("SELECT id, email, name FROM users WHERE email = ?", [email]);
+    if (!user || !user.id) {
+      return res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
+    }
+
+    try {
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+
+      // Invalidate any existing unused tokens for this user
+      await db.run(
+        "UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0",
+        [user.id]
+      );
+
+      await db.run(
+        "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
+        [user.id, token, expiresAt]
+      );
+
+      const appUrl = process.env.APP_URL || "https://www.konvict-artz.com";
+      const resetLink = `${appUrl}/reset-password?token=${token}`;
+
+      fireAndForget("Password reset email", () => sendPasswordResetEmail(user.email, user.name, resetLink));
+
+      return res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
+    } catch (err) {
+      console.error("[auth:forgot-password]", err?.message);
+      return res.status(500).json({ error: "Could not process password reset request." });
+    }
+  }
+);
+
+// POST /api/auth/reset-password
+router.post(
+  "/reset-password",
+  [
+    body("token").notEmpty().trim(),
+    body("password").isLength({ min: 6 }),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const { token, password } = req.body;
+    const db = getDb();
+
+    try {
+      const record = await db.get(
+        "SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0",
+        [token]
+      );
+
+      if (!record) {
+        return res.status(400).json({ error: "This reset link is invalid or has already been used." });
+      }
+
+      if (new Date() > new Date(record.expires_at)) {
+        return res.status(400).json({ error: "This reset link has expired. Please request a new one." });
+      }
+
+      const hashed = await bcrypt.hash(password, 12);
+      await db.run("UPDATE users SET password = ? WHERE id = ?", [hashed, record.user_id]);
+      await db.run("UPDATE password_reset_tokens SET used = 1 WHERE id = ?", [record.id]);
+
+      return res.json({ success: true, message: "Password updated. You can now log in with your new password." });
+    } catch (err) {
+      console.error("[auth:reset-password]", err?.message);
+      return res.status(500).json({ error: "Could not reset password. Please try again." });
+    }
+  }
+);
 
 export default router;

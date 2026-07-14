@@ -72,6 +72,8 @@ export const api = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   me: () => request("/auth/me"),
+  forgotPassword: (body) => request("/auth/forgot-password", { method: "POST", body: JSON.stringify(body) }),
+  resetPassword: (body) => request("/auth/reset-password", { method: "POST", body: JSON.stringify(body) }),
 
   // Dex
   chat: (message) => request("/dex/chat", { method: "POST", body: JSON.stringify({ message }) }),
@@ -108,6 +110,10 @@ export const api = {
 
   // Call Events
   getCallEvents: () => request("/dex/call-events"),
+
+  // Games
+  dexChessMove: (body) => request("/dex/games/chess/move", { method: "POST", body: JSON.stringify(body) }),
+  dexCheckersMove: (body) => request("/dex/games/checkers/move", { method: "POST", body: JSON.stringify(body) }),
 
   // Permissions
   getPermissions: () => request("/dex/permissions"),

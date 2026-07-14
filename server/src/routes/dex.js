@@ -409,7 +409,47 @@ function getLearningDefaults(preferences = {}, body = {}) {
                 focus: body.focus || preferences.learning_focus || "conversation",
                 style: body.style || preferences.learning_style || "gentle",
                 topic: body.topic || preferences.learning_subject || preferences.learning_focus || "daily conversation",
+                lessonType: body.lessonType || null,
         };
+}
+
+const LESSON_TYPE_POOL = [
+        "conversation",
+        "grammar",
+        "culture",
+        "pronunciation",
+        "storytelling",
+        "dialogue",
+        "vocabulary",
+        "slang",
+];
+
+function pickLessonType(lessonType, recentLessonTypes = []) {
+        if (lessonType) return lessonType;
+        const available = LESSON_TYPE_POOL.filter((t) => !recentLessonTypes.slice(0, 3).includes(t));
+        const pool = available.length > 0 ? available : LESSON_TYPE_POOL;
+        return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function buildLessonPrompt(learning, lessonType) {
+        const typeInstructions = {
+                conversation: `Write a conversational lesson. Focus on common phrases used in real everyday exchanges. Include a realistic back-and-forth dialogue snippet and a practice prompt where the learner responds to a question.`,
+                grammar: `Write a grammar-focused lesson. Explain one grammar rule clearly, show the pattern, give contrasting examples (right vs wrong), and end with a fill-in practice sentence.`,
+                culture: `Write a culture lesson. Share an interesting cultural fact, tradition, or social custom tied to the language. Connect vocabulary or phrases to cultural context. Make it feel like a story.`,
+                pronunciation: `Write a pronunciation lesson. Focus on 2-3 tricky sounds. Use sound-it-out phonetics in parentheses after every word (e.g. hola = oh-lah). Include a tongue exercise or rhythm tip.`,
+                storytelling: `Write a mini-story lesson (4-6 sentences) told entirely in ${learning.language} with an interlinear English translation below each sentence. Choose a fun, relatable scenario.`,
+                dialogue: `Write a lesson built around a realistic two-person dialogue (at least 6 lines). Label speakers A and B. Add vocabulary notes below and a role-play challenge at the end.`,
+                vocabulary: `Write a vocabulary-themed lesson. Teach 6-8 related words grouped by theme. For each word give pronunciation, part of speech, and one example sentence.`,
+                slang: `Write a lesson on everyday slang, idioms, or colloquial expressions for ${learning.language}. Explain what each phrase literally means versus what it actually means in conversation.`,
+        };
+        const typeGuide = typeInstructions[lessonType] || typeInstructions.conversation;
+        return (
+                `Create a ${learning.language} lesson for a ${learning.level} learner. ` +
+                `Lesson type: ${lessonType}. Focus area: ${learning.focus}. Topic: ${learning.topic}. Teaching style: ${learning.style}. ` +
+                typeGuide +
+                ` For any pronunciation guides, always write phonetics in parentheses after the word — never spell letter by letter. ` +
+                `Return a short punchy title on the first line, then the lesson body. Keep the whole response under 600 words.`
+        );
 }
 
 function extractJsonObject(text = "") {
@@ -1433,6 +1473,12 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
                 }
         }
 
+        const recentLessonTypes = await db.all(
+                `SELECT lesson_type FROM learning_lessons WHERE user_id = ? ORDER BY created_at DESC LIMIT 5`,
+                [req.user.id]
+        );
+        const chosenLessonType = pickLessonType(learning.lessonType, recentLessonTypes.map((l) => l.lesson_type));
+
         try {
                 const openai = getOpenAI();
                 const completion = await openai.chat.completions.create({
@@ -1440,18 +1486,15 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
                         messages: [
                                 {
                                         role: "system",
-                                        content: "You create short daily lessons for an AI tutor. Keep them practical, encouraging, and easy to follow.",
+                                        content: "You are Dex, a warm and encouraging language tutor. Write lessons that feel personal, practical, and fun — like a real tutor talking to a student, not a textbook.",
                                 },
                                 {
                                         role: "user",
-                                        content:
-                                                `Create a daily ${learning.language} lesson for a ${learning.level} learner focused on ${learning.focus}. ` +
-                                                `Teaching style: ${learning.style}. Topic: ${learning.topic}. ` +
-                                                "Return a short title on the first line, then a concise lesson with: vocabulary, pronunciation help, two example sentences, and a mini practice prompt. For pronunciation, put sound-it-out phonetics in parentheses after the word, like hola (oh lah); do not spell words letter by letter.",
+                                        content: buildLessonPrompt(learning, chosenLessonType),
                                 },
                         ],
-                        max_tokens: 700,
-                        temperature: 0.8,
+                        max_tokens: 750,
+                        temperature: 0.85,
                 });
 
                 const raw = completion.choices[0].message.content.trim();
@@ -1461,8 +1504,8 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
 
                 const result = await db.run(
                         `INSERT INTO learning_lessons (user_id, topic, language, level, lesson_type, title, content)
-                         VALUES (?, ?, ?, ?, 'daily', ?, ?)`,
-                        [req.user.id, learning.topic, learning.language, learning.level, title, content]
+                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        [req.user.id, learning.topic, learning.language, learning.level, chosenLessonType, title, content]
                 );
 
                 return res.json({
@@ -1471,7 +1514,7 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
                                 topic: learning.topic,
                                 language: learning.language,
                                 level: learning.level,
-                                lesson_type: "daily",
+                                lesson_type: chosenLessonType,
                                 title,
                                 content,
                         },
@@ -2342,6 +2385,96 @@ router.get("/history", requireUser, async (req, res) => {
           [req.user.id]
         );
     return res.json(history);
+});
+
+// POST /api/dex/games/chess/move
+router.post("/games/chess/move", requireUser, async (req, res) => {
+        const user = await getUserRecord(req.user.id);
+        if (!userHasDexAccess(user)) {
+                return res.status(403).json({ error: "no_access", message: "Start your free 3-day trial to play games with Dex." });
+        }
+
+        const { board, history: moveHistory = [] } = req.body || {};
+        if (!board) return res.status(400).json({ error: "board state required" });
+
+        try {
+                const openai = getOpenAI();
+                const boardStr = Array.isArray(board)
+                        ? board.map((row, r) => row.map((cell, c) => cell ? `${cell}@${String.fromCharCode(97+c)}${8-r}` : ".").join(" ")).join("\n")
+                        : String(board);
+                const historyStr = moveHistory.slice(-10).join(", ") || "none";
+
+                const completion = await openai.chat.completions.create({
+                        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+                        messages: [
+                                {
+                                        role: "system",
+                                        content: "You are Dex, a chess-playing AI. You play as Black pieces. Given the current board state and move history, respond with exactly one legal chess move in algebraic notation (e.g. e5, Nf6, O-O). Respond with only the move notation and a brief one-sentence comment.",
+                                },
+                                {
+                                        role: "user",
+                                        content: `Board (rows 8 to 1, columns a-h):\n${boardStr}\n\nMove history: ${historyStr}\n\nPick your best move as Black. Reply: <move> | <short comment>`,
+                                },
+                        ],
+                        max_tokens: 60,
+                        temperature: 0.4,
+                });
+
+                const raw = completion.choices[0].message.content.trim();
+                const [move, ...commentParts] = raw.split("|");
+                return res.json({
+                        move: move.trim(),
+                        comment: commentParts.join("|").trim() || "Your move.",
+                });
+        } catch (err) {
+                console.error("Chess move error:", err.message);
+                return res.status(500).json({ error: "Dex could not pick a chess move right now." });
+        }
+});
+
+// POST /api/dex/games/checkers/move
+router.post("/games/checkers/move", requireUser, async (req, res) => {
+        const user = await getUserRecord(req.user.id);
+        if (!userHasDexAccess(user)) {
+                return res.status(403).json({ error: "no_access", message: "Start your free 3-day trial to play games with Dex." });
+        }
+
+        const { board, history: moveHistory = [] } = req.body || {};
+        if (!board) return res.status(400).json({ error: "board state required" });
+
+        try {
+                const openai = getOpenAI();
+                const boardStr = Array.isArray(board)
+                        ? board.map((row, r) => row.map((cell, c) => cell || ".").join(" ")).join("\n")
+                        : String(board);
+                const historyStr = moveHistory.slice(-6).join(", ") || "none";
+
+                const completion = await openai.chat.completions.create({
+                        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+                        messages: [
+                                {
+                                        role: "system",
+                                        content: "You are Dex, a checkers-playing AI. You play as the dark pieces (marked 'd' or 'D' for kings). Given the 8x8 board and move history, respond with exactly one legal checkers move as 'fromRow,fromCol->toRow,toCol'. Multiple jumps use 'fromRow,fromCol->midRow,midCol->toRow,toCol'. Respond with only the move and a brief one-sentence comment.",
+                                },
+                                {
+                                        role: "user",
+                                        content: `Board (row 0 = top):\n${boardStr}\n\nMove history: ${historyStr}\n\nPick your best move as dark pieces. Reply: <move> | <short comment>`,
+                                },
+                        ],
+                        max_tokens: 60,
+                        temperature: 0.4,
+                });
+
+                const raw = completion.choices[0].message.content.trim();
+                const [move, ...commentParts] = raw.split("|");
+                return res.json({
+                        move: move.trim(),
+                        comment: commentParts.join("|").trim() || "Your move.",
+                });
+        } catch (err) {
+                console.error("Checkers move error:", err.message);
+                return res.status(500).json({ error: "Dex could not pick a checkers move right now." });
+        }
 });
 
 export default router;

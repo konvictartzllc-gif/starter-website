@@ -2,7 +2,7 @@ import Settings from "./pages/Settings.jsx";
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth.jsx";
 import Home from "./pages/Home.jsx";
-import { RegisterPage, LoginPage } from "./pages/Auth.jsx";
+import { RegisterPage, LoginPage, ForgotPasswordPage, ResetPasswordPage } from "./pages/Auth.jsx";
 import AdminPortal from "./pages/AdminPortal.jsx";
 import AffiliateDashboard from "./pages/AffiliateDashboard.jsx";
 import Shop from "./pages/Shop.jsx";
@@ -21,6 +21,8 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/admin" element={<AdminPortal />} />
         <Route path="/affiliate" element={<AffiliateDashboard />} />
         <Route path="/shop" element={<Shop />} />
