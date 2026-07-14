@@ -389,7 +389,7 @@
     // ── Seed admin user ─────────────────────────────────────────────────------
     const existing = await db.get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
     if (!existing) {
-      const hashed = await bcrypt.hash(adminPassword, 12);
+      const hashed = await bcrypt.hash(adminPassword, 10);
       await db.run(
         `INSERT INTO users (email, name, password, role, access_type)
          VALUES (?, ?, ?, 'admin', 'unlimited')`,

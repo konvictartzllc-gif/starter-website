@@ -151,7 +151,7 @@ router.post(
           return res.status(409).json({ error: "Email already registered" });
         }
 
-        const hashed = await bcrypt.hash(password, 12);
+        const hashed = await bcrypt.hash(password, 10);
         await db.run(
           `UPDATE users
               SET password = ?,
@@ -191,7 +191,7 @@ router.post(
         }
       }
 
-      const hashed = await bcrypt.hash(password, 12);
+      const hashed = await bcrypt.hash(password, 10);
       const trialStart = new Date().toISOString();
       const result = await db.run(
         `INSERT INTO users (email, name, password, role, access_type, trial_start, referred_by)
@@ -393,7 +393,7 @@ router.post(
         return res.status(400).json({ error: "This reset link has expired. Please request a new one." });
       }
 
-      const hashed = await bcrypt.hash(password, 12);
+      const hashed = await bcrypt.hash(password, 10);
       await db.run("UPDATE users SET password = ? WHERE id = ?", [hashed, record.user_id]);
       await db.run("UPDATE password_reset_tokens SET used = 1 WHERE id = ?", [record.id]);
 
