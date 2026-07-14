@@ -308,6 +308,15 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
     const token = localStorage.getItem("dex_token");
     if (!token) { speakNow(); return; }
 
+    // Stop any in-progress Audio element before starting a new one
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+      } catch {}
+      audioRef.current = null;
+    }
+
     isSpeakingRef.current = true;
     clearWakeTimeout();
     listeningForCommandRef.current = false;

@@ -2254,6 +2254,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                         }
 
                         // ── PROACTIVE AUTOMATION ──────────────────────────────────────────────────
+                        const MAX_APPT_TITLE_LENGTH = 80;
                         let automationPerformed = false;
                         let communicationDraft = null;
 
@@ -2262,7 +2263,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                         if (appointmentIntent) {
                                 try {
                                         const startTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-                                        const apptTitle = message.slice(0, 80);
+                                        const apptTitle = message.slice(0, MAX_APPT_TITLE_LENGTH);
                                         const result = await db.run(
                                                 `INSERT INTO appointments (user_id, title, description, start_time)
                                                  VALUES (?, ?, ?, ?)`,
@@ -2304,20 +2305,23 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                         if (matchedIntent === "communicate" || matchedIntent === "send") {
                                 try {
                                         await ensureCommunicationDraftsTable(db);
-                                        const commMatch = message.match(/\b(?:text|message|email)\s+(?:to\s+)?(.+?)(?:\s+(?:saying|about|that|:)\s+(.+))?$/i);
-                                        const targetName = commMatch?.[1]?.trim() || "contact";
-                                        const bodyText = commMatch?.[2]?.trim() || message;
+                                        // Parse "text/email/message [to] <name> [saying/about/that/: <body>]"
+                                        // Split on known keyword boundaries to avoid backtracking on long input
                                         const channel = /\bemail\b/i.test(message) ? "email" : "sms";
+                                        const withoutVerb = message.replace(/^\s*\b(?:text|message|email)\s+(?:to\s+)?/i, "");
+                                        const bodyKeyword = withoutVerb.search(/\s+(?:saying|about|that|:)\s+/i);
+                                        const targetName = (bodyKeyword > 0 ? withoutVerb.slice(0, bodyKeyword) : withoutVerb).trim().slice(0, 200) || "contact";
+                                        const bodyText = bodyKeyword > 0 ? withoutVerb.slice(withoutVerb.indexOf(" ", bodyKeyword) + 1).trim() : message;
                                         const result = await db.run(
                                                 `INSERT INTO communication_drafts (user_id, channel, target_name, target_value, body, source)
                                                  VALUES (?, ?, ?, ?, ?, 'dex_chat')`,
-                                                [userId, channel, targetName, targetName, bodyText]
+                                                [userId, channel, targetName, targetName, bodyText.slice(0, 2000)]
                                         );
                                         communicationDraft = {
                                                 id: result.lastID,
                                                 channel,
                                                 targetName,
-                                                body: bodyText,
+                                                body: bodyText.slice(0, 2000),
                                         };
                                         automationPerformed = true;
                                 } catch (e) {
@@ -2676,11 +2680,12 @@ router.post("/games/checkers/move", requireUser, async (req, res) => {
 });
 
 // POST /api/dex/tts — OpenAI text-to-speech (streams MP3 back to the client)
+const MAX_TTS_INPUT_LENGTH = 4096; // OpenAI TTS input character limit
 router.post("/tts", requireUser, [body("text").notEmpty().trim()], async (req, res) => {
 	const errors = validationResult(req);
 	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-	const text = String(req.body.text || "").trim().slice(0, 4096);
+	const text = String(req.body.text || "").trim().slice(0, MAX_TTS_INPUT_LENGTH);
 	if (!text) return res.status(400).json({ error: "text required" });
 
 	try {

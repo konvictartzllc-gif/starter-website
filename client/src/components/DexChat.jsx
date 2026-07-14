@@ -547,6 +547,11 @@ export default function DexChat() {
     loadShop();
   }
 
+  function openBoardGames() {
+    setOpen(false);
+    navigate("/games");
+  }
+
   function submitGameAnswer(e) {
     e.preventDefault();
     if (gameFeedback || memoryVisible) return;
@@ -879,7 +884,7 @@ export default function DexChat() {
             </button>
             <button
               type="button"
-              onClick={() => { setOpen(false); navigate("/games"); }}
+              onClick={openBoardGames}
               className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
             >
               Board Games
