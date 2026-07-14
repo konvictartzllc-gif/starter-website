@@ -192,14 +192,3 @@ export async function sendPasswordResetEmail(email, name, resetLink) {
     </div>`
   );
 }
-
-  const safeSubject = subject || ad?.title || "Konvict Artz update";
-  const html = `
-    <div style="font-family:sans-serif;max-width:600px;margin:auto;">
-      <h2>${ad?.title || safeSubject}</h2>
-      <p>${ad?.content || ""}</p>
-      ${ad?.image ? `<img src="${ad.image}" alt="${ad.title || "Ad image"}" style="max-width:100%;height:auto;" />` : ""}
-    </div>
-  `;
-  return await send(to, safeSubject, html);
-}
