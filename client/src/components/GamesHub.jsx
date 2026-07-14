@@ -449,28 +449,77 @@ function ChessGame() {
   async function dexMoveAPI(nb, hist) {
     try {
       const data = await api.dexChessMove({ board: nb, history: hist });
-      const moveStr = data.move || "";
+      const moveStr = (data.move || "").trim();
       const comment = data.comment || "Your move.";
 
-      // Parse move like "e5", "Nf6" or fallback to local
-      let parsed = null;
       const fileMap = { a: 0, b: 1, c: 2, d: 3, e: 4, f: 5, g: 6, h: 7 };
-      const simple = moveStr.match(/^([a-h])([1-8])$/);
-      if (simple) {
-        const tc = fileMap[simple[1]], tr = 8 - parseInt(simple[2]);
-        // find a black piece that can move there
+      let parsed = null;
+
+      // Handle castling O-O or O-O-O (black, row 0)
+      if (moveStr === "O-O" || moveStr === "0-0") {
+        if (nb[0][4] === "bK" && nb[0][7] === "bR" && !nb[0][5] && !nb[0][6]) {
+          const nb2 = nb.map((row) => [...row]);
+          nb2[0][4] = null; nb2[0][7] = null;
+          nb2[0][6] = "bK"; nb2[0][5] = "bR";
+          setBoard(nb2);
+          setDexComment(comment);
+          setMoveHistory([...hist, "b:castle-short"]);
+          const wKing = nb2.flat().find((p) => p === "wK");
+          if (!wKing) setGameOver("Dex wins! Your king was captured.");
+          setIsWhiteTurn(true);
+          setDexThinking(false);
+          return;
+        }
+      }
+      if (moveStr === "O-O-O" || moveStr === "0-0-0") {
+        if (nb[0][4] === "bK" && nb[0][0] === "bR" && !nb[0][1] && !nb[0][2] && !nb[0][3]) {
+          const nb2 = nb.map((row) => [...row]);
+          nb2[0][4] = null; nb2[0][0] = null;
+          nb2[0][2] = "bK"; nb2[0][3] = "bR";
+          setBoard(nb2);
+          setDexComment(comment);
+          setMoveHistory([...hist, "b:castle-long"]);
+          const wKing = nb2.flat().find((p) => p === "wK");
+          if (!wKing) setGameOver("Dex wins! Your king was captured.");
+          setIsWhiteTurn(true);
+          setDexThinking(false);
+          return;
+        }
+      }
+
+      // Parse standard algebraic notation
+      // Strip check/checkmate indicators
+      const cleanMove = moveStr.replace(/[+#!?]/g, "");
+
+      // Piece type prefix: K, Q, R, B, N or pawn (no prefix)
+      const pieceTypeMap = { K: "K", Q: "Q", R: "R", B: "B", N: "N" };
+      const pieceMatch = cleanMove.match(/^([KQRBN])?([a-h])?([1-8])?x?([a-h])([1-8])(?:=([QRBN]))?$/);
+
+      if (pieceMatch) {
+        const pieceChar = pieceMatch[1] || "P"; // no prefix = pawn
+        const disambigFile = pieceMatch[2]; // optional from-file
+        const disambigRank = pieceMatch[3]; // optional from-rank
+        const toFile = pieceMatch[4];
+        const toRank = pieceMatch[5];
+        const tc = fileMap[toFile];
+        const tr = 8 - parseInt(toRank);
+        const pieceCode = `b${pieceTypeMap[pieceChar] || "P"}`;
+
+        // Find matching black piece that can legally move to (tr, tc)
+        const candidates = [];
         for (let r = 0; r < 8; r++) {
           for (let c = 0; c < 8; c++) {
-            if (isBlack(nb[r][c])) {
-              const ms = getChessMoves(nb, r, c);
-              if (ms.some(([mr, mc]) => mr === tr && mc === tc)) {
-                parsed = { fr: r, fc: c, tr, tc };
-                break;
-              }
+            if (nb[r][c] !== pieceCode) continue;
+            if (disambigFile && fileMap[disambigFile] !== c) continue;
+            if (disambigRank && (8 - parseInt(disambigRank)) !== r) continue;
+            const moves = getChessMoves(nb, r, c);
+            if (moves.some(([mr, mc]) => mr === tr && mc === tc)) {
+              candidates.push({ fr: r, fc: c, tr, tc });
             }
           }
-          if (parsed) break;
         }
+
+        if (candidates.length > 0) parsed = candidates[0];
       }
 
       if (parsed) {
@@ -479,7 +528,7 @@ function ChessGame() {
         setBoard(nb2);
         setDexComment(comment);
         setMoveHistory([...hist, `b:${parsed.fr},${parsed.fc}->${parsed.tr},${parsed.tc}`]);
-        if (!wKing) { setGameOver("Dex wins! Your king was captured."); }
+        if (!wKing) setGameOver("Dex wins! Your king was captured.");
         setIsWhiteTurn(true);
       } else {
         dexMoveLocal(nb, hist);

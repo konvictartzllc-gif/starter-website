@@ -424,10 +424,9 @@ const LESSON_TYPE_POOL = [
         "slang",
 ];
 
-function pickLessonType(lessonType, recentLessons = []) {
+function pickLessonType(lessonType, recentLessonTypes = []) {
         if (lessonType) return lessonType;
-        const recentTypes = recentLessons.map((l) => l.lesson_type).filter(Boolean);
-        const available = LESSON_TYPE_POOL.filter((t) => !recentTypes.slice(0, 3).includes(t));
+        const available = LESSON_TYPE_POOL.filter((t) => !recentLessonTypes.slice(0, 3).includes(t));
         const pool = available.length > 0 ? available : LESSON_TYPE_POOL;
         return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -1474,11 +1473,11 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
                 }
         }
 
-        const recentLessons = await db.all(
+        const recentLessonTypes = await db.all(
                 `SELECT lesson_type FROM learning_lessons WHERE user_id = ? ORDER BY created_at DESC LIMIT 5`,
                 [req.user.id]
         );
-        const chosenLessonType = pickLessonType(learning.lessonType, recentLessons);
+        const chosenLessonType = pickLessonType(learning.lessonType, recentLessonTypes.map((l) => l.lesson_type));
 
         try {
                 const openai = getOpenAI();
