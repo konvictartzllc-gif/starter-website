@@ -221,16 +221,27 @@ async function checkInventoryAlerts() {
 
 // ── Start server ──────────────────────────────────────────────────────────────
 async function start() {
-  requireJwtSecret();
+  const missingVars = [];
+  try { requireJwtSecret(); } catch { missingVars.push("JWT_SECRET"); }
+
   const dbPath = getDefaultDbPath(path.join(__dirname, ".."));
   const adminUsername = process.env.ADMIN_EMAIL?.trim();
   const adminPassword = process.env.ADMIN_PASSWORD?.trim();
 
-  if (!adminUsername || !adminPassword) {
-    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be configured before Dex can start.");
+  if (!adminUsername) missingVars.push("ADMIN_EMAIL");
+  if (!adminPassword) missingVars.push("ADMIN_PASSWORD");
+
+  if (missingVars.length > 0) {
+    console.error(`❌ Missing required environment variables: ${missingVars.join(", ")}`);
+    console.error("   The server will start but auth endpoints will not work until these are set.");
   }
 
-  await initDb({ dbPath, adminUsername, adminPassword });
+  if (adminUsername && adminPassword) {
+    await initDb({ dbPath, adminUsername, adminPassword });
+  } else {
+    console.warn("⚠️  Skipping database init: ADMIN_EMAIL or ADMIN_PASSWORD not set.");
+  }
+
   initEmail();
   initCommunications();
   await initAI();
@@ -240,9 +251,12 @@ async function start() {
 
   app.listen(PORT, () => {
     console.log(`\n🚀 Konvict Artz - Dex AI Backend running on port ${PORT}`);
-    console.log(`   Admin login: ${adminUsername}`);
+    if (adminUsername) console.log(`   Admin login: ${adminUsername}`);
     console.log(`   Health: http://localhost:${PORT}/health`);
     console.log(`   Provider status: AI=${getAIStatus().reason}, Email=${getEmailStatus().reason}, Communications=${getCommunicationsStatus().reason}\n`);
+    if (missingVars.length > 0) {
+      console.warn(`   ⚠️  Missing env vars (set in Railway dashboard): ${missingVars.join(", ")}`);
+    }
   });
 }
 
