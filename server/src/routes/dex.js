@@ -753,15 +753,15 @@ async function buildMorningBriefing(db, userId) {
                 kind: task.kind,
         }));
 
-        const highlights = [];
-        if (specialDays.length) {
-                for (const sd of specialDays) {
-                        const kindLabel = sd.kind === "birthday" ? "🎂 Birthday" :
-                        	sd.kind === "anniversary" ? "💍 Anniversary" :
-                        	sd.kind === "holiday" ? "🎉 Holiday" : "📌 Reminder";
-                        highlights.push(`${kindLabel}: ${sd.title} is today!`);
-                }
-        }
+	const highlights = [];
+	if (specialDays.length) {
+		for (const sd of specialDays) {
+			const kindLabel = sd.kind === "birthday" ? "🎂 Birthday" :
+				sd.kind === "anniversary" ? "💍 Anniversary" :
+				sd.kind === "holiday" ? "🎉 Holiday" : "📌 Reminder";
+			highlights.push(`${kindLabel}: ${sd.title} is today!`);
+		}
+	}
         if (agenda.length) {
                 highlights.push(`You have ${agenda.length} calendar item${agenda.length === 1 ? "" : "s"} today.`);
         }
@@ -2275,26 +2275,26 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 } catch (e) {
                                         console.error("Auto-calendar sync failed:", e.message);
                                 }
-                        }
-                        // Remind automation — create a task_item so Dex tracks and delivers the reminder
-                        if (matchedIntent === "remind" && enabledAutomations["remind"]) {
-                                try {
-                                	await ensureTaskItemsTable(db);
-                                			await db.run(
-                                			`INSERT INTO task_items (user_id, title, details, kind, source)
-                                			 VALUES (?, ?, ?, 'reminder', 'dex_chat')`,
-                                			[req.user.id, message.slice(0, 200), `Captured from chat: "${message.slice(0, 500)}"`]
-                                		);
-                                	automationPerformed = true;
-                                } catch (e) {
-                                	console.error("Auto-reminder task creation failed:", e.message);
-                                }
-                        }
-                        // Call automation (stub)
-                        if (matchedIntent === "call" && enabledAutomations["call"]) {
-                                // Future: integrate with Android call trigger
-                                automationPerformed = true;
-                        }
+			}
+			// Remind automation — create a task_item so Dex tracks and delivers the reminder
+			if (matchedIntent === "remind" && enabledAutomations["remind"]) {
+				try {
+					await ensureTaskItemsTable(db);
+					await db.run(
+                        `INSERT INTO task_items (user_id, title, details, kind, source)
+                         VALUES (?, ?, ?, 'reminder', 'dex_chat')`,
+                        [req.user.id, message.slice(0, 200), `Captured from chat: "${message.slice(0, 500)}"`]
+					);
+					automationPerformed = true;
+				} catch (e) {
+					console.error("Auto-reminder task creation failed:", e.message);
+				}
+			}
+			// Call automation (stub)
+			if (matchedIntent === "call" && enabledAutomations["call"]) {
+				// Future: integrate with Android call trigger
+				automationPerformed = true;
+			}
 
                         return res.json({
                                 reply,
