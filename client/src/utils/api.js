@@ -15,7 +15,7 @@ function shouldUseSameOriginApi() {
 
 const BASE = shouldUseSameOriginApi()
   ? "/api"
-  : normalizeApiBase(import.meta.env.VITE_API_URL || "https://konvict-artz-api.konvictartzllc.workers.dev");
+  : normalizeApiBase(import.meta.env.VITE_API_URL || "https://konvict-artz-backend-production.up.railway.app");
 
 function getToken() {
   return localStorage.getItem("dex_token");
