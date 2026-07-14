@@ -18,6 +18,7 @@ import { getToneInstruction, styleResponse } from "../services/responseStyler.js
 import { buildSupportReply, detectSafetySignal } from "../services/safetySignals.js";
 import { dexIntentEngine } from "../services/dexIntentEngine.js";
 import { getPublicApiBaseUrl } from "../deploy.js";
+import { scheduleAppointmentNotifications } from "../services/notificationScheduler.js";
 const router = Router();
 
 const CHAT_MEMORY_RETENTION_DAYS = 3;
@@ -192,6 +193,7 @@ const FREE_SETTING_KEYS = new Set([
         "learning_subject",
         "daily_briefing_enabled",
         "daily_briefing_time",
+        "notification_phone",
         "comfort_style",
         "grounding_preference",
         "safety_follow_up_opt_in",
@@ -657,8 +659,21 @@ async function buildMorningBriefing(db, userId) {
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(now);
         endOfDay.setHours(23, 59, 59, 999);
+        const todayKey = now.toISOString().slice(0, 10);
+        const monthDay = todayKey.slice(5);
 
-        const [appointments, tasks, callEvents, aliases, preferences, lessons, quizAttempts] = await Promise.all([
+        // Ensure special_days table exists (best-effort — may not exist on first run)
+        try {
+                await db.run(`CREATE TABLE IF NOT EXISTS special_days (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                        title TEXT NOT NULL, date TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'reminder',
+                        recur_yearly INTEGER NOT NULL DEFAULT 0, notes TEXT,
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )`);
+        } catch {}
+
+        const [appointments, tasks, callEvents, aliases, preferences, lessons, quizAttempts, specialDays] = await Promise.all([
                 db.all(
                         `SELECT * FROM appointments
                           WHERE user_id = ?
@@ -712,6 +727,13 @@ async function buildMorningBriefing(db, userId) {
                           LIMIT 8`,
                         [userId]
                 ),
+                db.all(
+                        `SELECT * FROM special_days
+                          WHERE user_id = ?
+                            AND (date = ? OR (recur_yearly = 1 AND substr(date,6) = ?))
+                          ORDER BY date ASC`,
+                        [userId, todayKey, monthDay]
+                ).catch(() => []),
         ]);
 
         const nextLesson = buildWeakAreaRecommendation(quizAttempts, preferences);
@@ -732,6 +754,14 @@ async function buildMorningBriefing(db, userId) {
         }));
 
         const highlights = [];
+        if (specialDays.length) {
+                for (const sd of specialDays) {
+                        const kindLabel = sd.kind === "birthday" ? "🎂 Birthday" :
+                        	sd.kind === "anniversary" ? "💍 Anniversary" :
+                        	sd.kind === "holiday" ? "🎉 Holiday" : "📌 Reminder";
+                        highlights.push(`${kindLabel}: ${sd.title} is today!`);
+                }
+        }
         if (agenda.length) {
                 highlights.push(`You have ${agenda.length} calendar item${agenda.length === 1 ? "" : "s"} today.`);
         }
@@ -757,6 +787,7 @@ async function buildMorningBriefing(db, userId) {
                 aliases,
                 nextLesson,
                 followUps,
+                specialDays,
                 tone: preferences.conversation_tone || "balanced",
                 latestLesson: lessons[0] || null,
         };
@@ -2245,10 +2276,19 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                         console.error("Auto-calendar sync failed:", e.message);
                                 }
                         }
-                        // Remind automation (stub)
+                        // Remind automation — create a task_item so Dex tracks and delivers the reminder
                         if (matchedIntent === "remind" && enabledAutomations["remind"]) {
-                                // Future: integrate with reminders/notifications
-                                automationPerformed = true;
+                                try {
+                                	await ensureTaskItemsTable(db);
+                                			await db.run(
+                                			`INSERT INTO task_items (user_id, title, details, kind, source)
+                                			 VALUES (?, ?, ?, 'reminder', 'dex_chat')`,
+                                			[req.user.id, message.slice(0, 200), `Captured from chat: "${message.slice(0, 500)}"`]
+                                		);
+                                	automationPerformed = true;
+                                } catch (e) {
+                                	console.error("Auto-reminder task creation failed:", e.message);
+                                }
                         }
                         // Call automation (stub)
                         if (matchedIntent === "call" && enabledAutomations["call"]) {
@@ -2366,7 +2406,39 @@ router.post("/appointment", requireUser, [
                 }
         }
 
+        // Auto-schedule reminders for the new appointment
+        try {
+        	await scheduleAppointmentNotifications(db, req.user.id, { id: result.lastID, start_time });
+        } catch (err) {
+        	console.warn("[Appointment] Could not schedule notifications:", err.message);
+        }
+
         return res.json({ success: true, id: result.lastID, title, start_time });
+});
+
+// Schedule reminders for an existing appointment by ID
+router.post("/appointment/:id/notify", requireUser, async (req, res) => {
+        const db = getDb();
+        const appt = await db.get(
+        	"SELECT * FROM appointments WHERE id = ? AND user_id = ?",
+        	[req.params.id, req.user.id]
+        );
+        if (!appt) return res.status(404).json({ error: "Appointment not found." });
+        await scheduleAppointmentNotifications(db, req.user.id, appt);
+        res.json({ success: true, message: "Reminders scheduled." });
+});
+
+// Delete an appointment
+router.delete("/appointment/:id", requireUser, async (req, res) => {
+        const db = getDb();
+        const appt = await db.get(
+        	"SELECT id FROM appointments WHERE id = ? AND user_id = ?",
+        	[req.params.id, req.user.id]
+        );
+        if (!appt) return res.status(404).json({ error: "Appointment not found." });
+        await db.run("DELETE FROM appointments WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+        await db.run("DELETE FROM appointment_notifications WHERE appointment_id = ?", [appt.id]);
+        res.json({ success: true });
 });
 
 router.get("/appointments", requireUser, async (req, res) => {
@@ -2376,6 +2448,96 @@ router.get("/appointments", requireUser, async (req, res) => {
           [req.user.id]
         );
     return res.json(appts);
+});
+
+// ── SPECIAL DAYS ─────────────────────────────────────────────────────────────
+// Birthdays, anniversaries, holidays, and any marked calendar day
+
+async function ensureSpecialDaysTable(db) {
+        await db.run(`
+        	CREATE TABLE IF NOT EXISTS special_days (
+        		id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        		user_id      INTEGER NOT NULL,
+        		title        TEXT NOT NULL,
+        		date         TEXT NOT NULL,
+        		kind         TEXT NOT NULL DEFAULT 'reminder',
+        		recur_yearly INTEGER NOT NULL DEFAULT 0,
+        		notes        TEXT,
+        		created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        		updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+        	)
+        `);
+}
+
+router.get("/special-days", requireUser, async (req, res) => {
+        const db = getDb();
+        await ensureSpecialDaysTable(db);
+        const rows = await db.all(
+        	"SELECT * FROM special_days WHERE user_id = ? ORDER BY date ASC",
+        	[req.user.id]
+        );
+        res.json({ specialDays: rows });
+});
+
+router.post("/special-days", requireUser, [
+        body("title").notEmpty().trim(),
+        body("date").notEmpty(),
+        body("kind").optional().isIn(["birthday", "anniversary", "holiday", "reminder"]),
+], async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+        const db = getDb();
+        await ensureSpecialDaysTable(db);
+        const { title, date, kind, recur_yearly, notes } = req.body;
+        const result = await db.run(
+        	`INSERT INTO special_days (user_id, title, date, kind, recur_yearly, notes)
+        	 VALUES (?, ?, ?, ?, ?, ?)`,
+        	[
+        		req.user.id,
+        		title.trim(),
+        		date,
+        		kind || "reminder",
+        		recur_yearly ? 1 : 0,
+        		notes || null,
+        	]
+        );
+        const saved = await db.get("SELECT * FROM special_days WHERE id = ?", [result.lastID]);
+        res.json({ success: true, specialDay: saved });
+});
+
+router.patch("/special-days/:id", requireUser, async (req, res) => {
+        const db = getDb();
+        await ensureSpecialDaysTable(db);
+        const current = await db.get(
+        	"SELECT * FROM special_days WHERE id = ? AND user_id = ?",
+        	[req.params.id, req.user.id]
+        );
+        if (!current) return res.status(404).json({ error: "Special day not found." });
+        const title = req.body.title !== undefined ? String(req.body.title).trim() : current.title;
+        const date = req.body.date !== undefined ? req.body.date : current.date;
+        const kind = req.body.kind !== undefined ? req.body.kind : current.kind;
+        const recurYearly = req.body.recur_yearly !== undefined ? (req.body.recur_yearly ? 1 : 0) : current.recur_yearly;
+        const notes = req.body.notes !== undefined ? req.body.notes : current.notes;
+        await db.run(
+        	`UPDATE special_days
+        	    SET title = ?, date = ?, kind = ?, recur_yearly = ?, notes = ?, updated_at = datetime('now')
+        	  WHERE id = ? AND user_id = ?`,
+        	[title, date, kind, recurYearly, notes, req.params.id, req.user.id]
+        );
+        const updated = await db.get("SELECT * FROM special_days WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+        res.json({ success: true, specialDay: updated });
+});
+
+router.delete("/special-days/:id", requireUser, async (req, res) => {
+        const db = getDb();
+        await ensureSpecialDaysTable(db);
+        const row = await db.get(
+        	"SELECT id FROM special_days WHERE id = ? AND user_id = ?",
+        	[req.params.id, req.user.id]
+        );
+        if (!row) return res.status(404).json({ error: "Special day not found." });
+        await db.run("DELETE FROM special_days WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+        res.json({ success: true });
 });
 
 router.get("/history", requireUser, async (req, res) => {
