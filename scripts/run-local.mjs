@@ -5,14 +5,27 @@ const mode = process.argv[2] === "start" ? "start" : "dev";
 const HEALTH_PATH = "/api/health";
 
 function isServerAlreadyRunning() {
-  return new Promise((resolve) => {
-    const req = http.get(
-      {
-        hostname: "localhost",
-        port: 4000,
-        path: HEALTH_PATH,
-        timeout: 1200,
-      },
+  return new Promisejavascript
+const http = require('http');
+
+const HEALTH_PATH = '/health';
+
+const gpt35TurboReq = http.get(
+  {
+    hostname: "localhost",
+    port: 3001,
+    path: HEALTH_PATH
+  },
+  (res) => {
+    let data = '';
+    res.on('data', (chunk) => {
+      data += chunk;
+    });
+    res.on('end', () => {
+      console.log(JSON.parse(data));
+    });
+  }
+);
       (res) => {
         let raw = "";
         res.setEncoding("utf8");
@@ -33,8 +46,8 @@ function isServerAlreadyRunning() {
           }
         });
       }
-    );
-
+  ;
+}gpt-3.5-turbo
     req.on("timeout", () => {
       req.destroy();
       resolve(false);
@@ -43,8 +56,8 @@ function isServerAlreadyRunning() {
     req.on("error", () => {
       resolve(false);
     });
-  });
-}
+  ;
+
 
 function runServerScript(scriptName) {
   const child = spawn("npm", ["--prefix", "server", "run", scriptName], {
@@ -53,14 +66,14 @@ function runServerScript(scriptName) {
   });
 
   child.on("exit", (code) => {
-    process.exit(code ?? 0);
+    process.exit(code || 0); // Changed '??' to '||' for compatibility
   });
 }
 
 const running = await isServerAlreadyRunning();
 
 if (running) {
-  console.log("Server already running at http://localhost:4000 (health check passed).");
+  console.log("Server already running at http://localhost:3001 (health check passed).");
   process.exit(0);
 }
 
