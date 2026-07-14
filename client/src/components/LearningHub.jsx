@@ -3,6 +3,18 @@ import { api } from "../utils/api";
 
 const VOICE_STORAGE_KEY = "dex_voice_name";
 
+const LESSON_TYPE_OPTIONS = [
+  { value: "", label: "Dex Picks" },
+  { value: "conversation", label: "Conversation" },
+  { value: "grammar", label: "Grammar" },
+  { value: "culture", label: "Culture" },
+  { value: "pronunciation", label: "Pronunciation" },
+  { value: "storytelling", label: "Story" },
+  { value: "dialogue", label: "Dialogue" },
+  { value: "vocabulary", label: "Vocabulary" },
+  { value: "slang", label: "Slang & Idioms" },
+];
+
 function getPreferredVoice() {
   if (!("speechSynthesis" in window)) return null;
   const voices = window.speechSynthesis.getVoices();
@@ -34,32 +46,66 @@ function splitLessonSections(content = "") {
     pronunciation: [],
     examples: [],
     practice: [],
+    dialogue: [],
+    culture: [],
     other: [],
   };
 
   let current = "other";
   for (const line of lines) {
     const lower = line.toLowerCase();
-    if (lower.includes("vocabulary")) {
-      current = "vocabulary";
-      continue;
-    }
-    if (lower.includes("pronunciation")) {
-      current = "pronunciation";
-      continue;
-    }
-    if (lower.includes("example")) {
-      current = "examples";
-      continue;
-    }
-    if (lower.includes("practice") || lower.includes("prompt")) {
-      current = "practice";
-      continue;
-    }
+    if (lower.includes("vocabulary") || lower.includes("words")) { current = "vocabulary"; continue; }
+    if (lower.includes("pronunciation") || lower.includes("phonetic")) { current = "pronunciation"; continue; }
+    if (lower.includes("example") || lower.includes("sentence")) { current = "examples"; continue; }
+    if (lower.includes("practice") || lower.includes("prompt") || lower.includes("challenge")) { current = "practice"; continue; }
+    if (lower.includes("dialogue") || lower.includes("speaker") || lower.includes("person a") || lower.includes("person b")) { current = "dialogue"; continue; }
+    if (lower.includes("culture") || lower.includes("tradition") || lower.includes("custom")) { current = "culture"; continue; }
     sections[current].push(line);
   }
 
   return sections;
+}
+
+const LESSON_INTROS = [
+  (subject, level) => `Alright, pull up a chair. Today we are doing ${subject} — ${level} style.`,
+  (subject, level) => `Hey, glad you are here. I have got a ${level} ${subject} lesson ready and it is a good one.`,
+  (subject) => `Okay, let's get into it. ${subject}. This one is going to stick with you.`,
+  (subject, level) => `No textbook energy today. Just you, me, and real ${subject}. We are at ${level} level, so here is what you need to know.`,
+  (subject) => `I picked this one specifically for where you are. Today: ${subject}. Stay with me.`,
+];
+
+const VOCAB_BRIDGES = [
+  "Let me hit you with the key words first. Say each one once in your head.",
+  "Before anything else, here are the words that matter.",
+  "These are the building blocks. Learn these and the rest will click.",
+];
+
+const PRONUNCIATION_BRIDGES = [
+  "Now, how do you actually say this? Slow it down — let your mouth learn the shape.",
+  "Pronunciation time. This part is worth slowing down for.",
+  "Listen closely. The way your mouth moves here is what makes it sound natural.",
+];
+
+const EXAMPLE_BRIDGES = [
+  "Here is what it looks like in the real world.",
+  "Now watch how it sounds in an actual sentence.",
+  "Real talk — here is how a native speaker would use this.",
+];
+
+const CULTURE_BRIDGES = [
+  "Here is something I bet you did not know.",
+  "This next part is about more than just words — it is about the people.",
+  "Context matters. Here is the culture behind this.",
+];
+
+const PRACTICE_CLOSERS = [
+  "Your turn. Say one sentence out loud using what you just learned. Do not overthink it.",
+  "Now practice. Make one short sentence and say it aloud before you move on.",
+  "Try it yourself. One sentence. Out loud. That is all I need from you right now.",
+];
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 function buildTeachingScript(lesson) {
@@ -67,41 +113,59 @@ function buildTeachingScript(lesson) {
   const sections = splitLessonSections(lesson.content);
   const subject = lesson.language || "today's topic";
   const level = lesson.level || "your level";
+  const lessonType = lesson.lesson_type || "";
+
+  const introFn = pickRandom(LESSON_INTROS);
   const script = [
-    `Alright, let's learn this together. Today's lesson is ${lesson.title}.`,
-    `I am going to teach it like we are practicing out loud, not just reading notes. This is for ${subject}, at ${level}.`,
+    introFn(subject, level),
+    `Today's lesson: ${lesson.title}.`,
   ];
 
+  if (lessonType === "culture" && sections.culture.length) {
+    script.push(pickRandom(CULTURE_BRIDGES));
+    script.push(sections.culture.slice(0, 3).join(". "));
+  }
+
+  if (lessonType === "storytelling" && sections.other.length) {
+    script.push("Here is a short story. Listen for familiar patterns.");
+    script.push(sections.other.slice(0, 4).join(" "));
+  }
+
+  if (lessonType === "dialogue" && sections.dialogue.length) {
+    script.push("I am going to walk you through a real exchange now. Picture yourself in this conversation.");
+    script.push(sections.dialogue.slice(0, 6).join(". "));
+  }
+
   if (sections.vocabulary.length) {
-    script.push("First, listen for the key words.");
-    script.push(sections.vocabulary.slice(0, 4).join(". "));
-    script.push("Say those once in your head, and notice which one feels hardest.");
+    script.push(pickRandom(VOCAB_BRIDGES));
+    script.push(sections.vocabulary.slice(0, 5).join(". "));
+    script.push("Which one felt new? That is the one to drill.");
   }
 
   if (sections.pronunciation.length) {
-    script.push("Now pronunciation. Slow it down and let your mouth learn the shape.");
+    script.push(pickRandom(PRONUNCIATION_BRIDGES));
     script.push(sections.pronunciation.slice(0, 3).join(". "));
   }
 
   if (sections.examples.length) {
-    script.push("Here is how it sounds in real use.");
+    script.push(pickRandom(EXAMPLE_BRIDGES));
     script.push(sections.examples.slice(0, 3).join(". "));
-    script.push("The point is not perfection. The point is recognizing the pattern when you hear it again.");
+    script.push("Notice the pattern. The goal is not perfection — it is recognition.");
   }
 
-  const extra = sections.other.slice(0, 3).join(". ");
+  const extra = sections.other.filter((_, i) => lessonType !== "storytelling" || i > 3).slice(0, 2).join(". ");
   if (extra) {
-    script.push(`One useful thing to remember is this. ${extra}`);
+    script.push(`One thing I want you to remember from this lesson: ${extra}`);
   }
 
   if (sections.practice.length) {
-    script.push("Now your turn. Here is the practice.");
+    script.push(pickRandom(PRACTICE_CLOSERS));
     script.push(sections.practice.slice(0, 2).join(". "));
   } else {
-    script.push("Now your turn. Try making one short sentence using the main word from this lesson.");
+    script.push(pickRandom(PRACTICE_CLOSERS));
   }
 
-  script.push("Take a second. Say your answer out loud, then tap Start Quiz Mode when you want me to check what stuck.");
+  script.push("When you are ready, tap Start Quiz Mode and I will check what stuck.");
   return script;
 }
 
@@ -115,6 +179,7 @@ export default function LearningHub() {
   const [answers, setAnswers] = useState([]);
   const [quizResult, setQuizResult] = useState(null);
   const [speaking, setSpeaking] = useState(false);
+  const [selectedLessonType, setSelectedLessonType] = useState("");
   const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
   function speakText(text, options = {}) {
@@ -218,7 +283,8 @@ export default function LearningHub() {
     setBusy("lesson");
     setError("");
     try {
-      const data = await api.getDailyLesson();
+      const body = selectedLessonType ? { lessonType: selectedLessonType } : {};
+      const data = await api.getDailyLesson(body);
       setLesson(data.lesson);
       setQuiz(null);
       setQuizResult(null);
@@ -300,6 +366,26 @@ export default function LearningHub() {
         </button>
       </div>
 
+      <div>
+        <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Lesson Type</p>
+        <div className="flex flex-wrap gap-2">
+          {LESSON_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setSelectedLessonType(opt.value)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold border transition-all ${
+                selectedLessonType === opt.value
+                  ? "bg-brand border-brand text-white"
+                  : "border-gray-700 text-gray-400 hover:border-gray-500"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-md border border-gray-800 bg-gray-950 px-4 py-3">
           <div className="text-xs uppercase tracking-wide text-gray-500">Quiz Attempts</div>
@@ -345,7 +431,12 @@ export default function LearningHub() {
       {lesson && (
         <div className="rounded-lg border border-gray-800 bg-gray-950 p-4 space-y-3">
           <div>
-            <div className="text-xs uppercase tracking-wide text-gray-500">{lesson.language} • {lesson.level}</div>
+            <div className="text-xs uppercase tracking-wide text-gray-500">
+              {lesson.language} • {lesson.level}
+              {lesson.lesson_type && lesson.lesson_type !== "daily" && (
+                <span className="ml-2 text-brand capitalize">{lesson.lesson_type}</span>
+              )}
+            </div>
             <h3 className="text-lg font-semibold text-white mt-1">{lesson.title}</h3>
           </div>
           <div className="flex flex-wrap gap-2">
