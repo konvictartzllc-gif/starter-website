@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { api } from "../utils/api.js";
 
 const WAKE_WORD = "hey dex";
 const WAKE_VARIANTS = [
@@ -45,6 +46,7 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
   const idlePromptActiveRef = useRef(false);
   const synthRef = useRef(window.speechSynthesis);
   const isSpeakingRef = useRef(false);
+  const audioRef = useRef(null);
   const lastCommandRef = useRef({ text: "", at: 0 });
   const onWakeWordRef = useRef(onWakeWord);
   const onTranscriptRef = useRef(onTranscript);
@@ -250,9 +252,20 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
 
   const speak = useCallback((text) => {
     const synth = synthRef.current;
-    if (!synth || !text?.trim()) return;
+    if (!text?.trim()) return;
 
-    const speakNow = () => {
+    const resumeListening = () => {
+      isSpeakingRef.current = false;
+      setError("");
+      setStatus("listening");
+      try { recognitionRef.current?.start(); } catch {}
+      if (conversationActiveRef.current && !idlePromptActiveRef.current) {
+        scheduleIdlePrompt();
+      }
+    };
+
+    const speakWithBrowser = () => {
+      if (!synth) { resumeListening(); return; }
       isSpeakingRef.current = true;
       clearWakeTimeout();
       listeningForCommandRef.current = false;
@@ -263,7 +276,6 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
       utterance.rate = 0.9;
       utterance.pitch = 0.95;
       utterance.volume = 1.0;
-      // Try to pick a natural voice
       const voices = synth.getVoices();
       const savedVoiceName = window.localStorage.getItem(VOICE_STORAGE_KEY);
       const preferred =
@@ -276,35 +288,70 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
         );
       if (preferred) utterance.voice = preferred;
       setStatus("speaking");
-      const resumeListening = () => {
-        isSpeakingRef.current = false;
-        setError("");
-        setStatus("listening");
-        try { recognitionRef.current?.start(); } catch {}
-        if (conversationActiveRef.current && !idlePromptActiveRef.current) {
-          scheduleIdlePrompt();
-        }
-      };
       utterance.onend = resumeListening;
       utterance.onerror = resumeListening;
       synth.speak(utterance);
       setError("");
     };
 
-    if (synth.getVoices().length === 0 && "onvoiceschanged" in synth) {
-      synth.onvoiceschanged = () => {
-        synth.onvoiceschanged = null;
+    const speakNow = () => {
+      if (synth?.getVoices().length === 0 && "onvoiceschanged" in synth) {
+        synth.onvoiceschanged = () => {
+          synth.onvoiceschanged = null;
+          speakWithBrowser();
+        };
+      } else {
+        speakWithBrowser();
+      }
+    };
+
+    const token = localStorage.getItem("dex_token");
+    if (!token) { speakNow(); return; }
+
+    isSpeakingRef.current = true;
+    clearWakeTimeout();
+    listeningForCommandRef.current = false;
+    try { recognitionRef.current?.stop(); } catch {}
+    setStatus("speaking");
+
+    api.speakTts(text)
+      .then(async (res) => {
+        if (!res.ok) throw new Error("tts_failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          audioRef.current = null;
+          resumeListening();
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(url);
+          audioRef.current = null;
+          resumeListening();
+        };
+        audio.play().catch(() => {
+          URL.revokeObjectURL(url);
+          audioRef.current = null;
+          speakNow();
+        });
+      })
+      .catch(() => {
         speakNow();
-      };
-    } else {
-      speakNow();
-    }
+      });
   }, [clearWakeTimeout, scheduleIdlePrompt]);
 
   const stopSpeaking = useCallback(() => {
     const synth = synthRef.current;
-    if (!synth) return;
-    synth.cancel();
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+      } catch {}
+      audioRef.current = null;
+    }
+    if (synth) synth.cancel();
     clearConversationTimers();
     conversationActiveRef.current = false;
     idlePromptActiveRef.current = false;

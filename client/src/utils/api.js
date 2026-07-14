@@ -120,6 +120,13 @@ export const api = {
   dexChessMove: (body) => request("/dex/games/chess/move", { method: "POST", body: JSON.stringify(body) }),
   dexCheckersMove: (body) => request("/dex/games/checkers/move", { method: "POST", body: JSON.stringify(body) }),
 
+  // TTS
+  speakTts: (text) => fetch(`${BASE}/dex/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ text }),
+  }),
+
   // Permissions
   getPermissions: () => request("/dex/permissions"),
   setPermissions: (permissions) => request("/dex/permissions", { method: "POST", body: JSON.stringify({ permissions }) }),
