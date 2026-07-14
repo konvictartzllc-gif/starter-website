@@ -9,6 +9,7 @@ import { initDb } from "./db.js";
 import { getEmailStatus, initEmail } from "./services/email.js";
 import { getCommunicationsStatus, initCommunications } from "./services/communications.js";
 import { getAIStatus, initAI } from "./services/ai.js";
+import { startNotificationScheduler } from "./services/notificationScheduler.js";
 import authRoutes from "./routes/auth.js";
 import dexRoutes from "./routes/dex.js";
 import paymentsRoutes from "./routes/payments.js";
@@ -252,6 +253,7 @@ async function start() {
   // Check inventory every hour (only when DB is initialized)
   if (adminUsername && adminPassword && !missingVars.includes("JWT_SECRET")) {
     setInterval(checkInventoryAlerts, 60 * 60 * 1000);
+    startNotificationScheduler();
   }
 
   app.listen(PORT, () => {

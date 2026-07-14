@@ -6,6 +6,7 @@ import LearningHub from "../components/LearningHub";
 import AssistantHub from "../components/AssistantHub";
 import CommunicationsCenter from "../components/CommunicationsCenter";
 import GamesHub from "../components/GamesHub";
+import CalendarView from "../components/CalendarView";
 
 export default function Settings() {
   return (
@@ -23,6 +24,9 @@ export default function Settings() {
         <BillingPanel />
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
           <AssistantHub />
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+          <CalendarView />
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
           <CommunicationsCenter />
