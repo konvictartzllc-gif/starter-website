@@ -54,7 +54,7 @@ code .\server\.env
 Important current env keys include:
 
 ```env
-PORT=4000
+PORT=3001
 PUBLIC_SITE_URL=https://www.konvict-artz.com
 CLIENT_ORIGIN=https://www.konvict-artz.com
 ALLOWED_ORIGINS=https://www.konvict-artz.com,https://konvict-artz.com
@@ -104,10 +104,10 @@ npm --prefix .\client run dev
 
 Useful backend URLs:
 
-- `http://localhost:4000/`
-- `http://localhost:4000/health`
-- `http://localhost:4000/api/health`
-- `http://localhost:4000/api/diagnostics/providers`
+- `http://localhost:3001/`
+- `http://localhost:3001/health`
+- `http://localhost:3001/api/health`
+- `http://localhost:3001/api/diagnostics/providers`
 
 ## Current Deployment Path
 
