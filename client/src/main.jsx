@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
 
-// Dex Providers
+// Dex global providers
 import { DexProvider } from "./providers/DexProvider";
 import { AvatarProvider } from "./providers/AvatarProvider";
 import { SafetyProvider } from "./providers/SafetyProvider";
