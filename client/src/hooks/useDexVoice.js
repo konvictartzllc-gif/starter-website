@@ -330,19 +330,20 @@ export function useDexVoice({ onWakeWord, onTranscript, onIdlePrompt, enabled = 
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audioRef.current = audio;
-        audio.onended = () => {
+        const cleanupAudio = () => {
           URL.revokeObjectURL(url);
           audioRef.current = null;
+        };
+        audio.onended = () => {
+          cleanupAudio();
           resumeListening();
         };
         audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          audioRef.current = null;
+          cleanupAudio();
           resumeListening();
         };
         audio.play().catch(() => {
-          URL.revokeObjectURL(url);
-          audioRef.current = null;
+          cleanupAudio();
           speakNow();
         });
       })

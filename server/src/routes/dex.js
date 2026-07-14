@@ -2263,7 +2263,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                         if (appointmentIntent) {
                                 try {
                                         const startTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-                                        const apptTitle = message.slice(0, MAX_APPT_TITLE_LENGTH);
+                                        const apptTitle = `Konvict Artz: ${message.slice(0, MAX_APPT_TITLE_LENGTH - 14)}`;
                                         const result = await db.run(
                                                 `INSERT INTO appointments (user_id, title, description, start_time)
                                                  VALUES (?, ?, ?, ?)`,
@@ -2306,12 +2306,15 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 try {
                                         await ensureCommunicationDraftsTable(db);
                                         // Parse "text/email/message [to] <name> [saying/about/that/: <body>]"
-                                        // Split on known keyword boundaries to avoid backtracking on long input
+                                        // Collapse whitespace first so split markers are predictable (no \s+ ReDoS risk)
                                         const channel = /\bemail\b/i.test(message) ? "email" : "sms";
-                                        const withoutVerb = message.replace(/^\s*\b(?:text|message|email)\s+(?:to\s+)?/i, "");
-                                        const bodyKeyword = withoutVerb.search(/\s+(?:saying|about|that|:)\s+/i);
-                                        const targetName = (bodyKeyword > 0 ? withoutVerb.slice(0, bodyKeyword) : withoutVerb).trim().slice(0, 200) || "contact";
-                                        const bodyText = bodyKeyword > 0 ? withoutVerb.slice(withoutVerb.indexOf(" ", bodyKeyword) + 1).trim() : message;
+                                        const normalized = message.replace(/\s+/g, " ").trim();
+                                        const withoutVerb = normalized.replace(/^ *(?:text|message|email) +(?:to +)?/i, "");
+                                        // Split on a single space followed by a keyword then a single space
+                                        const COMM_SPLIT_RE = / (?:saying|about|that) | *: */i;
+                                        const parts = withoutVerb.split(COMM_SPLIT_RE);
+                                        const targetName = (parts[0] || "").trim().slice(0, 200) || "contact";
+                                        const bodyText = parts.length > 1 ? parts.slice(1).join(" ").trim() : normalized;
                                         const result = await db.run(
                                                 `INSERT INTO communication_drafts (user_id, channel, target_name, target_value, body, source)
                                                  VALUES (?, ?, ?, ?, ?, 'dex_chat')`,
