@@ -222,7 +222,10 @@ async function checkInventoryAlerts() {
 // ── Start server ──────────────────────────────────────────────────────────────
 async function start() {
   const missingVars = [];
-  try { requireJwtSecret(); } catch { missingVars.push("JWT_SECRET"); }
+  try { requireJwtSecret(); } catch (err) {
+    console.error("JWT_SECRET error:", err?.message || err);
+    missingVars.push("JWT_SECRET");
+  }
 
   const dbPath = getDefaultDbPath(path.join(__dirname, ".."));
   const adminUsername = process.env.ADMIN_EMAIL?.trim();
@@ -233,21 +236,23 @@ async function start() {
 
   if (missingVars.length > 0) {
     console.error(`❌ Missing required environment variables: ${missingVars.join(", ")}`);
-    console.error("   The server will start but auth endpoints will not work until these are set.");
+    console.error("   The server will start but auth/db endpoints will not work until these are set.");
   }
 
-  if (adminUsername && adminPassword) {
+  if (adminUsername && adminPassword && !missingVars.includes("JWT_SECRET")) {
     await initDb({ dbPath, adminUsername, adminPassword });
   } else {
-    console.warn("⚠️  Skipping database init: ADMIN_EMAIL or ADMIN_PASSWORD not set.");
+    console.warn("⚠️  Skipping database init: required env vars not set. Set them in the Railway dashboard and redeploy.");
   }
 
   initEmail();
   initCommunications();
   await initAI();
 
-  // Check inventory every hour
-  setInterval(checkInventoryAlerts, 60 * 60 * 1000);
+  // Check inventory every hour (only when DB is initialized)
+  if (adminUsername && adminPassword && !missingVars.includes("JWT_SECRET")) {
+    setInterval(checkInventoryAlerts, 60 * 60 * 1000);
+  }
 
   app.listen(PORT, () => {
     console.log(`\n🚀 Konvict Artz - Dex AI Backend running on port ${PORT}`);

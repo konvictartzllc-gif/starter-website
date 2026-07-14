@@ -10,7 +10,7 @@
     "numReplicas": 1,
     "startCommand": "node src/index.js",
     "healthcheckPath": "/health",
-    "healthcheckTimeout": 30,
+    "healthcheckTimeout": 15,
     "sleepApplication": false,
     "useLegacyStacker": false,
     "ipv6EgressEnabled": false,
