@@ -176,14 +176,19 @@ export async function sendAffiliateInvite(email, name, inviteCode, registerLink)
   );
 }
 
-export async function sendAdEmail(to, subject, ad) {
-  const safeSubject = subject || ad?.title || "Konvict Artz update";
-  const html = `
-    <div style="font-family:sans-serif;max-width:600px;margin:auto;">
-      <h2>${ad?.title || safeSubject}</h2>
-      <p>${ad?.content || ""}</p>
-      ${ad?.image ? `<img src="${ad.image}" alt="${ad.title || "Ad image"}" style="max-width:100%;height:auto;" />` : ""}
-    </div>
-  `;
-  return await send(to, safeSubject, html);
+export async function sendPasswordResetEmail(email, name, resetLink) {
+  return await send(
+    email,
+    "Reset Your Dex Password",
+    `<div style="font-family:sans-serif;max-width:600px;margin:auto;line-height:1.6;">
+      <h2>Hey ${name || "there"},</h2>
+      <p>We received a request to reset your <strong>Konvict Artz</strong> password.</p>
+      <p>Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
+      <p style="text-align:center;margin:28px 0;">
+        <a href="${resetLink}" style="background:#7c3aed;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;">Reset My Password</a>
+      </p>
+      <p style="color:#888;font-size:13px;">If you didn't request this, you can safely ignore this email. Your password will not change.</p>
+      <p style="color:#888;font-size:13px;">Or copy this link: <a href="${resetLink}">${resetLink}</a></p>
+    </div>`
+  );
 }

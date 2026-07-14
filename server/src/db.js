@@ -375,10 +375,49 @@
         ('learning_reminders', 1, 'Enable Dex daily learning reminder scheduling.')
       ON CONFLICT(key) DO NOTHING;
     `);
+    // ── Appointment Notifications ─────────────────────────────────────────────
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS appointment_notifications (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id         INTEGER NOT NULL REFERENCES users(id),
+        appointment_id  INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+        notify_at       TEXT NOT NULL,
+        channel         TEXT NOT NULL DEFAULT 'sms',
+        sent            INTEGER NOT NULL DEFAULT 0,
+        sent_at         TEXT,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(appointment_id, notify_at, channel)
+      );
+    `);
+    // ── Special Days ──────────────────────────────────────────────────────────
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS special_days (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL REFERENCES users(id),
+        title       TEXT NOT NULL,
+        date        TEXT NOT NULL,
+        kind        TEXT NOT NULL DEFAULT 'reminder',
+        recur_yearly INTEGER NOT NULL DEFAULT 0,
+        notes       TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    // ── Password Reset Tokens ─────────────────────────────────────────────────
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        token      TEXT    NOT NULL UNIQUE,
+        expires_at TEXT    NOT NULL,
+        used       INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
     // ── Seed admin user ─────────────────────────────────────────────────------
     const existing = await db.get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
     if (!existing) {
-      const hashed = await bcrypt.hash(adminPassword, 12);
+      const hashed = await bcrypt.hash(adminPassword, 10);
       await db.run(
         `INSERT INTO users (email, name, password, role, access_type)
          VALUES (?, ?, ?, 'admin', 'unlimited')`,

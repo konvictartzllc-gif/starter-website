@@ -15,7 +15,7 @@ function shouldUseSameOriginApi() {
 
 const BASE = shouldUseSameOriginApi()
   ? "/api"
-  : normalizeApiBase(import.meta.env.VITE_API_URL || "https://konvict-artz-api.konvictartzllc.workers.dev");
+  : normalizeApiBase(import.meta.env.VITE_API_URL || "https://konvict-artz-backend-production.up.railway.app");
 
 function getToken() {
   return localStorage.getItem("dex_token");
@@ -72,6 +72,8 @@ export const api = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   me: () => request("/auth/me"),
+  forgotPassword: (body) => request("/auth/forgot-password", { method: "POST", body: JSON.stringify(body) }),
+  resetPassword: (body) => request("/auth/reset-password", { method: "POST", body: JSON.stringify(body) }),
 
   // Dex
   chat: (message) => request("/dex/chat", { method: "POST", body: JSON.stringify({ message }) }),
@@ -79,6 +81,11 @@ export const api = {
   getHistory: () => request("/dex/history"),
   saveAppointment: (body) => request("/dex/appointment", { method: "POST", body: JSON.stringify(body) }),
   getAppointments: () => request("/dex/appointments"),
+  deleteAppointment: (id) => request(`/dex/appointment/${id}`, { method: "DELETE" }),
+  getSpecialDays: () => request("/dex/special-days"),
+  createSpecialDay: (body) => request("/dex/special-days", { method: "POST", body: JSON.stringify(body) }),
+  updateSpecialDay: (id, body) => request(`/dex/special-days/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteSpecialDay: (id) => request(`/dex/special-days/${id}`, { method: "DELETE" }),
   getLearningHistory: () => request("/dex/learning/history"),
   getDailyLesson: (body = {}) => request("/dex/learning/daily-lesson", { method: "POST", body: JSON.stringify(body) }),
   createLearningQuiz: (body = {}) => request("/dex/learning/quiz", { method: "POST", body: JSON.stringify(body) }),
@@ -108,6 +115,17 @@ export const api = {
 
   // Call Events
   getCallEvents: () => request("/dex/call-events"),
+
+  // Games
+  dexChessMove: (body) => request("/dex/games/chess/move", { method: "POST", body: JSON.stringify(body) }),
+  dexCheckersMove: (body) => request("/dex/games/checkers/move", { method: "POST", body: JSON.stringify(body) }),
+
+  // TTS
+  speakTts: (text) => fetch(`${BASE}/dex/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ text }),
+  }),
 
   // Permissions
   getPermissions: () => request("/dex/permissions"),

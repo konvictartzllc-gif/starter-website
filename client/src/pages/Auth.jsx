@@ -167,6 +167,11 @@ export function LoginPage() {
             className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
             required
           />
+          <div className="text-right">
+            <Link to="/forgot-password" className="text-xs text-gray-400 hover:text-brand">
+              Forgot password?
+            </Link>
+          </div>
           <button
             type="submit"
             disabled={loading}
@@ -177,6 +182,145 @@ export function LoginPage() {
         </form>
         <p className="text-center text-gray-500 text-sm mt-4">
           No account? <Link to="/register" className="text-brand hover:underline">Start free trial</Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const data = await api.forgotPassword({ email });
+      setMessage(data.message || "If that email is registered, a reset link has been sent.");
+    } catch (err) {
+      setError(err.error || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+      <div className="bg-gray-900 rounded-2xl p-8 w-full max-w-md border border-gray-700">
+        <h1 className="text-2xl font-bold text-white mb-1">Reset Your Password</h1>
+        <p className="text-gray-400 text-sm mb-6">
+          Enter your email and we will send you a reset link.
+        </p>
+        {message && <p className="text-green-300 text-sm mb-4 bg-green-900/20 rounded-lg px-3 py-2">{message}</p>}
+        {error && <p className="text-red-400 text-sm mb-4 bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
+        {!message && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input
+              type="email"
+              placeholder="Email Address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+              required
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50"
+            >
+              {loading ? "Sending..." : "Send Reset Link"}
+            </button>
+          </form>
+        )}
+        <p className="text-center text-gray-500 text-sm mt-4">
+          <Link to="/login" className="text-brand hover:underline">Back to Login</Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function ResetPasswordPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") || "";
+  const [form, setForm] = useState({ password: "", confirm: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (form.password !== form.confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await api.resetPassword({ token, password: form.password });
+      setSuccess(true);
+      setTimeout(() => navigate("/login"), 2500);
+    } catch (err) {
+      setError(err.error || "Could not reset password. The link may have expired.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <div className="bg-gray-900 rounded-2xl p-8 w-full max-w-md border border-gray-700 text-center">
+          <p className="text-red-400 text-sm">Invalid reset link. <Link to="/forgot-password" className="text-brand hover:underline">Request a new one</Link>.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+      <div className="bg-gray-900 rounded-2xl p-8 w-full max-w-md border border-gray-700">
+        <h1 className="text-2xl font-bold text-white mb-1">Set New Password</h1>
+        <p className="text-gray-400 text-sm mb-6">Choose a strong password (minimum 6 characters).</p>
+        {success && <p className="text-green-300 text-sm mb-4 bg-green-900/20 rounded-lg px-3 py-2">Password updated! Redirecting to login...</p>}
+        {error && <p className="text-red-400 text-sm mb-4 bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
+        {!success && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input
+              type="password"
+              placeholder="New Password (min 6 chars)"
+              value={form.password}
+              onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+              className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+              required
+              minLength={6}
+            />
+            <input
+              type="password"
+              placeholder="Confirm New Password"
+              value={form.confirm}
+              onChange={(e) => setForm((p) => ({ ...p, confirm: e.target.value }))}
+              className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-600 focus:border-brand text-sm"
+              required
+              minLength={6}
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-brand hover:bg-brand-light text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50"
+            >
+              {loading ? "Updating..." : "Update Password"}
+            </button>
+          </form>
+        )}
+        <p className="text-center text-gray-500 text-sm mt-4">
+          <Link to="/login" className="text-brand hover:underline">Back to Login</Link>
         </p>
       </div>
     </div>

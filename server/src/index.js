@@ -9,6 +9,7 @@ import { initDb } from "./db.js";
 import { getEmailStatus, initEmail } from "./services/email.js";
 import { getCommunicationsStatus, initCommunications } from "./services/communications.js";
 import { getAIStatus, initAI } from "./services/ai.js";
+import { startNotificationScheduler } from "./services/notificationScheduler.js";
 import authRoutes from "./routes/auth.js";
 import dexRoutes from "./routes/dex.js";
 import paymentsRoutes from "./routes/payments.js";
@@ -221,28 +222,48 @@ async function checkInventoryAlerts() {
 
 // ── Start server ──────────────────────────────────────────────────────────────
 async function start() {
-  requireJwtSecret();
+  const missingVars = [];
+  try { requireJwtSecret(); } catch (err) {
+    console.error("JWT_SECRET error:", err?.message || err);
+    missingVars.push("JWT_SECRET");
+  }
+
   const dbPath = getDefaultDbPath(path.join(__dirname, ".."));
   const adminUsername = process.env.ADMIN_EMAIL?.trim();
   const adminPassword = process.env.ADMIN_PASSWORD?.trim();
 
-  if (!adminUsername || !adminPassword) {
-    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be configured before Dex can start.");
+  if (!adminUsername) missingVars.push("ADMIN_EMAIL");
+  if (!adminPassword) missingVars.push("ADMIN_PASSWORD");
+
+  if (missingVars.length > 0) {
+    console.error(`❌ Missing required environment variables: ${missingVars.join(", ")}`);
+    console.error("   The server will start but auth/db endpoints will not work until these are set.");
   }
 
-  await initDb({ dbPath, adminUsername, adminPassword });
+  if (adminUsername && adminPassword && !missingVars.includes("JWT_SECRET")) {
+    await initDb({ dbPath, adminUsername, adminPassword });
+  } else {
+    console.warn("⚠️  Skipping database init: required env vars not set. Set them in the Railway dashboard and redeploy.");
+  }
+
   initEmail();
   initCommunications();
   await initAI();
 
-  // Check inventory every hour
-  setInterval(checkInventoryAlerts, 60 * 60 * 1000);
+  // Check inventory every hour (only when DB is initialized)
+  if (adminUsername && adminPassword && !missingVars.includes("JWT_SECRET")) {
+    setInterval(checkInventoryAlerts, 60 * 60 * 1000);
+    startNotificationScheduler();
+  }
 
   app.listen(PORT, () => {
     console.log(`\n🚀 Konvict Artz - Dex AI Backend running on port ${PORT}`);
-    console.log(`   Admin login: ${adminUsername}`);
+    if (adminUsername) console.log(`   Admin login: ${adminUsername}`);
     console.log(`   Health: http://localhost:${PORT}/health`);
     console.log(`   Provider status: AI=${getAIStatus().reason}, Email=${getEmailStatus().reason}, Communications=${getCommunicationsStatus().reason}\n`);
+    if (missingVars.length > 0) {
+      console.warn(`   ⚠️  Missing env vars (set in Railway dashboard): ${missingVars.join(", ")}`);
+    }
   });
 }
 

@@ -357,6 +357,16 @@ export default function Preferences() {
               onChange={(e) => setPreferences((prev) => ({ ...prev, daily_briefing_time: e.target.value }))}
             />
           </label>
+          <label>
+            <div>SMS Notification Number</div>
+            <input
+              type="tel"
+              placeholder="+12055550123"
+              value={preferences.notification_phone || ""}
+              onChange={(e) => setPreferences((prev) => ({ ...prev, notification_phone: e.target.value }))}
+            />
+            <small style={{ color: "#888" }}>Dex will text reminders to this number</small>
+          </label>
         </div>
         <label style={{ display: "block", marginBottom: 12 }}>
           <input
@@ -373,6 +383,7 @@ export default function Preferences() {
             await savePreference("conversation_tone", preferences.conversation_tone || "", "Briefing preferences updated!");
             await savePreference("daily_briefing_enabled", preferences.daily_briefing_enabled || "0", "Briefing preferences updated!");
             await savePreference("daily_briefing_time", preferences.daily_briefing_time || "", "Briefing preferences updated!");
+            await savePreference("notification_phone", preferences.notification_phone || "", "Notification phone saved!");
           }}
         >
           {saving ? "Saving..." : "Save Briefing Preferences"}

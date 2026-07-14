@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../utils/api.js";
 import { useDexVoice } from "../hooks/useDexVoice.js";
 import { useAuth } from "../hooks/useAuth.jsx";
@@ -303,6 +303,7 @@ function openReturnedAction(action) {
 
 export default function DexChat() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: "assistant", content: "Hey! I'm Dex, your Konvict Artz assistant. What can I help you with today?" },
@@ -544,6 +545,11 @@ export default function DexChat() {
     setShopOpen(true);
     setOpen(true);
     loadShop();
+  }
+
+  function openBoardGames() {
+    setOpen(false);
+    navigate("/games");
   }
 
   function submitGameAnswer(e) {
@@ -853,7 +859,7 @@ export default function DexChat() {
             </button>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 border-b border-gray-800 px-3 py-2 sm:flex">
+          <div className="grid grid-cols-5 gap-2 border-b border-gray-800 px-3 py-2 sm:flex">
             <button
               type="button"
               onClick={openDexTextPanel}
@@ -875,6 +881,13 @@ export default function DexChat() {
               className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
             >
               Games
+            </button>
+            <button
+              type="button"
+              onClick={openBoardGames}
+              className="rounded-md border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-100 hover:border-brand"
+            >
+              Board Games
             </button>
             <button
               type="button"

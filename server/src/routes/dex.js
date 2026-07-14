@@ -18,6 +18,7 @@ import { getToneInstruction, styleResponse } from "../services/responseStyler.js
 import { buildSupportReply, detectSafetySignal } from "../services/safetySignals.js";
 import { dexIntentEngine } from "../services/dexIntentEngine.js";
 import { getPublicApiBaseUrl } from "../deploy.js";
+import { scheduleAppointmentNotifications } from "../services/notificationScheduler.js";
 const router = Router();
 
 const CHAT_MEMORY_RETENTION_DAYS = 3;
@@ -192,6 +193,7 @@ const FREE_SETTING_KEYS = new Set([
         "learning_subject",
         "daily_briefing_enabled",
         "daily_briefing_time",
+        "notification_phone",
         "comfort_style",
         "grounding_preference",
         "safety_follow_up_opt_in",
@@ -409,7 +411,47 @@ function getLearningDefaults(preferences = {}, body = {}) {
                 focus: body.focus || preferences.learning_focus || "conversation",
                 style: body.style || preferences.learning_style || "gentle",
                 topic: body.topic || preferences.learning_subject || preferences.learning_focus || "daily conversation",
+                lessonType: body.lessonType || null,
         };
+}
+
+const LESSON_TYPE_POOL = [
+        "conversation",
+        "grammar",
+        "culture",
+        "pronunciation",
+        "storytelling",
+        "dialogue",
+        "vocabulary",
+        "slang",
+];
+
+function pickLessonType(lessonType, recentLessonTypes = []) {
+        if (lessonType) return lessonType;
+        const available = LESSON_TYPE_POOL.filter((t) => !recentLessonTypes.slice(0, 3).includes(t));
+        const pool = available.length > 0 ? available : LESSON_TYPE_POOL;
+        return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function buildLessonPrompt(learning, lessonType) {
+        const typeInstructions = {
+                conversation: `Write a conversational lesson. Focus on common phrases used in real everyday exchanges. Include a realistic back-and-forth dialogue snippet and a practice prompt where the learner responds to a question.`,
+                grammar: `Write a grammar-focused lesson. Explain one grammar rule clearly, show the pattern, give contrasting examples (right vs wrong), and end with a fill-in practice sentence.`,
+                culture: `Write a culture lesson. Share an interesting cultural fact, tradition, or social custom tied to the language. Connect vocabulary or phrases to cultural context. Make it feel like a story.`,
+                pronunciation: `Write a pronunciation lesson. Focus on 2-3 tricky sounds. Use sound-it-out phonetics in parentheses after every word (e.g. hola = oh-lah). Include a tongue exercise or rhythm tip.`,
+                storytelling: `Write a mini-story lesson (4-6 sentences) told entirely in ${learning.language} with an interlinear English translation below each sentence. Choose a fun, relatable scenario.`,
+                dialogue: `Write a lesson built around a realistic two-person dialogue (at least 6 lines). Label speakers A and B. Add vocabulary notes below and a role-play challenge at the end.`,
+                vocabulary: `Write a vocabulary-themed lesson. Teach 6-8 related words grouped by theme. For each word give pronunciation, part of speech, and one example sentence.`,
+                slang: `Write a lesson on everyday slang, idioms, or colloquial expressions for ${learning.language}. Explain what each phrase literally means versus what it actually means in conversation.`,
+        };
+        const typeGuide = typeInstructions[lessonType] || typeInstructions.conversation;
+        return (
+                `Create a ${learning.language} lesson for a ${learning.level} learner. ` +
+                `Lesson type: ${lessonType}. Focus area: ${learning.focus}. Topic: ${learning.topic}. Teaching style: ${learning.style}. ` +
+                typeGuide +
+                ` For any pronunciation guides, always write phonetics in parentheses after the word — never spell letter by letter. ` +
+                `Return a short punchy title on the first line, then the lesson body. Keep the whole response under 600 words.`
+        );
 }
 
 function extractJsonObject(text = "") {
@@ -617,8 +659,21 @@ async function buildMorningBriefing(db, userId) {
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(now);
         endOfDay.setHours(23, 59, 59, 999);
+        const todayKey = now.toISOString().slice(0, 10);
+        const monthDay = todayKey.slice(5);
 
-        const [appointments, tasks, callEvents, aliases, preferences, lessons, quizAttempts] = await Promise.all([
+        // Ensure special_days table exists (best-effort — may not exist on first run)
+        try {
+                await db.run(`CREATE TABLE IF NOT EXISTS special_days (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                        title TEXT NOT NULL, date TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'reminder',
+                        recur_yearly INTEGER NOT NULL DEFAULT 0, notes TEXT,
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )`);
+        } catch {}
+
+        const [appointments, tasks, callEvents, aliases, preferences, lessons, quizAttempts, specialDays] = await Promise.all([
                 db.all(
                         `SELECT * FROM appointments
                           WHERE user_id = ?
@@ -672,6 +727,13 @@ async function buildMorningBriefing(db, userId) {
                           LIMIT 8`,
                         [userId]
                 ),
+                db.all(
+                        `SELECT * FROM special_days
+                          WHERE user_id = ?
+                            AND (date = ? OR (recur_yearly = 1 AND substr(date,6) = ?))
+                          ORDER BY date ASC`,
+                        [userId, todayKey, monthDay]
+                ).catch(() => []),
         ]);
 
         const nextLesson = buildWeakAreaRecommendation(quizAttempts, preferences);
@@ -691,7 +753,15 @@ async function buildMorningBriefing(db, userId) {
                 kind: task.kind,
         }));
 
-        const highlights = [];
+	const highlights = [];
+	if (specialDays.length) {
+		for (const sd of specialDays) {
+			const kindLabel = sd.kind === "birthday" ? "🎂 Birthday" :
+				sd.kind === "anniversary" ? "💍 Anniversary" :
+				sd.kind === "holiday" ? "🎉 Holiday" : "📌 Reminder";
+			highlights.push(`${kindLabel}: ${sd.title} is today!`);
+		}
+	}
         if (agenda.length) {
                 highlights.push(`You have ${agenda.length} calendar item${agenda.length === 1 ? "" : "s"} today.`);
         }
@@ -717,6 +787,7 @@ async function buildMorningBriefing(db, userId) {
                 aliases,
                 nextLesson,
                 followUps,
+                specialDays,
                 tone: preferences.conversation_tone || "balanced",
                 latestLesson: lessons[0] || null,
         };
@@ -1433,6 +1504,12 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
                 }
         }
 
+        const recentLessonTypes = await db.all(
+                `SELECT lesson_type FROM learning_lessons WHERE user_id = ? ORDER BY created_at DESC LIMIT 5`,
+                [req.user.id]
+        );
+        const chosenLessonType = pickLessonType(learning.lessonType, recentLessonTypes.map((l) => l.lesson_type));
+
         try {
                 const openai = getOpenAI();
                 const completion = await openai.chat.completions.create({
@@ -1440,18 +1517,15 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
                         messages: [
                                 {
                                         role: "system",
-                                        content: "You create short daily lessons for an AI tutor. Keep them practical, encouraging, and easy to follow.",
+                                        content: "You are Dex, a warm and encouraging language tutor. Write lessons that feel personal, practical, and fun — like a real tutor talking to a student, not a textbook.",
                                 },
                                 {
                                         role: "user",
-                                        content:
-                                                `Create a daily ${learning.language} lesson for a ${learning.level} learner focused on ${learning.focus}. ` +
-                                                `Teaching style: ${learning.style}. Topic: ${learning.topic}. ` +
-                                                "Return a short title on the first line, then a concise lesson with: vocabulary, pronunciation help, two example sentences, and a mini practice prompt. For pronunciation, put sound-it-out phonetics in parentheses after the word, like hola (oh lah); do not spell words letter by letter.",
+                                        content: buildLessonPrompt(learning, chosenLessonType),
                                 },
                         ],
-                        max_tokens: 700,
-                        temperature: 0.8,
+                        max_tokens: 750,
+                        temperature: 0.85,
                 });
 
                 const raw = completion.choices[0].message.content.trim();
@@ -1461,8 +1535,8 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
 
                 const result = await db.run(
                         `INSERT INTO learning_lessons (user_id, topic, language, level, lesson_type, title, content)
-                         VALUES (?, ?, ?, ?, 'daily', ?, ?)`,
-                        [req.user.id, learning.topic, learning.language, learning.level, title, content]
+                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        [req.user.id, learning.topic, learning.language, learning.level, chosenLessonType, title, content]
                 );
 
                 return res.json({
@@ -1471,7 +1545,7 @@ router.post("/learning/daily-lesson", requireUser, async (req, res) => {
                                 topic: learning.topic,
                                 language: learning.language,
                                 level: learning.level,
-                                lesson_type: "daily",
+                                lesson_type: chosenLessonType,
                                 title,
                                 content,
                         },
@@ -1798,7 +1872,15 @@ async function saveLearnedWorkflow(db, userId, workflow) {
         return { id, ...JSON.parse(value) };
 }
 
-const DEX_SYSTEM_PROMPT = `You are Dex, a friendly and empathetic AI assistant for Konvict Artz. You help users with scheduling, questions, general support, and teaching. Be warm, concise, and helpful.
+const DEX_SYSTEM_PROMPT = `You are Dex, a real personal AI assistant for Konvict Artz. You are warm, conversational, and proactive — you take action and confirm, rather than just asking if the user wants you to act.
+
+Core assistant behaviors:
+- When the user asks you to schedule something, book an appointment, or add an event, tell them you have added it to their calendar and confirm the title and time in your reply. Do not ask permission to save it — just save it and report back.
+- When the user asks you to remind them of something, tell them you have created the reminder and will follow up. Confirm what you saved.
+- When the user asks you to draft a text or email to someone, write the full draft and show it to them for approval. Ask "Want me to send this?" at the end of the draft.
+- When an incoming call is announced, state the caller's name clearly and ask "Would you like to accept or decline?"
+- Always respond naturally and conversationally, as a real personal assistant would — not as a chatbot listing bullet points.
+- Keep responses concise but complete. Never ignore an action request — either do it or explain why you cannot.
 
 Device and web access:
 - Do not claim unlimited access. Be honest about permissions, device security, app store rules, browser limits, and third-party service limits.
@@ -2171,44 +2253,87 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 }
                         }
 
-                        // â”€â”€ PROACTIVE AUTOMATION (with user consent) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€--
-                        // Only perform if user enabled automation
+                        // ── PROACTIVE AUTOMATION ──────────────────────────────────────────────────
+                        const MAX_APPT_TITLE_LENGTH = 80;
                         let automationPerformed = false;
-                        // Check user preferences for enabled automations
-                        let enabledAutomations = {};
-                        try {
-                                const enabledRows = await db.all("SELECT key, value FROM user_memory WHERE user_id = ? AND key LIKE 'automation_enabled_%'", [userId]);
-                                for (const row of enabledRows) {
-                                        if (row.value === "1") {
-                                                const k = row.key.replace("automation_enabled_", "");
-                                                enabledAutomations[k] = true;
-                                        }
-                                }
-                        } catch {}
+                        let communicationDraft = null;
 
-                        // Schedule automation
+                        // Schedule: always save the appointment, then confirm in reply
                         const appointmentIntent = matchedIntent === "schedule";
-                        if (appointmentIntent && enabledAutomations["schedule"]) {
+                        if (appointmentIntent) {
                                 try {
                                         const startTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-                                        await createEvent({
-                                                title: `Konvict Artz: ${message.substring(0, 30)}...`,
-                                                description: `Dex AI Appointment: ${message}`,
-                                                startTime,
-                                                endTime: new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(),
-                                        });
+                                        const apptTitle = `Konvict Artz: ${message.slice(0, MAX_APPT_TITLE_LENGTH - 14)}`;
+                                        const result = await db.run(
+                                                `INSERT INTO appointments (user_id, title, description, start_time)
+                                                 VALUES (?, ?, ?, ?)`,
+                                                [userId, apptTitle, `Scheduled via Dex: "${message.slice(0, 500)}"`, startTime]
+                                        );
+                                        try {
+                                                await createEvent({
+                                                        title: `Konvict Artz: ${apptTitle}`,
+                                                        description: `Dex AI Appointment: ${message}`,
+                                                        startTime,
+                                                        endTime: new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(),
+                                                });
+                                        } catch {}
+                                        try {
+                                                await scheduleAppointmentNotifications(db, userId, { id: result.lastID, start_time: startTime });
+                                        } catch {}
                                         automationPerformed = true;
                                 } catch (e) {
-                                        console.error("Auto-calendar sync failed:", e.message);
+                                        console.error("Auto-calendar save failed:", e.message);
                                 }
                         }
-                        // Remind automation (stub)
-                        if (matchedIntent === "remind" && enabledAutomations["remind"]) {
-                                // Future: integrate with reminders/notifications
-                                automationPerformed = true;
+
+                        // Remind: always create a task item, then confirm in reply
+                        if (matchedIntent === "remind") {
+                                try {
+                                        await ensureTaskItemsTable(db);
+                                        await db.run(
+                                                `INSERT INTO task_items (user_id, title, details, kind, source)
+                                                 VALUES (?, ?, ?, 'reminder', 'dex_chat')`,
+                                                [userId, message.slice(0, 200), `Captured from chat: "${message.slice(0, 500)}"`]
+                                        );
+                                        automationPerformed = true;
+                                } catch (e) {
+                                        console.error("Auto-reminder task creation failed:", e.message);
+                                }
                         }
+
+                        // Communication: draft text/email to communication_drafts and return draft in reply
+                        if (matchedIntent === "communicate" || matchedIntent === "send") {
+                                try {
+                                        await ensureCommunicationDraftsTable(db);
+                                        // Parse "text/email/message [to] <name> [saying/about/that/: <body>]"
+                                        // Collapse whitespace first so split markers are predictable (no \s+ ReDoS risk)
+                                        const channel = /\bemail\b/i.test(message) ? "email" : "sms";
+                                        const normalized = message.replace(/\s+/g, " ").trim();
+                                        const withoutVerb = normalized.replace(/^ *(?:text|message|email) +(?:to +)?/i, "");
+                                        // Split on a single space followed by a keyword then a single space
+                                        const COMM_SPLIT_RE = / (?:saying|about|that) | *: */i;
+                                        const parts = withoutVerb.split(COMM_SPLIT_RE);
+                                        const targetName = (parts[0] || "").trim().slice(0, 200) || "contact";
+                                        const bodyText = parts.length > 1 ? parts.slice(1).join(" ").trim() : normalized;
+                                        const result = await db.run(
+                                                `INSERT INTO communication_drafts (user_id, channel, target_name, target_value, body, source)
+                                                 VALUES (?, ?, ?, ?, ?, 'dex_chat')`,
+                                                [userId, channel, targetName, targetName, bodyText.slice(0, 2000)]
+                                        );
+                                        communicationDraft = {
+                                                id: result.lastID,
+                                                channel,
+                                                targetName,
+                                                body: bodyText.slice(0, 2000),
+                                        };
+                                        automationPerformed = true;
+                                } catch (e) {
+                                        console.error("Auto-communication draft failed:", e.message);
+                                }
+                        }
+
                         // Call automation (stub)
-                        if (matchedIntent === "call" && enabledAutomations["call"]) {
+                        if (matchedIntent === "call") {
                                 // Future: integrate with Android call trigger
                                 automationPerformed = true;
                         }
@@ -2217,6 +2342,7 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 reply,
                                 appointmentIntent,
                                 automationPerformed,
+                                communicationDraft,
                                 tone: styledReply.meta?.detectedTone || detectedTone || "neutral",
                                 toneStyle: styledReply.meta?.appliedStyle || "neutral",
                                 dexBrain,
@@ -2323,7 +2449,39 @@ router.post("/appointment", requireUser, [
                 }
         }
 
+        // Auto-schedule reminders for the new appointment
+        try {
+        	await scheduleAppointmentNotifications(db, req.user.id, { id: result.lastID, start_time });
+        } catch (err) {
+        	console.warn("[Appointment] Could not schedule notifications:", err.message);
+        }
+
         return res.json({ success: true, id: result.lastID, title, start_time });
+});
+
+// Schedule reminders for an existing appointment by ID
+router.post("/appointment/:id/notify", requireUser, async (req, res) => {
+        const db = getDb();
+        const appt = await db.get(
+        	"SELECT * FROM appointments WHERE id = ? AND user_id = ?",
+        	[req.params.id, req.user.id]
+        );
+        if (!appt) return res.status(404).json({ error: "Appointment not found." });
+        await scheduleAppointmentNotifications(db, req.user.id, appt);
+        res.json({ success: true, message: "Reminders scheduled." });
+});
+
+// Delete an appointment
+router.delete("/appointment/:id", requireUser, async (req, res) => {
+        const db = getDb();
+        const appt = await db.get(
+        	"SELECT id FROM appointments WHERE id = ? AND user_id = ?",
+        	[req.params.id, req.user.id]
+        );
+        if (!appt) return res.status(404).json({ error: "Appointment not found." });
+        await db.run("DELETE FROM appointments WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+        await db.run("DELETE FROM appointment_notifications WHERE appointment_id = ?", [appt.id]);
+        res.json({ success: true });
 });
 
 router.get("/appointments", requireUser, async (req, res) => {
@@ -2335,6 +2493,96 @@ router.get("/appointments", requireUser, async (req, res) => {
     return res.json(appts);
 });
 
+// ── SPECIAL DAYS ─────────────────────────────────────────────────────────────
+// Birthdays, anniversaries, holidays, and any marked calendar day
+
+async function ensureSpecialDaysTable(db) {
+        await db.run(`
+        	CREATE TABLE IF NOT EXISTS special_days (
+        		id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        		user_id      INTEGER NOT NULL,
+        		title        TEXT NOT NULL,
+        		date         TEXT NOT NULL,
+        		kind         TEXT NOT NULL DEFAULT 'reminder',
+        		recur_yearly INTEGER NOT NULL DEFAULT 0,
+        		notes        TEXT,
+        		created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        		updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+        	)
+        `);
+}
+
+router.get("/special-days", requireUser, async (req, res) => {
+        const db = getDb();
+        await ensureSpecialDaysTable(db);
+        const rows = await db.all(
+        	"SELECT * FROM special_days WHERE user_id = ? ORDER BY date ASC",
+        	[req.user.id]
+        );
+        res.json({ specialDays: rows });
+});
+
+router.post("/special-days", requireUser, [
+        body("title").notEmpty().trim(),
+        body("date").notEmpty(),
+        body("kind").optional().isIn(["birthday", "anniversary", "holiday", "reminder"]),
+], async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+        const db = getDb();
+        await ensureSpecialDaysTable(db);
+        const { title, date, kind, recur_yearly, notes } = req.body;
+        const result = await db.run(
+        	`INSERT INTO special_days (user_id, title, date, kind, recur_yearly, notes)
+        	 VALUES (?, ?, ?, ?, ?, ?)`,
+        	[
+        		req.user.id,
+        		title.trim(),
+        		date,
+        		kind || "reminder",
+        		recur_yearly ? 1 : 0,
+        		notes || null,
+        	]
+        );
+        const saved = await db.get("SELECT * FROM special_days WHERE id = ?", [result.lastID]);
+        res.json({ success: true, specialDay: saved });
+});
+
+router.patch("/special-days/:id", requireUser, async (req, res) => {
+        const db = getDb();
+        await ensureSpecialDaysTable(db);
+        const current = await db.get(
+        	"SELECT * FROM special_days WHERE id = ? AND user_id = ?",
+        	[req.params.id, req.user.id]
+        );
+        if (!current) return res.status(404).json({ error: "Special day not found." });
+        const title = req.body.title !== undefined ? String(req.body.title).trim() : current.title;
+        const date = req.body.date !== undefined ? req.body.date : current.date;
+        const kind = req.body.kind !== undefined ? req.body.kind : current.kind;
+        const recurYearly = req.body.recur_yearly !== undefined ? (req.body.recur_yearly ? 1 : 0) : current.recur_yearly;
+        const notes = req.body.notes !== undefined ? req.body.notes : current.notes;
+        await db.run(
+        	`UPDATE special_days
+        	    SET title = ?, date = ?, kind = ?, recur_yearly = ?, notes = ?, updated_at = datetime('now')
+        	  WHERE id = ? AND user_id = ?`,
+        	[title, date, kind, recurYearly, notes, req.params.id, req.user.id]
+        );
+        const updated = await db.get("SELECT * FROM special_days WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+        res.json({ success: true, specialDay: updated });
+});
+
+router.delete("/special-days/:id", requireUser, async (req, res) => {
+        const db = getDb();
+        await ensureSpecialDaysTable(db);
+        const row = await db.get(
+        	"SELECT id FROM special_days WHERE id = ? AND user_id = ?",
+        	[req.params.id, req.user.id]
+        );
+        if (!row) return res.status(404).json({ error: "Special day not found." });
+        await db.run("DELETE FROM special_days WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+        res.json({ success: true });
+});
+
 router.get("/history", requireUser, async (req, res) => {
     const db = getDb();
     const history = await db.all(
@@ -2342,6 +2590,125 @@ router.get("/history", requireUser, async (req, res) => {
           [req.user.id]
         );
     return res.json(history);
+});
+
+// POST /api/dex/games/chess/move
+router.post("/games/chess/move", requireUser, async (req, res) => {
+        const user = await getUserRecord(req.user.id);
+        if (!userHasDexAccess(user)) {
+                return res.status(403).json({ error: "no_access", message: "Start your free 3-day trial to play games with Dex." });
+        }
+
+        const { board, history: moveHistory = [] } = req.body || {};
+        if (!board) return res.status(400).json({ error: "board state required" });
+
+        try {
+                const openai = getOpenAI();
+                const boardStr = Array.isArray(board)
+                        ? board.map((row, r) => row.map((cell, c) => cell ? `${cell}@${String.fromCharCode(97+c)}${8-r}` : ".").join(" ")).join("\n")
+                        : String(board);
+                const historyStr = moveHistory.slice(-10).join(", ") || "none";
+
+                const completion = await openai.chat.completions.create({
+                        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+                        messages: [
+                                {
+                                        role: "system",
+                                        content: "You are Dex, a chess-playing AI. You play as Black pieces. Given the current board state and move history, respond with exactly one legal chess move in algebraic notation (e.g. e5, Nf6, O-O). Respond with only the move notation and a brief one-sentence comment.",
+                                },
+                                {
+                                        role: "user",
+                                        content: `Board (rows 8 to 1, columns a-h):\n${boardStr}\n\nMove history: ${historyStr}\n\nPick your best move as Black. Reply: <move> | <short comment>`,
+                                },
+                        ],
+                        max_tokens: 60,
+                        temperature: 0.4,
+                });
+
+                const raw = completion.choices[0].message.content.trim();
+                const [move, ...commentParts] = raw.split("|");
+                return res.json({
+                        move: move.trim(),
+                        comment: commentParts.join("|").trim() || "Your move.",
+                });
+        } catch (err) {
+                console.error("Chess move error:", err.message);
+                return res.status(500).json({ error: "Dex could not pick a chess move right now." });
+        }
+});
+
+// POST /api/dex/games/checkers/move
+router.post("/games/checkers/move", requireUser, async (req, res) => {
+        const user = await getUserRecord(req.user.id);
+        if (!userHasDexAccess(user)) {
+                return res.status(403).json({ error: "no_access", message: "Start your free 3-day trial to play games with Dex." });
+        }
+
+        const { board, history: moveHistory = [] } = req.body || {};
+        if (!board) return res.status(400).json({ error: "board state required" });
+
+        try {
+                const openai = getOpenAI();
+                const boardStr = Array.isArray(board)
+                        ? board.map((row, r) => row.map((cell, c) => cell || ".").join(" ")).join("\n")
+                        : String(board);
+                const historyStr = moveHistory.slice(-6).join(", ") || "none";
+
+                const completion = await openai.chat.completions.create({
+                        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+                        messages: [
+                                {
+                                        role: "system",
+                                        content: "You are Dex, a checkers-playing AI. You play as the dark pieces (marked 'd' or 'D' for kings). Given the 8x8 board and move history, respond with exactly one legal checkers move as 'fromRow,fromCol->toRow,toCol'. Multiple jumps use 'fromRow,fromCol->midRow,midCol->toRow,toCol'. Respond with only the move and a brief one-sentence comment.",
+                                },
+                                {
+                                        role: "user",
+                                        content: `Board (row 0 = top):\n${boardStr}\n\nMove history: ${historyStr}\n\nPick your best move as dark pieces. Reply: <move> | <short comment>`,
+                                },
+                        ],
+                        max_tokens: 60,
+                        temperature: 0.4,
+                });
+
+                const raw = completion.choices[0].message.content.trim();
+                const [move, ...commentParts] = raw.split("|");
+                return res.json({
+                        move: move.trim(),
+                        comment: commentParts.join("|").trim() || "Your move.",
+                });
+        } catch (err) {
+                console.error("Checkers move error:", err.message);
+                return res.status(500).json({ error: "Dex could not pick a checkers move right now." });
+        }
+});
+
+// POST /api/dex/tts — OpenAI text-to-speech (streams MP3 back to the client)
+const MAX_TTS_INPUT_LENGTH = 4096; // OpenAI TTS input character limit
+router.post("/tts", requireUser, [body("text").notEmpty().trim()], async (req, res) => {
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+	const text = String(req.body.text || "").trim().slice(0, MAX_TTS_INPUT_LENGTH);
+	if (!text) return res.status(400).json({ error: "text required" });
+
+	try {
+		const openai = getOpenAI();
+		const mp3 = await openai.audio.speech.create({
+			model: "tts-1",
+			voice: "nova",
+			input: text,
+		});
+		const buffer = Buffer.from(await mp3.arrayBuffer());
+		res.set({
+			"Content-Type": "audio/mpeg",
+			"Content-Length": buffer.length,
+			"Cache-Control": "no-store",
+		});
+		return res.send(buffer);
+	} catch (err) {
+		console.error("TTS error:", err.message);
+		return res.status(503).json({ error: "tts_unavailable", message: "Text-to-speech is temporarily unavailable." });
+	}
 });
 
 export default router;
