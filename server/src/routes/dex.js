@@ -1872,7 +1872,15 @@ async function saveLearnedWorkflow(db, userId, workflow) {
         return { id, ...JSON.parse(value) };
 }
 
-const DEX_SYSTEM_PROMPT = `You are Dex, a friendly and empathetic AI assistant for Konvict Artz. You help users with scheduling, questions, general support, and teaching. Be warm, concise, and helpful.
+const DEX_SYSTEM_PROMPT = `You are Dex, a real personal AI assistant for Konvict Artz. You are warm, conversational, and proactive — you take action and confirm, rather than just asking if the user wants you to act.
+
+Core assistant behaviors:
+- When the user asks you to schedule something, book an appointment, or add an event, tell them you have added it to their calendar and confirm the title and time in your reply. Do not ask permission to save it — just save it and report back.
+- When the user asks you to remind them of something, tell them you have created the reminder and will follow up. Confirm what you saved.
+- When the user asks you to draft a text or email to someone, write the full draft and show it to them for approval. Ask "Want me to send this?" at the end of the draft.
+- When an incoming call is announced, state the caller's name clearly and ask "Would you like to accept or decline?"
+- Always respond naturally and conversationally, as a real personal assistant would — not as a chatbot listing bullet points.
+- Keep responses concise but complete. Never ignore an action request — either do it or explain why you cannot.
 
 Device and web access:
 - Do not claim unlimited access. Be honest about permissions, device security, app store rules, browser limits, and third-party service limits.
@@ -2245,61 +2253,96 @@ router.post("/chat", requireUser, spamFilter, [body("message").notEmpty().trim()
                                 }
                         }
 
-                        // â”€â”€ PROACTIVE AUTOMATION (with user consent) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€--
-                        // Only perform if user enabled automation
+                        // ── PROACTIVE AUTOMATION ──────────────────────────────────────────────────
+                        const MAX_APPT_TITLE_LENGTH = 80;
                         let automationPerformed = false;
-                        // Check user preferences for enabled automations
-                        let enabledAutomations = {};
-                        try {
-                                const enabledRows = await db.all("SELECT key, value FROM user_memory WHERE user_id = ? AND key LIKE 'automation_enabled_%'", [userId]);
-                                for (const row of enabledRows) {
-                                        if (row.value === "1") {
-                                                const k = row.key.replace("automation_enabled_", "");
-                                                enabledAutomations[k] = true;
-                                        }
-                                }
-                        } catch {}
+                        let communicationDraft = null;
 
-                        // Schedule automation
+                        // Schedule: always save the appointment, then confirm in reply
                         const appointmentIntent = matchedIntent === "schedule";
-                        if (appointmentIntent && enabledAutomations["schedule"]) {
+                        if (appointmentIntent) {
                                 try {
                                         const startTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-                                        await createEvent({
-                                                title: `Konvict Artz: ${message.substring(0, 30)}...`,
-                                                description: `Dex AI Appointment: ${message}`,
-                                                startTime,
-                                                endTime: new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(),
-                                        });
+                                        const apptTitle = `Konvict Artz: ${message.slice(0, MAX_APPT_TITLE_LENGTH - 14)}`;
+                                        const result = await db.run(
+                                                `INSERT INTO appointments (user_id, title, description, start_time)
+                                                 VALUES (?, ?, ?, ?)`,
+                                                [userId, apptTitle, `Scheduled via Dex: "${message.slice(0, 500)}"`, startTime]
+                                        );
+                                        try {
+                                                await createEvent({
+                                                        title: `Konvict Artz: ${apptTitle}`,
+                                                        description: `Dex AI Appointment: ${message}`,
+                                                        startTime,
+                                                        endTime: new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(),
+                                                });
+                                        } catch {}
+                                        try {
+                                                await scheduleAppointmentNotifications(db, userId, { id: result.lastID, start_time: startTime });
+                                        } catch {}
                                         automationPerformed = true;
                                 } catch (e) {
-                                        console.error("Auto-calendar sync failed:", e.message);
+                                        console.error("Auto-calendar save failed:", e.message);
                                 }
-			}
-			// Remind automation — create a task_item so Dex tracks and delivers the reminder
-			if (matchedIntent === "remind" && enabledAutomations["remind"]) {
-				try {
-					await ensureTaskItemsTable(db);
-					await db.run(
-                        `INSERT INTO task_items (user_id, title, details, kind, source)
-                         VALUES (?, ?, ?, 'reminder', 'dex_chat')`,
-                        [req.user.id, message.slice(0, 200), `Captured from chat: "${message.slice(0, 500)}"`]
-					);
-					automationPerformed = true;
-				} catch (e) {
-					console.error("Auto-reminder task creation failed:", e.message);
-				}
-			}
-			// Call automation (stub)
-			if (matchedIntent === "call" && enabledAutomations["call"]) {
-				// Future: integrate with Android call trigger
-				automationPerformed = true;
-			}
+                        }
+
+                        // Remind: always create a task item, then confirm in reply
+                        if (matchedIntent === "remind") {
+                                try {
+                                        await ensureTaskItemsTable(db);
+                                        await db.run(
+                                                `INSERT INTO task_items (user_id, title, details, kind, source)
+                                                 VALUES (?, ?, ?, 'reminder', 'dex_chat')`,
+                                                [userId, message.slice(0, 200), `Captured from chat: "${message.slice(0, 500)}"`]
+                                        );
+                                        automationPerformed = true;
+                                } catch (e) {
+                                        console.error("Auto-reminder task creation failed:", e.message);
+                                }
+                        }
+
+                        // Communication: draft text/email to communication_drafts and return draft in reply
+                        if (matchedIntent === "communicate" || matchedIntent === "send") {
+                                try {
+                                        await ensureCommunicationDraftsTable(db);
+                                        // Parse "text/email/message [to] <name> [saying/about/that/: <body>]"
+                                        // Collapse whitespace first so split markers are predictable (no \s+ ReDoS risk)
+                                        const channel = /\bemail\b/i.test(message) ? "email" : "sms";
+                                        const normalized = message.replace(/\s+/g, " ").trim();
+                                        const withoutVerb = normalized.replace(/^ *(?:text|message|email) +(?:to +)?/i, "");
+                                        // Split on a single space followed by a keyword then a single space
+                                        const COMM_SPLIT_RE = / (?:saying|about|that) | *: */i;
+                                        const parts = withoutVerb.split(COMM_SPLIT_RE);
+                                        const targetName = (parts[0] || "").trim().slice(0, 200) || "contact";
+                                        const bodyText = parts.length > 1 ? parts.slice(1).join(" ").trim() : normalized;
+                                        const result = await db.run(
+                                                `INSERT INTO communication_drafts (user_id, channel, target_name, target_value, body, source)
+                                                 VALUES (?, ?, ?, ?, ?, 'dex_chat')`,
+                                                [userId, channel, targetName, targetName, bodyText.slice(0, 2000)]
+                                        );
+                                        communicationDraft = {
+                                                id: result.lastID,
+                                                channel,
+                                                targetName,
+                                                body: bodyText.slice(0, 2000),
+                                        };
+                                        automationPerformed = true;
+                                } catch (e) {
+                                        console.error("Auto-communication draft failed:", e.message);
+                                }
+                        }
+
+                        // Call automation (stub)
+                        if (matchedIntent === "call") {
+                                // Future: integrate with Android call trigger
+                                automationPerformed = true;
+                        }
 
                         return res.json({
                                 reply,
                                 appointmentIntent,
                                 automationPerformed,
+                                communicationDraft,
                                 tone: styledReply.meta?.detectedTone || detectedTone || "neutral",
                                 toneStyle: styledReply.meta?.appliedStyle || "neutral",
                                 dexBrain,
@@ -2637,6 +2680,35 @@ router.post("/games/checkers/move", requireUser, async (req, res) => {
                 console.error("Checkers move error:", err.message);
                 return res.status(500).json({ error: "Dex could not pick a checkers move right now." });
         }
+});
+
+// POST /api/dex/tts — OpenAI text-to-speech (streams MP3 back to the client)
+const MAX_TTS_INPUT_LENGTH = 4096; // OpenAI TTS input character limit
+router.post("/tts", requireUser, [body("text").notEmpty().trim()], async (req, res) => {
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+	const text = String(req.body.text || "").trim().slice(0, MAX_TTS_INPUT_LENGTH);
+	if (!text) return res.status(400).json({ error: "text required" });
+
+	try {
+		const openai = getOpenAI();
+		const mp3 = await openai.audio.speech.create({
+			model: "tts-1",
+			voice: "nova",
+			input: text,
+		});
+		const buffer = Buffer.from(await mp3.arrayBuffer());
+		res.set({
+			"Content-Type": "audio/mpeg",
+			"Content-Length": buffer.length,
+			"Cache-Control": "no-store",
+		});
+		return res.send(buffer);
+	} catch (err) {
+		console.error("TTS error:", err.message);
+		return res.status(503).json({ error: "tts_unavailable", message: "Text-to-speech is temporarily unavailable." });
+	}
 });
 
 export default router;

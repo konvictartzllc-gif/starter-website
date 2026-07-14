@@ -7,6 +7,7 @@ import AdminPortal from "./pages/AdminPortal.jsx";
 import AffiliateDashboard from "./pages/AffiliateDashboard.jsx";
 import Shop from "./pages/Shop.jsx";
 import DexChat from "./components/DexChat.jsx";
+import GamesHub from "./components/GamesHub.jsx";
 import Onboarding from "./components/Onboarding.jsx";
 import BannerAds from "./components/BannerAds.jsx";
 import PrivacyBanner from "./components/PrivacyBanner.jsx";
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/games" element={<GamesHub />} />
       </Routes>
       <PrivacyBanner />
       <BannerAds location="USA" />
